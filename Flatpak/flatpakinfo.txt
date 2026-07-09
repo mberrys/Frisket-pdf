@@ -1,9 +1,6 @@
-flatpak-builder --sandbox --force-clean  build-dir io.github.JakubMelka.Pdf4qt.json 
+flatpak-builder --sandbox --force-clean  build-dir io.github.mberrys.Frisket-pdf.json
 
 
-flatpak-builder --repo=repo --sandbox --force-clean  build-dir io.github.JakubMelka.Pdf4qt.json 
+flatpak-builder --repo=repo --sandbox --force-clean  build-dir io.github.mberrys.Frisket-pdf.json
 
-flatpak build-bundle repo io.github.JakubMelka.Pdf4qt.flatpak io.github.JakubMelka.Pdf4qt
-
-
-
+flatpak build-bundle repo io.github.mberrys.Frisket-pdf.flatpak io.github.mberrys.Frisket-pdf

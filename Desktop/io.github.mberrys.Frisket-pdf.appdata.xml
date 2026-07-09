@@ -1,27 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Copyright 2023-2025 Jakub Melka -->
+<!-- Copyright 2023-2025 Jakub Melka; Frisket-PDF fork branding 2026 Michael Berry -->
 <component type="desktop-application">
-  <id>io.github.JakubMelka.Pdf4qt</id>
+  <id>io.github.mberrys.Frisket-pdf</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <name>PDF4QT</name>
-  <summary>Open Source PDF Editor</summary>
+  <name>Frisket-PDF</name>
+  <summary>PDF editor and toolkit (PDF4QT fork)</summary>
   <description>
     <p>
-      Unleash the power of PDF4QT: Your go-to open source PDF editor. Beyond its capabilities in encryption, optimization, advanced annotations, editing, and signing, PDF4QT offers an extensive range of features to enhance your PDF experience. With intuitive PDF viewing/editing applications and a handy command-line tool, PDF4QT streamlines your PDF interactions. Discover its vast potential today.
+      Frisket-PDF is based on PDF4QT, an open source PDF editor and toolkit. It provides encryption, optimization, annotations, editing, signing, viewing applications, and the PdfTool command-line interface.
     </p>
   </description>
   <categories>
     <category>Office</category>
     <category>Utility</category>
   </categories>
-  <developer_name>Jakub Melka</developer_name>
-  <url type="homepage">https://jakubmelka.github.io/</url>
-  <url type="bugtracker">https://github.com/JakubMelka/PDF4QT/issues</url>
-  <url type="help">https://github.com/JakubMelka/PDF4QT/discussions</url>
-  <update_contact>Mgr.Jakub.Melka_AT_gmail.com</update_contact>
+  <developer_name>Michael Berry</developer_name>
+  <url type="homepage">https://github.com/mberrys/Frisket-pdf</url>
+  <url type="bugtracker">https://github.com/mberrys/Frisket-pdf/issues</url>
+  <url type="help">https://github.com/mberrys/Frisket-pdf</url>
   <content_rating type="oars-1.1"/>
-  <launchable type="desktop-id">io.github.JakubMelka.Pdf4qt.desktop</launchable>
+  <launchable type="desktop-id">io.github.mberrys.Frisket-pdf.desktop</launchable>
   <releases>
     <release version="1.6.0.0" date="2026-06-14">
       <description>

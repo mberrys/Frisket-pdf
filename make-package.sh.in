@@ -4,20 +4,20 @@ mkdir -p install/DEBIAN/
 file="install/DEBIAN/control"
 
 >$file
-echo "Package: PDF4QT" >>$file
+echo "Package: Frisket-pdf" >>$file
 echo "Version: ${PDF4QT_VERSION}" >>$file
 echo "Section: base" >>$file
 echo "Priority: optional" >>$file
 echo "Architecture: amd64" >>$file
-echo "Maintainer: Jakub Melka" >>$file
-echo "Description: Unleash the power of PDF4QT: Your go-to open source PDF editor powered by the Qt framework. With a robust C++ library, intuitive PDF viewing/editing applications, and a handy command-line tool, PDF4QT streamlines your PDF interactions. Try it today." >>$file
-echo "Homepage: https://jakubmelka.github.io/" >>$file
-echo "Vcs-Browser: https://github.com/JakubMelka/PDF4QT" >>$file
+echo "Maintainer: Michael Berry" >>$file
+echo "Description: Frisket-PDF: PDF editor and toolkit based on PDF4QT (Qt, C++)." >>$file
+echo "Homepage: https://github.com/mberrys/Frisket-pdf" >>$file
+echo "Vcs-Browser: https://github.com/mberrys/Frisket-pdf" >>$file
 
 
 dpkg-deb --build install
 
-mv install.deb PDF4QT-${PDF4QT_VERSION}.deb
+mv install.deb Frisket-pdf-${PDF4QT_VERSION}.deb
 
 
 
