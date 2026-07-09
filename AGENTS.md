@@ -115,5 +115,6 @@ Do not make Viewer the primary shell or add plugin hosting to PageMaster without
 
 ## Git & safety
 
+- Upstream tracking: see [docs/REPO_MAP.md](docs/REPO_MAP.md) for sync workflow, conflict handling, and fork-only files. Pull from upstream only when explicitly asked.
 - Do not commit, push, amend, or rewrite history unless the user explicitly asks.
 - Do not edit vendored or third-party trees (e.g. font bundles, vcpkg overlay ports) unless the task is specifically about those files.

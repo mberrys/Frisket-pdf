@@ -63,3 +63,8 @@ Several third-party libraries are used.
 7. zlib, [https://zlib.net/](https://zlib.net/)
 8. Blend2D, [https://blend2d.com/](https://blend2d.com/)
 
+8. Blend2D, [https://blend2d.com/](https://blend2d.com/)
+
+## 5. CONTRIBUTIONS
+
+Fork and upstream policy: see [docs/REPO_MAP.md](docs/REPO_MAP.md).
