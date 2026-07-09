@@ -43,6 +43,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QProcessEnvironment>
 
 namespace
 {
@@ -138,6 +139,11 @@ bool PreflightCorpusTest::resolveFixture(const QString& pdf, const QString& prof
 void PreflightCorpusTest::runPreflight(const QString& pdfPath, const QString& profilePath, QJsonObject& report, int& exitCode)
 {
     QProcess process;
+    // PdfTool constructs a QGuiApplication; force the offscreen platform so the
+    // child process can start on headless CI runners with no X display.
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
+    process.setProcessEnvironment(environment);
     process.start(QStringLiteral(PDFTOOL_EXECUTABLE_PATH),
                    { QStringLiteral("preflight"), pdfPath, QStringLiteral("--profile"), profilePath });
     QVERIFY2(process.waitForFinished(30000), "PdfTool preflight timed out");
