@@ -97,6 +97,7 @@ Process detail: [docs/PLANNING.md](docs/PLANNING.md).
 ## Editing hygiene
 
 - Preserve CRLF line endings when creating or editing source and text files.
+- Preflight contract: profile + report schemas live under `frisket-preflight/` (see that README). Do not invent alternate report shapes in the Qt plugin.
 - Match existing include order, naming, brace style, and file layout; do not reformat unrelated code or run mass clang-format.
 - Prefer minimal diffs: no drive-by cleanups, renames, header reshuffles, or “modernization” of untouched code.
 - Keep the MIT license header on new `.h` / `.cpp` files, matching neighboring files.

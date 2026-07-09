@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frisket.dev/schemas/preflight/report.schema.json",
+  "title": "Frisket Preflight Report",
+  "description": "Normalized JSON report written to stdout by frisket-preflight. The Qt plugin consumes this shape only — never backend-specific payloads.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pass", "profile", "errors", "warnings", "fixups_available"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Report contract version. Bump only with a coordinated engine + plugin release."
+    },
+    "pass": {
+      "type": "boolean",
+      "description": "True when errors[] is empty. Warnings alone do not fail the run."
+    },
+    "profile": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Profile name that produced this report (profile.name)."
+    },
+    "engine_version": {
+      "type": "string",
+      "description": "Optional frisket-preflight engine version string."
+    },
+    "pdf": {
+      "type": "string",
+      "description": "Optional path or basename of the checked PDF."
+    },
+    "errors": {
+      "type": "array",
+      "description": "Failing findings with severity error (or mapped to error).",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Non-failing findings.",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "fixups_available": {
+      "type": "array",
+      "description": "Fixups the engine believes apply to this document given the profile.",
+      "items": { "$ref": "#/$defs/fixup_available" }
+    }
+  },
+  "$defs": {
+    "bbox": {
+      "type": "array",
+      "description": "Axis-aligned box in PDF user space (points), page coordinates: [x0, y0, x1, y1] with x0 <= x1 and y0 <= y1. Origin is the page's media-box lower-left (PDF convention). Required on every finding so Phase 2 overlays can highlight without a second pass. For page-level issues, use the relevant page box (typically MediaBox or TrimBox).",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number" }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["page", "type", "severity", "message", "bbox"],
+      "properties": {
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based page index."
+        },
+        "object_id": {
+          "type": ["string", "null"],
+          "description": "Optional PDF object / resource identifier when known (stringified). Null or omit when not applicable."
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Machine-readable finding type (kebab-case), often matching a check id."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning", "info"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable description for the report panel."
+        },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "check_id": {
+          "type": "string",
+          "description": "Optional profile check id that produced this finding."
+        }
+      }
+    },
+    "fixup_available": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "safe", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "safe": {
+          "type": "boolean",
+          "description": "True only for fixups that do not change printed color/content in a material way. Most print fixups are safe: false."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
