@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "pass": false,
+  "profile": "Frisket Default",
+  "engine_version": "0.0.0-dev",
+  "pdf": "example-venue-poster.pdf",
+  "errors": [
+    {
+      "page": 1,
+      "object_id": "42",
+      "type": "font-missing",
+      "severity": "error",
+      "message": "Arial Bold not embedded",
+      "bbox": [100, 200, 300, 250],
+      "check_id": "embedded-fonts"
+    },
+    {
+      "page": 1,
+      "object_id": null,
+      "type": "bleed",
+      "severity": "error",
+      "message": "BleedBox is missing or less than 9 pt on one or more edges",
+      "bbox": [0, 0, 612, 792],
+      "check_id": "bleed"
+    }
+  ],
+  "warnings": [
+    {
+      "page": 1,
+      "object_id": "87",
+      "type": "image-resolution",
+      "severity": "warning",
+      "message": "Image effective DPI 180 is below min_dpi 300",
+      "bbox": [72, 400, 540, 720],
+      "check_id": "image-resolution"
+    }
+  ],
+  "fixups_available": [
+    {
+      "id": "rgb-to-cmyk",
+      "safe": false,
+      "description": "Convert all RGB colors to CMYK"
+    },
+    {
+      "id": "add-bleed",
+      "safe": false,
+      "description": "Extend page boxes / artwork to provide 9 pt bleed"
+    },
+    {
+      "id": "downsample-images",
+      "safe": false,
+      "description": "Downsample images above target DPI to 300"
+    }
+  ]
+}
