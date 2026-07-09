@@ -1,0 +1,40 @@
+{
+    "errors": [
+        {
+            "bbox": [
+                0,
+                0,
+                200,
+                200
+            ],
+            "check_id": "bleed",
+            "message": "BleedBox is missing or less than 9 pt on one or more edges",
+            "object_id": null,
+            "page": 1,
+            "severity": "error",
+            "type": "bleed"
+        }
+    ],
+    "fixups_available": [
+        {
+            "description": "Convert all RGB colors to CMYK",
+            "id": "rgb-to-cmyk",
+            "safe": false
+        },
+        {
+            "description": "Extend page boxes / artwork to provide bleed",
+            "id": "add-bleed",
+            "safe": false
+        },
+        {
+            "description": "Downsample images above target DPI",
+            "id": "downsample-images",
+            "safe": false
+        }
+    ],
+    "pass": false,
+    "profile": "Frisket Default",
+    "schema_version": 1,
+    "warnings": [
+    ]
+}
