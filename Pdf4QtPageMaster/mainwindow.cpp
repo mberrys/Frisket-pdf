@@ -42,6 +42,7 @@
 #include "pdfutils.h"
 
 #include <QFileDialog>
+#include <QCheckBox>
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QBuffer>
@@ -284,6 +285,93 @@ pdf::PDFPageGeometrySettings pageGeometrySettingsFromJson(const QJsonObject& obj
     return settings;
 }
 
+
+QString bleedFixupModeToString(pdf::PDFBleedFixupMode mode)
+{
+    switch (mode)
+    {
+        case pdf::PDFBleedFixupMode::Mirror: return QStringLiteral("mirror");
+        case pdf::PDFBleedFixupMode::PixelRepeat: return QStringLiteral("pixel-repeat");
+        case pdf::PDFBleedFixupMode::Stretch: return QStringLiteral("stretch");
+    }
+    return QStringLiteral("mirror");
+}
+
+pdf::PDFBleedFixupMode bleedFixupModeFromString(const QString& text)
+{
+    const QString value = text.trimmed().toLower();
+    if (value == QStringLiteral("pixel-repeat") || value == QStringLiteral("repeat"))
+    {
+        return pdf::PDFBleedFixupMode::PixelRepeat;
+    }
+    if (value == QStringLiteral("stretch"))
+    {
+        return pdf::PDFBleedFixupMode::Stretch;
+    }
+    return pdf::PDFBleedFixupMode::Mirror;
+}
+
+QString bleedFixupReferenceBoxToString(pdf::PDFBleedFixupSettings::ReferenceBox box)
+{
+    switch (box)
+    {
+        case pdf::PDFBleedFixupSettings::ReferenceBox::CropBox: return QStringLiteral("crop");
+        case pdf::PDFBleedFixupSettings::ReferenceBox::MediaBox: return QStringLiteral("media");
+        case pdf::PDFBleedFixupSettings::ReferenceBox::TrimBox:
+        default: return QStringLiteral("trim");
+    }
+}
+
+pdf::PDFBleedFixupSettings::ReferenceBox bleedFixupReferenceBoxFromString(const QString& text)
+{
+    const QString value = text.trimmed().toLower();
+    if (value == QStringLiteral("crop"))
+    {
+        return pdf::PDFBleedFixupSettings::ReferenceBox::CropBox;
+    }
+    if (value == QStringLiteral("media"))
+    {
+        return pdf::PDFBleedFixupSettings::ReferenceBox::MediaBox;
+    }
+    return pdf::PDFBleedFixupSettings::ReferenceBox::TrimBox;
+}
+
+QJsonObject bleedFixupSettingsToJson(const pdf::PDFBleedFixupSettings& settings)
+{
+    QJsonObject object;
+    object["mode"] = bleedFixupModeToString(settings.mode);
+    object["pageRange"] = settings.pageRange;
+    object["referenceBox"] = bleedFixupReferenceBoxToString(settings.referenceBox);
+    object["bleedMM"] = marginsToJson(settings.bleedMM);
+    object["expandMediaBox"] = settings.expandMediaBox;
+    object["expandCropBox"] = settings.expandCropBox;
+    object["expandBleedBox"] = settings.expandBleedBox;
+    object["expandTrimBox"] = settings.expandTrimBox;
+    object["dpi"] = settings.dpi;
+    object["samplePixels"] = settings.samplePixels;
+    object["skipIfAlreadyBleeding"] = settings.skipIfAlreadyBleeding;
+    object["force"] = settings.force;
+    return object;
+}
+
+pdf::PDFBleedFixupSettings bleedFixupSettingsFromJson(const QJsonObject& object)
+{
+    pdf::PDFBleedFixupSettings settings;
+    settings.mode = bleedFixupModeFromString(object["mode"].toString(bleedFixupModeToString(settings.mode)));
+    settings.pageRange = object["pageRange"].toString(settings.pageRange);
+    settings.referenceBox = bleedFixupReferenceBoxFromString(object["referenceBox"].toString(bleedFixupReferenceBoxToString(settings.referenceBox)));
+    settings.bleedMM = marginsFromJson(object["bleedMM"].toObject(), settings.bleedMM);
+    settings.expandMediaBox = object["expandMediaBox"].toBool(settings.expandMediaBox);
+    settings.expandCropBox = object["expandCropBox"].toBool(settings.expandCropBox);
+    settings.expandBleedBox = object["expandBleedBox"].toBool(settings.expandBleedBox);
+    settings.expandTrimBox = object["expandTrimBox"].toBool(settings.expandTrimBox);
+    settings.dpi = object["dpi"].toInt(settings.dpi);
+    settings.samplePixels = object["samplePixels"].toInt(settings.samplePixels);
+    settings.skipIfAlreadyBleeding = object["skipIfAlreadyBleeding"].toBool(settings.skipIfAlreadyBleeding);
+    settings.force = object["force"].toBool(settings.force);
+    return settings;
+}
+
 void replaceInString(QString& templateString, QChar character, int number)
 {
     int index = templateString.indexOf(character, 0, Qt::CaseSensitive);
@@ -346,6 +434,8 @@ struct ExportJob
     pdf::PDFImageOptimizer::Settings imageOptimizationSettings;
     bool hasPageGeometrySettings = false;
     pdf::PDFPageGeometrySettings pageGeometrySettings;
+    bool hasBleedFixupSettings = false;
+    pdf::PDFBleedFixupSettings bleedFixupSettings;
     pdf::PDFProgress* progress = nullptr;
 };
 
@@ -405,6 +495,19 @@ ExportResult runExportJob(ExportJob job)
                     job.progress->finish();
                 }
                 return createExportError(geometryResult.getErrorMessage());
+            }
+        }
+
+        if (job.hasBleedFixupSettings)
+        {
+            const pdf::PDFOperationResult bleedResult = pdf::PDFBleedFixup::apply(&assembledDocument, job.bleedFixupSettings);
+            if (!bleedResult)
+            {
+                if (job.progress)
+                {
+                    job.progress->finish();
+                }
+                return createExportError(bleedResult.getErrorMessage());
             }
         }
 
@@ -872,6 +975,8 @@ MainWindow::MainWindow(QWidget* parent) :
     ui->actionInsert_Empty_Page->setData(int(Operation::InsertEmptyPage));
     ui->actionInsert_PDF->setData(int(Operation::InsertPDF));
     ui->actionPageGeometry->setData(int(Operation::ConfigurePageGeometry));
+    m_actionBleedFixup = new QAction(tr("Bleed Fixup..."), this);
+    m_actionBleedFixup->setData(int(Operation::ConfigureBleedFixup));
     ui->actionGet_Source->setData(int(Operation::GetSource));
     ui->actionBecomeASponsor->setData(int(Operation::BecomeSponsor));
     ui->actionAbout->setData(int(Operation::About));
@@ -985,6 +1090,7 @@ MainWindow::MainWindow(QWidget* parent) :
     mainToolbar->addActions({ ui->actionGroup, ui->actionUngroup });
     mainToolbar->addSeparator();
     mainToolbar->addAction(ui->actionPageGeometry);
+    mainToolbar->addAction(m_actionBleedFixup);
     mainToolbar->addAction(ui->actionCropPages);
     mainToolbar->addAction(ui->actionProperties);
     QToolBar* insertToolbar = addToolBar(tr("&Insert"));
@@ -2286,6 +2392,7 @@ bool MainWindow::canPerformOperation(Operation operation) const
         case Operation::InsertPDF:
         case Operation::InsertPDFPages:
         case Operation::ConfigurePageGeometry:
+        case Operation::ConfigureBleedFixup:
         case Operation::GetSource:
         case Operation::BecomeSponsor:
         case Operation::About:
@@ -2509,7 +2616,26 @@ void MainWindow::exportAssembledDocuments(std::vector<std::vector<pdf::PDFDocume
     job.imageOptimizationSettings = imageOptimizationSettings;
     job.hasPageGeometrySettings = m_hasPageGeometrySettings;
     job.pageGeometrySettings = m_pageGeometrySettings;
+    job.hasBleedFixupSettings = m_hasBleedFixupSettings;
+    job.bleedFixupSettings = m_bleedFixupSettings;
     job.progress = m_exportProgress;
+
+    if (m_hasBleedFixupSettings)
+    {
+        if (m_hasPageGeometrySettings && m_pageGeometrySettings.applyBleedBox)
+        {
+            QMessageBox::warning(this, tr("Bleed Fixup"),
+                                 tr("Page geometry is set to rewrite BleedBox. Bleed fixup will run after geometry and may expand boxes again."));
+        }
+
+        const auto answer = QMessageBox::question(this, tr("Bleed Fixup"),
+                                                  tr("Bleed fixup will rewrite page content by rasterizing and extending page edges. Continue?"),
+                                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
 
     setExportInProgress(true);
     m_exportProgressLabel->setText(tr("Preparing export..."));
@@ -3091,6 +3217,10 @@ QJsonObject MainWindow::createProjectJson() const
     pageGeometryObject["enabled"] = m_hasPageGeometrySettings;
     pageGeometryObject["settings"] = pageGeometrySettingsToJson(m_pageGeometrySettings);
     settingsObject["pageGeometry"] = pageGeometryObject;
+    QJsonObject bleedFixupObject;
+    bleedFixupObject["enabled"] = m_hasBleedFixupSettings;
+    bleedFixupObject["settings"] = bleedFixupSettingsToJson(m_bleedFixupSettings);
+    settingsObject["bleedFixup"] = bleedFixupObject;
     project["settings"] = settingsObject;
 
     return project;
@@ -3233,6 +3363,12 @@ bool MainWindow::loadProjectJson(const QJsonObject& project, QString* errorMessa
     if (pageGeometryObject.contains("settings"))
     {
         m_pageGeometrySettings = pageGeometrySettingsFromJson(pageGeometryObject["settings"].toObject());
+    }
+    const QJsonObject bleedFixupObject = settingsObject["bleedFixup"].toObject();
+    m_hasBleedFixupSettings = bleedFixupObject["enabled"].toBool(false);
+    if (bleedFixupObject.contains("settings"))
+    {
+        m_bleedFixupSettings = bleedFixupSettingsFromJson(bleedFixupObject["settings"].toObject());
     }
 
     updateActions();
@@ -3521,6 +3657,72 @@ void MainWindow::performOperation(Operation operation)
         case Operation::InsertEmptyPage:
             m_model->insertEmptyPage(getSelectedRows());
             break;
+
+        case Operation::ConfigureBleedFixup:
+        {
+            QDialog dialog(this);
+            dialog.setWindowTitle(tr("Bleed Fixup"));
+            QVBoxLayout* layout = new QVBoxLayout(&dialog);
+            QFormLayout* form = new QFormLayout();
+
+            QComboBox* modeCombo = new QComboBox(&dialog);
+            modeCombo->addItem(tr("Mirror"), QStringLiteral("mirror"));
+            modeCombo->addItem(tr("Pixel repeat"), QStringLiteral("pixel-repeat"));
+            modeCombo->addItem(tr("Stretch"), QStringLiteral("stretch"));
+            modeCombo->setCurrentIndex(qMax(0, modeCombo->findData(bleedFixupModeToString(m_bleedFixupSettings.mode))));
+            form->addRow(tr("Mode"), modeCombo);
+
+            QComboBox* referenceCombo = new QComboBox(&dialog);
+            referenceCombo->addItem(tr("Trim box"), QStringLiteral("trim"));
+            referenceCombo->addItem(tr("Crop box"), QStringLiteral("crop"));
+            referenceCombo->addItem(tr("Media box"), QStringLiteral("media"));
+            referenceCombo->setCurrentIndex(qMax(0, referenceCombo->findData(bleedFixupReferenceBoxToString(m_bleedFixupSettings.referenceBox))));
+            form->addRow(tr("Reference box"), referenceCombo);
+
+            QDoubleSpinBox* bleedSpin = new QDoubleSpinBox(&dialog);
+            bleedSpin->setRange(0.0, 50.0);
+            bleedSpin->setDecimals(2);
+            bleedSpin->setSuffix(tr(" mm"));
+            bleedSpin->setValue(m_bleedFixupSettings.bleedMM.left());
+            form->addRow(tr("Bleed"), bleedSpin);
+
+            QSpinBox* dpiSpin = new QSpinBox(&dialog);
+            dpiSpin->setRange(72, 1200);
+            dpiSpin->setValue(m_bleedFixupSettings.dpi);
+            form->addRow(tr("DPI"), dpiSpin);
+
+            QSpinBox* sampleSpin = new QSpinBox(&dialog);
+            sampleSpin->setRange(1, 32);
+            sampleSpin->setValue(m_bleedFixupSettings.samplePixels);
+            form->addRow(tr("Sample pixels"), sampleSpin);
+
+            QCheckBox* skipCheck = new QCheckBox(tr("Skip sides that already have enough BleedBox"), &dialog);
+            skipCheck->setChecked(m_bleedFixupSettings.skipIfAlreadyBleeding);
+            form->addRow(QString(), skipCheck);
+
+            QCheckBox* enableCheck = new QCheckBox(tr("Enable bleed fixup on export"), &dialog);
+            enableCheck->setChecked(m_hasBleedFixupSettings);
+            form->addRow(QString(), enableCheck);
+
+            layout->addLayout(form);
+            QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+            layout->addWidget(buttons);
+            QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+            QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+            if (dialog.exec() == QDialog::Accepted)
+            {
+                m_bleedFixupSettings.mode = bleedFixupModeFromString(modeCombo->currentData().toString());
+                m_bleedFixupSettings.referenceBox = bleedFixupReferenceBoxFromString(referenceCombo->currentData().toString());
+                const qreal bleedMm = bleedSpin->value();
+                m_bleedFixupSettings.bleedMM = QMarginsF(bleedMm, bleedMm, bleedMm, bleedMm);
+                m_bleedFixupSettings.dpi = dpiSpin->value();
+                m_bleedFixupSettings.samplePixels = sampleSpin->value();
+                m_bleedFixupSettings.skipIfAlreadyBleeding = skipCheck->isChecked();
+                m_hasBleedFixupSettings = enableCheck->isChecked();
+            }
+            break;
+        }
 
         case Operation::ConfigurePageGeometry:
         {

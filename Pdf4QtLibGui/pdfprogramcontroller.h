@@ -122,6 +122,7 @@ public:
         Sanitize,
         RemoveExternalLinks,
         PageGeometry,
+        BleedFixup,
         CreateBitonalDocument,
         Encryption,
         FitPage,
@@ -379,6 +380,7 @@ private:
     void onActionSanitizeTriggered();
     void onActionRemoveExternalLinksTriggered();
     void onActionPageGeometryTriggered();
+    void onActionBleedFixupTriggered();
     void onActionCreateBitonalDocumentTriggered();
     void onActionEncryptionTriggered();
     void onActionFitPageTriggered();

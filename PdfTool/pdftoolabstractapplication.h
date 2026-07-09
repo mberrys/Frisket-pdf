@@ -32,6 +32,7 @@
 #include "pdfoptimizer.h"
 #include "pdfimageoptimizer.h"
 #include "pdfredact.h"
+#include "pdfbleedfixup.h"
 
 #include <QtGlobal>
 #include <QString>
@@ -171,6 +172,12 @@ struct PDFToolOptions
     pdf::PDFRedact::Options redactOptions = {};
     QString redactedDocument;
 
+    // For option 'AddBleed'
+    pdf::PDFBleedFixupSettings addBleedSettings;
+    QString addBleedOutputDocument;
+    bool addBleedDryRun = false;
+    bool addBleedReport = false;
+
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
@@ -265,6 +272,7 @@ public:
         Encrypt                         = 0x00800000,       ///< Encryption settings
         Diff                            = 0x01000000,       ///< Diff settings (compare documents)
         Redact                          = 0x02000000,       ///< Settings for Redact tool
+        AddBleed                        = 0x04000000,       ///< Settings for add-bleed tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 

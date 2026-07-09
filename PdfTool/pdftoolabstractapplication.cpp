@@ -195,6 +195,20 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("redact-copy-outline", "Copy source outline into the redacted document."));
     }
 
+    if (optionFlags.testFlag(AddBleed))
+    {
+        parser->addOption(QCommandLineOption(QStringList() << "o" << "output", "Output document filename.", "file"));
+        parser->addOption(QCommandLineOption("mode", "Bleed fill mode: mirror|pixel-repeat|stretch.", "mode", "mirror"));
+        parser->addOption(QCommandLineOption("bleed-mm", "Uniform bleed distance in millimeters.", "mm", "3"));
+        parser->addOption(QCommandLineOption("bleed-mm-ltrb", "Per-side bleed in millimeters as left,top,right,bottom.", "ltrb"));
+        parser->addOption(QCommandLineOption("reference-box", "Reference content box: trim|crop|media.", "box", "trim"));
+        parser->addOption(QCommandLineOption("dpi", "Rasterization DPI for edge sampling.", "dpi", "300"));
+        parser->addOption(QCommandLineOption("sample-pixels", "Edge sample depth in pixels for pixel-repeat/stretch.", "n", "1"));
+        parser->addOption(QCommandLineOption("force", "Ignore skip-if-already-bleeding heuristic."));
+        parser->addOption(QCommandLineOption("dry-run", "Compute report only; do not write an output file."));
+        parser->addOption(QCommandLineOption("report", "Print before/after box report."));
+    }
+
     if (optionFlags.testFlag(SignatureVerification))
     {
         parser->addOption(QCommandLineOption("ver-no-user-cert", "Disable user certificate store."));
@@ -468,6 +482,104 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         if (parser->isSet("redact-copy-outline"))
         {
             options.redactOptions |= pdf::PDFRedact::CopyOutline;
+        }
+    }
+
+    if (optionFlags.testFlag(AddBleed))
+    {
+        options.addBleedOutputDocument = parser->isSet("output") ? parser->value("output") : QString();
+        options.addBleedDryRun = parser->isSet("dry-run");
+        options.addBleedReport = parser->isSet("report");
+        options.addBleedSettings = pdf::PDFBleedFixupSettings();
+
+        const QString mode = parser->value("mode").trimmed().toLower();
+        if (mode == QStringLiteral("mirror") || mode.isEmpty())
+        {
+            options.addBleedSettings.mode = pdf::PDFBleedFixupMode::Mirror;
+        }
+        else if (mode == QStringLiteral("pixel-repeat") || mode == QStringLiteral("repeat"))
+        {
+            options.addBleedSettings.mode = pdf::PDFBleedFixupMode::PixelRepeat;
+        }
+        else if (mode == QStringLiteral("stretch"))
+        {
+            options.addBleedSettings.mode = pdf::PDFBleedFixupMode::Stretch;
+        }
+        else
+        {
+            PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown bleed mode '%1'. Defaulting to mirror.").arg(mode), options.outputCodec);
+            options.addBleedSettings.mode = pdf::PDFBleedFixupMode::Mirror;
+        }
+
+        const QString referenceBox = parser->value("reference-box").trimmed().toLower();
+        if (referenceBox == QStringLiteral("crop"))
+        {
+            options.addBleedSettings.referenceBox = pdf::PDFBleedFixupSettings::ReferenceBox::CropBox;
+        }
+        else if (referenceBox == QStringLiteral("media"))
+        {
+            options.addBleedSettings.referenceBox = pdf::PDFBleedFixupSettings::ReferenceBox::MediaBox;
+        }
+        else
+        {
+            options.addBleedSettings.referenceBox = pdf::PDFBleedFixupSettings::ReferenceBox::TrimBox;
+            if (!referenceBox.isEmpty() && referenceBox != QStringLiteral("trim"))
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Unknown reference box '%1'. Defaulting to trim.").arg(referenceBox), options.outputCodec);
+            }
+        }
+
+        bool ok = false;
+        const qreal bleedMm = parser->value("bleed-mm").toDouble(&ok);
+        if (ok && bleedMm >= 0.0)
+        {
+            options.addBleedSettings.bleedMM = QMarginsF(bleedMm, bleedMm, bleedMm, bleedMm);
+        }
+
+        if (parser->isSet("bleed-mm-ltrb"))
+        {
+            const QStringList parts = parser->value("bleed-mm-ltrb").split(QLatin1Char(','), Qt::KeepEmptyParts);
+            if (parts.size() == 4)
+            {
+                bool okL = false;
+                bool okT = false;
+                bool okR = false;
+                bool okB = false;
+                const qreal left = parts[0].trimmed().toDouble(&okL);
+                const qreal top = parts[1].trimmed().toDouble(&okT);
+                const qreal right = parts[2].trimmed().toDouble(&okR);
+                const qreal bottom = parts[3].trimmed().toDouble(&okB);
+                if (okL && okT && okR && okB)
+                {
+                    options.addBleedSettings.bleedMM = QMarginsF(left, top, right, bottom);
+                }
+                else
+                {
+                    PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid --bleed-mm-ltrb value '%1'.").arg(parser->value("bleed-mm-ltrb")), options.outputCodec);
+                }
+            }
+            else
+            {
+                PDFConsole::writeError(PDFToolTranslationContext::tr("Invalid --bleed-mm-ltrb value '%1'. Expected left,top,right,bottom.").arg(parser->value("bleed-mm-ltrb")), options.outputCodec);
+            }
+        }
+
+        const int dpi = parser->value("dpi").toInt(&ok);
+        if (ok && dpi > 0)
+        {
+            options.addBleedSettings.dpi = dpi;
+        }
+
+        const int samplePixels = parser->value("sample-pixels").toInt(&ok);
+        if (ok && samplePixels > 0)
+        {
+            options.addBleedSettings.samplePixels = samplePixels;
+        }
+
+        options.addBleedSettings.force = parser->isSet("force");
+        if (options.addBleedSettings.force)
+        {
+            options.addBleedSettings.skipIfAlreadyBleeding = false;
         }
     }
 

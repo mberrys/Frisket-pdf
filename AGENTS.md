@@ -54,9 +54,9 @@ Frisket uses a **split surface** model — one core library (`Pdf4QtLibCore`), m
 
 **Editor is the only plugin host.** `PDFProgramController` loads plugins only when the `Plugins` feature flag is set. Editor initializes with `AllFeatures`; Viewer initializes with `TextToSpeech | Tools` only (no plugins). New Frisket capabilities (preflight, ObjectInspector extensions, future Ocr/Bleed plugins) belong in `Pdf4QtEditorPlugins/` and are loaded from `PDF4QT_PLUGINS_DIR`.
 
-**PageMaster is not a plugin host.** It uses its own `MainWindow` / workspace model (`pageitemmodel`, assembly export). It already persists page-geometry settings (including `applyBleedBox`) in export JSON — keep batch page/bleed/imposition work here, not in Editor plugins.
+**PageMaster is not a plugin host.** It uses its own `MainWindow` / workspace model (`pageitemmodel`, assembly export). It already persists page-geometry settings (including `applyBleedBox`) in export JSON — note `applyBleedBox` is **box rewrite only**, not artwork bleed generation. Keep batch page/bleed/imposition work here, not in Editor plugins.
 
-**PdfTool is not an interactive shell.** Extend it for throughput (scripted checks, renders, optimizations), not as a GUI replacement.
+**PdfTool is not an interactive shell.** Extend it for throughput (scripted checks, renders, optimizations), not as a GUI replacement. Destructive fixups stay non-interactive (`--force` / `--dry-run` / `--report`); confirmation dialogs belong in PageMaster or Editor only.
 
 **Placement rules for new work:**
 
@@ -66,6 +66,26 @@ Frisket uses a **split surface** model — one core library (`Pdf4QtLibCore`), m
 - Shared PDF logic used by multiple surfaces → **Core** (and `Pdf4QtLibWidgets/` / `Pdf4QtLibGui/` if UI helpers are needed)
 
 Do not make Viewer the primary shell or add plugin hosting to PageMaster without an explicit architecture change.
+
+## Page boxes and prepress fixups
+
+- `PDFPageGeometry` / PageMaster `applyBleedBox` rewrite box metadata (and optional content scale). They do **not** generate bleed artwork.
+- Artwork bleed / edge-extend fixups belong in Core as their own `apply()` API, surfaced via PdfTool first, then PageMaster batch export; Editor confirm UI is optional and later. See [docs/MIRROR_BLEED_PLAN.md](docs/MIRROR_BLEED_PLAN.md) (`PDFBleedFixup` / `PdfTool add-bleed`).
+- Default box nesting when expanding for production: grow MediaBox, CropBox, and BleedBox together; keep TrimBox fixed unless the feature explicitly says otherwise. Missing Bleed/Trim/Art often default to CropBox in this codebase.
+- If injecting page content with `PDFPageContentStreamBuilder`, expand MediaBox before `begin()` (paint surface is sized from the current MediaBox). Prefer `PlaceBefore` for underlays, `PlaceAfter` for overlays.
+- PageMaster export order for stacked ops: assemble → page geometry → content fixups → image optimize → write.
+- Prefer one Core fixup API with a mode enum when variants share box/render/placement plumbing (e.g. mirror vs pixel-repeat vs stretch).
+
+## Planning related multi-surface features
+
+When two or more issues/modes will share one Core API (or one PdfTool command):
+
+1. Lock naming, settings shape, box policy, and surface order in a docs plan **before** coding (M0).
+2. Update Linear issues to match; set blocked-by when a later mode depends on shared scaffolding.
+3. Land the shared `apply()` + first mode first; add sibling modes as strip/transform variants only — do not fork a second pipeline.
+4. Prefer amending the plan doc over renaming types mid-implementation.
+
+Process detail: [docs/PLANNING.md](docs/PLANNING.md).
 
 ## Build & configure
 
@@ -118,3 +138,31 @@ Do not make Viewer the primary shell or add plugin hosting to PageMaster without
 - Upstream tracking: see [docs/REPO_MAP.md](docs/REPO_MAP.md) for sync workflow, conflict handling, and fork-only files. Pull from upstream only when explicitly asked.
 - Do not commit, push, amend, or rewrite history unless the user explicitly asks.
 - Do not edit vendored or third-party trees (e.g. font bundles, vcpkg overlay ports) unless the task is specifically about those files.
+
+## Cursor Cloud specific instructions
+
+Environment is prebuilt into the VM snapshot; the startup update script only refreshes vcpkg deps. Build/run tooling is not on `PATH` by default in non-login shells — the exports below live in `~/.bashrc`, so use a login/interactive shell or re-source it if a command "can't find Qt/vcpkg".
+
+**Prebuilt locations (persisted in snapshot, outside `/workspace`):**
+
+- Qt **6.9.1** (gcc_64) at `/opt/Qt/6.9.1/gcc_64` (installed via `aqtinstall`).
+- vcpkg at `/opt/vcpkg`; installed deps at `/opt/vcpkg_installed` (`x64-linux`, static libs).
+- `~/.bashrc` exports: `PDF4QT_QT_ROOT`, `QT_ROOT_DIR`, `CMAKE_PREFIX_PATH`, `LD_LIBRARY_PATH` (Qt), `VCPKG_ROOT`, `VCPKG_INSTALLED_DIR=/opt/vcpkg_installed`, `VCPKG_OVERLAY_PORTS=/workspace/vcpkg/overlays/linux:/workspace/vcpkg/overlays/general`, `CC=gcc`, `CXX=g++`, and `QT_QPA_PLATFORM=offscreen`.
+
+**Compiler gotcha:** `/usr/bin/c++` is misconfigured clang (looks for gcc-14 libstdc++ that is not installed) — plain `cmake`/`vcpkg` will fail with `cannot find -lstdc++`. This is a **GCC** build; `CC=gcc`/`CXX=g++` (gcc-13) are exported to force it. Keep them set.
+
+**Configure (existing build dir is `/workspace/build`, Ninja):**
+```
+cmake -B build -S . -G Ninja -DPDF4QT_INSTALL_QT_DEPENDENCIES=0 \
+  -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DVCPKG_INSTALLED_DIR=/opt/vcpkg_installed -DVCPKG_MANIFEST_INSTALL=OFF \
+  -DCMAKE_BUILD_TYPE=Release -DPDF4QT_QT_ROOT=/opt/Qt/6.9.1/gcc_64
+```
+Build all: `cmake --build build --target all release_translations -j$(nproc)` (~5 min on 4 cores). Prefer single targets (e.g. `--target Pdf4QtLibCore`, `PdfTool`, `UnitTests`) per repo rules.
+
+**Test:** `cd build && ctest --output-on-failure` (runs `UnitTests`, `UnitTestsImageOptimizer`). CI itself does not run ctest. No separate lint step exists — compiler warnings are the only static checks.
+
+**Run:** Binaries land in `build/usr/bin`, plugins in `build/usr/lib/pdf4qt` (Editor finds them via the relative `../lib/pdf4qt` path).
+- Headless CLI: `PdfTool <command> ...` (works with the default `QT_QPA_PLATFORM=offscreen`).
+- GUI apps (Pdf4QtEditor, Viewer, PageMaster, Diff): a VNC X server is on `DISPLAY=:1`. Run with `DISPLAY=:1` and `QT_QPA_PLATFORM` unset (or `=xcb`) — otherwise the offscreen default gives no visible window. Harmless `qt.multimedia ... pipewire-0.3` warnings appear (no audio backend) and can be ignored.
+- No sample PDFs ship in the repo; generate some with `PdfExampleGenerator` (writes `Ex_*.pdf` into the CWD).
