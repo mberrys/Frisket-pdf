@@ -73,6 +73,8 @@ Several third-party libraries are used.
 
 ## 5. CONTRIBUTIONS
 
+Fork and upstream policy: see [docs/REPO_MAP.md](docs/REPO_MAP.md).
+
 Contributions are welcome!
 
 Since the project is now licensed under the MIT License, contributions can be freely submitted without the need to sign a Contributor License Agreement (CLA).
