@@ -54,9 +54,9 @@ Frisket uses a **split surface** model — one core library (`Pdf4QtLibCore`), m
 
 **Editor is the only plugin host.** `PDFProgramController` loads plugins only when the `Plugins` feature flag is set. Editor initializes with `AllFeatures`; Viewer initializes with `TextToSpeech | Tools` only (no plugins). New Frisket capabilities (preflight, ObjectInspector extensions, future Ocr/Bleed plugins) belong in `Pdf4QtEditorPlugins/` and are loaded from `PDF4QT_PLUGINS_DIR`.
 
-**PageMaster is not a plugin host.** It uses its own `MainWindow` / workspace model (`pageitemmodel`, assembly export). It already persists page-geometry settings (including `applyBleedBox`) in export JSON — keep batch page/bleed/imposition work here, not in Editor plugins.
+**PageMaster is not a plugin host.** It uses its own `MainWindow` / workspace model (`pageitemmodel`, assembly export). It already persists page-geometry settings (including `applyBleedBox`) in export JSON — note `applyBleedBox` is **box rewrite only**, not artwork bleed generation. Keep batch page/bleed/imposition work here, not in Editor plugins.
 
-**PdfTool is not an interactive shell.** Extend it for throughput (scripted checks, renders, optimizations), not as a GUI replacement.
+**PdfTool is not an interactive shell.** Extend it for throughput (scripted checks, renders, optimizations), not as a GUI replacement. Destructive fixups stay non-interactive (`--force` / `--dry-run` / `--report`); confirmation dialogs belong in PageMaster or Editor only.
 
 **Placement rules for new work:**
 
@@ -66,6 +66,26 @@ Frisket uses a **split surface** model — one core library (`Pdf4QtLibCore`), m
 - Shared PDF logic used by multiple surfaces → **Core** (and `Pdf4QtLibWidgets/` / `Pdf4QtLibGui/` if UI helpers are needed)
 
 Do not make Viewer the primary shell or add plugin hosting to PageMaster without an explicit architecture change.
+
+## Page boxes and prepress fixups
+
+- `PDFPageGeometry` / PageMaster `applyBleedBox` rewrite box metadata (and optional content scale). They do **not** generate bleed artwork.
+- Artwork bleed / edge-extend fixups belong in Core as their own `apply()` API, surfaced via PdfTool first, then PageMaster batch export; Editor confirm UI is optional and later. See [docs/MIRROR_BLEED_PLAN.md](docs/MIRROR_BLEED_PLAN.md) (unified bleed-fixup naming may land as `PDFBleedFixup`).
+- Default box nesting when expanding for production: grow MediaBox, CropBox, and BleedBox together; keep TrimBox fixed unless the feature explicitly says otherwise. Missing Bleed/Trim/Art often default to CropBox in this codebase.
+- If injecting page content with `PDFPageContentStreamBuilder`, expand MediaBox before `begin()` (paint surface is sized from the current MediaBox). Prefer `PlaceBefore` for underlays, `PlaceAfter` for overlays.
+- PageMaster export order for stacked ops: assemble → page geometry → content fixups → image optimize → write.
+- Prefer one Core fixup API with a mode enum when variants share box/render/placement plumbing (e.g. mirror vs pixel-repeat vs stretch).
+
+## Planning related multi-surface features
+
+When two or more issues/modes will share one Core API (or one PdfTool command):
+
+1. Lock naming, settings shape, box policy, and surface order in a docs plan **before** coding (M0).
+2. Update Linear issues to match; set blocked-by when a later mode depends on shared scaffolding.
+3. Land the shared `apply()` + first mode first; add sibling modes as strip/transform variants only — do not fork a second pipeline.
+4. Prefer amending the plan doc over renaming types mid-implementation.
+
+Process detail: [docs/PLANNING.md](docs/PLANNING.md).
 
 ## Build & configure
 
