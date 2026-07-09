@@ -1,12 +1,9 @@
-[![CI](https://github.com/JakubMelka/PDF4QT/actions/workflows/ci.yml/badge.svg)](https://github.com/JakubMelka/PDF4QT/actions/workflows/ci.yml)
+# Frisket-PDF
 
-# PDF4QT
+[![GitHub Actions continuous integration status badge for Frisket-pdf](https://github.com/mberrys/Frisket-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/mberrys/Frisket-pdf/actions/workflows/ci.yml)
 
-**(c) Jakub Melka 2018-2025**
-
-**Mgr.Jakub.Melka@gmail.com**
-
-**https://jakubmelka.github.io/**
+## (c) Michael Berry 2026 Frisket PDF
+## © Jakub Melka 2018–2025 PDF4QT
 
 This software is consisting of PDF rendering library, and several
 applications, such as advanced document viewer, command line tool,
@@ -87,7 +84,7 @@ You are encouraged to contribute by testing, offering feedback, providing advice
 
 ### Windows
 
-The [Release page](https://github.com/JakubMelka/PDF4QT/releases) lists binaries for Windows, both with and without an installer.
+The [Release page](https://github.com/mberrys/Frisket-pdf/releases) lists binaries for Windows, both with and without an installer.
 
 ### Arch Linux
 
@@ -122,8 +119,8 @@ On Linux, a GCC version >= 8 should work, altough we tested it with GCC 11.
 
     2.1 Clone repo
 
-        git clone https://github.com/JakubMelka/PDF4QT
-        cd PDF4QT
+        git clone git clone https://github.com/mberrys/Frisket-pdf
+        cd Frisket-pdf
 
     2.2 Configure
 
@@ -192,11 +189,11 @@ to be able to built Debug build on MS Windows.
 
 
 ### Tested Compilers - Windows
- - Visual Studio 2022 (Microsoft Visual C++ Compiler 17.1)
+- Visual Studio 2022 (Microsoft Visual C++ Compiler 17.1)
  - MinGW 11.2.0
  
 ### Tested Compilers - Linux
- - GCC 13.1.1
+- GCC 13.1.1
 
 ## 8. DISCLAIMER
 
