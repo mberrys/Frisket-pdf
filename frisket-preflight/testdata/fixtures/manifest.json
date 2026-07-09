@@ -1,0 +1,18 @@
+[
+  {
+    "id": "bleed-adequate",
+    "pdf": "bleed-adequate.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "generated",
+    "notes": "MediaBox 220x220, TrimBox 200x200 inset 10pt on all sides -> unset BleedBox falls back to CropBox -> MediaBox, giving 10pt margin (>= amount_pt 9)."
+  },
+  {
+    "id": "bleed-missing",
+    "pdf": "bleed-missing.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": false, "check_ids": ["bleed"] },
+    "source": "generated",
+    "notes": "Only MediaBox (200x200) is set; TrimBox/BleedBox/CropBox all fall back to it, so bleed==trim==media -> zero bleed margin -> bleed check fails."
+  }
+]

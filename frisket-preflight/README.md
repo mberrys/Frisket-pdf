@@ -71,3 +71,77 @@ Other PdfTool commands accept `--console-format json` via `PDFOutputFormatter` (
 ## Versioning
 
 Bump `schema_version` only together with engine + plugin releases so the JSON contract stays in sync (see packaging notes in the hybrid sidecar plan).
+
+## Golden corpus & CI (MIC-132)
+
+A golden corpus of fixture PDFs is run against `PdfTool preflight` in CI via a QtTest
+executable, `UnitTestsPreflightCorpus` (`UnitTests/tst_preflightcorpus.cpp`), registered
+with `ctest` in `UnitTests/CMakeLists.txt`. `.github/workflows/ci.yml` runs
+`ctest --output-on-failure` after the build, so a regression in any check's pass/fail
+outcome or report output fails the build.
+
+### Layout
+
+| Path | Purpose |
+|------|---------|
+| `testdata/manifest.schema.json` | JSON Schema for corpus manifest entries |
+| `testdata/fixtures/manifest.json` | Corpus manifest: fixture → profile → expected outcome |
+| `testdata/fixtures/*.pdf` | Fixture PDFs (hand-built or generated; **not** client/job PDFs) |
+| `testdata/snapshots/<id>.json` | Golden report JSON per fixture, normalized (`engine_version`/`pdf` stripped) |
+| `tools/generate_fixtures.cpp` | Deterministically (re)generates the `bleed-*` fixtures via `pdf::PDFDocumentBuilder` |
+
+### Manifest entries
+
+```json
+{
+  "id": "bleed-adequate",
+  "pdf": "bleed-adequate.pdf",
+  "profile": "profiles/frisket-default.json",
+  "expect": { "pass": true, "check_ids": [] },
+  "source": "generated",
+  "notes": "short description of what the fixture exercises"
+}
+```
+
+`expect.check_ids` lists the `check_id`s that must appear in `errors[]`/`warnings[]`; leave
+empty for a clean pass. `UnitTestsPreflightCorpus` reads this manifest at test time — no
+code changes are needed to add a fixture, only a new PDF + manifest entry (+ an initial
+snapshot, below).
+
+### Adding a fixture
+
+1. Get a PDF: either extend `tools/generate_fixtures.cpp` (preferred for parametric cases
+   like bleed/trim/DPI amounts) or hand-build one (e.g. for font-embedding or color-mode
+   cases that need real content). Put it in `testdata/fixtures/`. No client/job PDFs.
+2. Add a `manifest.json` entry with the expected `pass` and `check_ids`.
+3. Create its snapshot once locally: `FRISKET_UPDATE_SNAPSHOTS=1 ctest -R UnitTestsPreflightCorpus`,
+   then review and commit the new `testdata/snapshots/<id>.json`.
+
+Until a fixture's PDF exists on disk, `UnitTestsPreflightCorpus` skips (not fails) its rows,
+so an in-progress manifest entry doesn't redden CI.
+
+### Regenerating the seeded fixtures
+
+```bash
+cmake --build build --target FrisketGenerateFixtures
+./build/usr/bin/FrisketGenerateFixtures frisket-preflight/testdata/fixtures
+FRISKET_UPDATE_SNAPSHOTS=1 ctest --test-dir build -R UnitTestsPreflightCorpus
+```
+
+Review the resulting diff before committing — a snapshot change should always be traceable
+to an intentional check-behavior change, not an accident.
+
+### Snapshot vs. manifest checks
+
+The manifest check (`preflightMatchesManifest`) is the correctness gate: does this fixture
+still pass/fail the way it's supposed to. The snapshot check (`preflightMatchesSnapshot`) is
+the regression gate: did anything about the report's *content* (message text, bbox, severity,
+finding order) change, even if pass/fail didn't. Both run for every corpus entry.
+
+### Public PDF/A corpora and the hand-built check matrix
+
+This directory currently seeds only the `bleed` check (the only one `PdfTool preflight`
+implements so far). The full hand-built fixture matrix (trim, page-size, image-resolution,
+color-mode, embedded-fonts) is tracked separately in MIC-145, and a pinned subset of public
+PDF/A corpora (veraPDF-corpus, Isartor, BFO) in MIC-146 — both add entries to this same
+manifest and drop fixtures into `testdata/fixtures/` without needing to change the runner.
