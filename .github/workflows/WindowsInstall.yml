@@ -173,8 +173,8 @@ jobs:
           $version = $version.Trim()  # Odstraní případné prázdné znaky kolem verze
           Write-Host "Version: $version"
           echo "pdf4qt_version=$version" >> $env:GITHUB_ENV
-          echo "msipackagefilename=JakubMelka.PDF4QT_${version}.msi" >> $env:GITHUB_ENV
-          Write-Host "MSI package file name: JakubMelka.PDF4QT_${version}.msi"
+          echo "msipackagefilename=mberrys.Frisket-pdf_${version}.msi" >> $env:GITHUB_ENV
+          Write-Host "MSI package file name: mberrys.Frisket-pdf_${version}.msi"
 
       - name: Find WiXUIExtension.dll
         id: find_wixui_extension
@@ -205,20 +205,20 @@ jobs:
 
       - name: Create MSIX Package
         run: |
-          MakeAppx pack /d ".\pdf4qt\build\install\usr\bin" /p ".\pdf4qt\build\install\JakubMelka.PDF4QT_${{ env.pdf4qt_version }}.msix"
+          MakeAppx pack /d ".\pdf4qt\build\install\usr\bin" /p ".\pdf4qt\build\install\mberrys.Frisket-pdf_${{ env.pdf4qt_version }}.msix"
           
       - name: Upload ZIP directory
         uses: actions/upload-artifact@v4
         with:
-          name: 'PDF4QT-${{ runner.os }}-${{ env.pdf4qt_version }}.zip'
+          name: 'Frisket-pdf-Windows-${{ env.pdf4qt_version }}.zip'
           path: .\pdf4qt\build\install\usr\bin
           retention-days: 30
 
       - name: Upload MSIX package
         uses: actions/upload-artifact@v4
         with:
-          name: 'JakubMelka.PDF4QT_${{ env.pdf4qt_version }}.msix'
-          path: .\pdf4qt\build\install\JakubMelka.PDF4QT_${{ env.pdf4qt_version }}.msix
+          name: 'mberrys.Frisket-pdf_${{ env.pdf4qt_version }}.msix'
+          path: .\pdf4qt\build\install\mberrys.Frisket-pdf_${{ env.pdf4qt_version }}.msix
           retention-days: 30
           compression-level: 0
           
