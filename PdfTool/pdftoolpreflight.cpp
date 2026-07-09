@@ -56,7 +56,7 @@ struct PreflightFixupConfig
     QString description;
 };
 
-struct PreflightProfile
+struct PreflightProfileData
 {
     QString name;
     QList<PreflightCheckConfig> checks;
@@ -102,7 +102,7 @@ QJsonObject findingToJson(const PreflightFinding& finding)
     return object;
 }
 
-bool loadProfile(const QString& profilePath, PreflightProfile& profile, QString& errorMessage)
+bool loadProfile(const QString& profilePath, PreflightProfileData& profile, QString& errorMessage)
 {
     QFile profileFile(profilePath);
     if (!profileFile.open(QIODevice::ReadOnly))
@@ -255,7 +255,7 @@ QString defaultFixupDescription(const QString& fixupId)
     return PDFToolTranslationContext::tr("Apply fixup '%1'").arg(fixupId);
 }
 
-QByteArray buildReportJson(const PreflightProfile& profile,
+QByteArray buildReportJson(const PreflightProfileData& profile,
                            const QString& pdfPath,
                            const QList<PreflightFinding>& errors,
                            const QList<PreflightFinding>& warnings)
@@ -332,7 +332,7 @@ int PDFToolPreflightApplication::execute(const PDFToolOptions& options)
         return ErrorInvalidArguments;
     }
 
-    PreflightProfile profile;
+    PreflightProfileData profile;
     QString profileError;
     if (!loadProfile(options.preflightProfilePath, profile, profileError))
     {
