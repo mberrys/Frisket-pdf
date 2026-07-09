@@ -44,6 +44,8 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfdocumentmanipulator.h
     sources/pdfpagegeometry.cpp
     sources/pdfpagegeometry.h
+    sources/pdfbleedfixup.cpp
+    sources/pdfbleedfixup.h
     sources/pdfdocumenttextflow.cpp
     sources/pdfdocumenttextflow.h
     sources/pdfdocumenttextfloweditormodel.cpp

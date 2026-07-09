@@ -170,6 +170,7 @@
     <addaction name="actionSanitize"/>
     <addaction name="actionRemoveExternalLinks"/>
     <addaction name="actionPageGeometry"/>
+    <addaction name="actionBleedFixup"/>
     <addaction name="actionCreateBitonalDocument"/>
    </widget>
    <widget class="QMenu" name="menuInsert">
@@ -1178,6 +1179,18 @@
    </property>
    <property name="toolTip">
     <string>Remove all external link annotations from the document.</string>
+   </property>
+  </action>
+  <action name="actionBleedFixup">
+   <property name="icon">
+    <iconset resource="pdf4qtlibgui.qrc">
+     <normaloff>:/resources/page.svg</normaloff>:/resources/page.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Bleed &amp;Fixup...</string>
+   </property>
+   <property name="toolTip">
+    <string>Expand page boxes and fill bleed margins by mirroring, repeating, or stretching edge pixels.</string>
    </property>
   </action>
   <action name="actionPageGeometry">

@@ -70,7 +70,7 @@ Do not make Viewer the primary shell or add plugin hosting to PageMaster without
 ## Page boxes and prepress fixups
 
 - `PDFPageGeometry` / PageMaster `applyBleedBox` rewrite box metadata (and optional content scale). They do **not** generate bleed artwork.
-- Artwork bleed / edge-extend fixups belong in Core as their own `apply()` API, surfaced via PdfTool first, then PageMaster batch export; Editor confirm UI is optional and later. See [docs/MIRROR_BLEED_PLAN.md](docs/MIRROR_BLEED_PLAN.md) (unified bleed-fixup naming may land as `PDFBleedFixup`).
+- Artwork bleed / edge-extend fixups belong in Core as their own `apply()` API, surfaced via PdfTool first, then PageMaster batch export; Editor confirm UI is optional and later. See [docs/MIRROR_BLEED_PLAN.md](docs/MIRROR_BLEED_PLAN.md) (`PDFBleedFixup` / `PdfTool add-bleed`).
 - Default box nesting when expanding for production: grow MediaBox, CropBox, and BleedBox together; keep TrimBox fixed unless the feature explicitly says otherwise. Missing Bleed/Trim/Art often default to CropBox in this codebase.
 - If injecting page content with `PDFPageContentStreamBuilder`, expand MediaBox before `begin()` (paint surface is sized from the current MediaBox). Prefer `PlaceBefore` for underlays, `PlaceAfter` for overlays.
 - PageMaster export order for stacked ops: assemble → page geometry → content fixups → image optimize → write.
