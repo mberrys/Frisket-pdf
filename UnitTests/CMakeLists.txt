@@ -62,6 +62,23 @@ set_target_properties(UnitTestsBleedFixup PROPERTIES
 )
 add_test(UnitTestsBleedFixup  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsBleedFixup")
 
+# Pure geometry math for the preflight custom checks (bleed / trim / page-size).
+# Header-only, so it only needs the PdfTool include dir - no Core or PdfTool link.
+add_executable(UnitTestsPreflightChecks
+	tst_preflightchecks.cpp
+)
+
+target_link_libraries(UnitTestsPreflightChecks PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+target_include_directories(UnitTestsPreflightChecks PRIVATE ${CMAKE_SOURCE_DIR}/PdfTool)
+
+set_target_properties(UnitTestsPreflightChecks PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsPreflightChecks  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsPreflightChecks")
+
 # Drives `PdfTool preflight` against the frisket-preflight golden corpus, so it needs
 # the PdfTool executable, which is not built in PDF4QT_BUILD_ONLY_CORE_LIBRARY mode.
 if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)

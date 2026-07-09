@@ -64,7 +64,7 @@ PdfTool preflight document.pdf --profile frisket-preflight/profiles/frisket-defa
 - Exit `0` when `pass` is true; exit `1` when `errors[]` is non-empty.
 - stdout: single JSON document validating against `schemas/report.schema.json`.
 - Profiles: **JSON** at runtime today (`frisket-default.json` mirrors the YAML). YAML authoring is fine; convert or add a loader later.
-- Implemented checks grow in MIC-134+; scaffold runs **bleed** from page boxes.
+- Implemented checks: **bleed**, **trim**, and **page-size**, all from page boxes (MIC-134). `trim` and `page-size` are **job-spec dependent** — each is skipped unless its profile check entry supplies both `expected_width_pt` and `expected_height_pt` (compared strictly, orientation-sensitive, within `tolerance_pt`). The generic `frisket-default.json` leaves them unset, so those two checks are no-ops there until a job-specific profile sets a size. Remaining checks (fonts, color mode, image DPI) land in later issues.
 
 Other PdfTool commands accept `--console-format json` via `PDFOutputFormatter` (tree JSON, not the preflight report schema).
 
