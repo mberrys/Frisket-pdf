@@ -154,7 +154,7 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
 
     if (optionFlags.testFlag(ConsoleFormat))
     {
-        parser->addOption(QCommandLineOption("console-format", "Console output text format (valid values: text|xml|html).", "format", "text"));
+        parser->addOption(QCommandLineOption("console-format", "Console output text format (valid values: text|xml|html|json).", "format", "text"));
         parser->addOption(QCommandLineOption("text-codec", QString("Text codec used when writing text output to redirected standard output. UTF-8 is default."), "text codec", "UTF-8"));
     }
 
@@ -207,6 +207,11 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("force", "Ignore skip-if-already-bleeding heuristic."));
         parser->addOption(QCommandLineOption("dry-run", "Compute report only; do not write an output file."));
         parser->addOption(QCommandLineOption("report", "Print before/after box report."));
+    }
+
+    if (optionFlags.testFlag(PreflightProfile))
+    {
+        parser->addOption(QCommandLineOption("profile", "Frisket preflight profile (JSON).", "profile"));
     }
 
     if (optionFlags.testFlag(SignatureVerification))
@@ -418,6 +423,10 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         {
             options.outputStyle = PDFOutputFormatter::Style::Html;
         }
+        else if (consoleFormat == "json")
+        {
+            options.outputStyle = PDFOutputFormatter::Style::Json;
+        }
         else
         {
             if (!consoleFormat.isEmpty())
@@ -581,6 +590,11 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         {
             options.addBleedSettings.skipIfAlreadyBleeding = false;
         }
+    }
+
+    if (optionFlags.testFlag(PreflightProfile))
+    {
+        options.preflightProfilePath = parser->value("profile");
     }
 
     if (optionFlags.testFlag(Separate))

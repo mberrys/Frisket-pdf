@@ -178,6 +178,9 @@ struct PDFToolOptions
     bool addBleedDryRun = false;
     bool addBleedReport = false;
 
+    // For option 'PreflightProfile'
+    QString preflightProfilePath;
+
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
@@ -273,6 +276,7 @@ public:
         Diff                            = 0x01000000,       ///< Diff settings (compare documents)
         Redact                          = 0x02000000,       ///< Settings for Redact tool
         AddBleed                        = 0x04000000,       ///< Settings for add-bleed tool
+        PreflightProfile                = 0x08000000,       ///< Frisket preflight profile path
     };
     Q_DECLARE_FLAGS(Options, Option)
 

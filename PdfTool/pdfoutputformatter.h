@@ -40,7 +40,8 @@ public:
     {
         Text,
         Xml,
-        Html
+        Html,
+        Json
     };
 
     explicit PDFOutputFormatter(Style style);

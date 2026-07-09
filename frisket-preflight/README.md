@@ -58,12 +58,15 @@ Every finding in `errors[]` / `warnings[]` **must** include:
 ## Intended CLI (MIC-133)
 
 ```bash
-frisket-preflight --pdf file.pdf --profile profiles/frisket-default.yaml
+PdfTool preflight document.pdf --profile frisket-preflight/profiles/frisket-default.json
 ```
 
-- Exit `0` when `pass` is true; non-zero when false (exact codes TBD in MIC-133).
+- Exit `0` when `pass` is true; exit `1` when `errors[]` is non-empty.
 - stdout: single JSON document validating against `schemas/report.schema.json`.
-- No Qt / Pdf4QtLib* dependency in this binary.
+- Profiles: **JSON** at runtime today (`frisket-default.json` mirrors the YAML). YAML authoring is fine; convert or add a loader later.
+- Implemented checks grow in MIC-134+; scaffold runs **bleed** from page boxes.
+
+Other PdfTool commands accept `--console-format json` via `PDFOutputFormatter` (tree JSON, not the preflight report schema).
 
 ## Versioning
 

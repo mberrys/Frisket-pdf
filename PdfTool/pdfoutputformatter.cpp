@@ -28,6 +28,9 @@
 #include <QCoreApplication>
 #include <QDataStream>
 #include <QStringEncoder>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
 
 #include <stack>
 
@@ -130,6 +133,33 @@ private:
     int m_depth;
     int m_headerDepth;
     std::stack<PDFOutputFormatter::Element> m_elementStack;
+};
+
+class PDFJsonOutputFormatterImpl : public PDFOutputFormatterImpl
+{
+public:
+    PDFJsonOutputFormatterImpl() = default;
+
+    virtual void beginElement(PDFOutputFormatter::Element type, QString name, QString description, Qt::Alignment alignment, int reference) override;
+    virtual void endElement() override;
+    virtual QString getString() const override;
+
+private:
+    struct JsonNode
+    {
+        PDFOutputFormatter::Element type = PDFOutputFormatter::Element::Root;
+        QString name;
+        QString description;
+        int reference = 0;
+        QJsonArray children;
+        QJsonArray tableRows;
+    };
+
+    std::stack<JsonNode> m_stack;
+    QJsonArray m_tableRow;
+    QString m_result;
+
+    void appendChild(const QJsonObject& child);
 };
 
 PDFTextOutputFormatterImpl::PDFTextOutputFormatterImpl() :
@@ -492,6 +522,126 @@ void PDFHtmlOutputFormatterImpl::endl()
     m_streamWriter.writeEndElement();
 }
 
+void PDFJsonOutputFormatterImpl::beginElement(PDFOutputFormatter::Element type, QString name, QString description, Qt::Alignment alignment, int reference)
+{
+    Q_UNUSED(alignment);
+
+    JsonNode node;
+    node.type = type;
+    node.name = name;
+    node.description = description;
+    node.reference = reference;
+    m_stack.push(node);
+}
+
+void PDFJsonOutputFormatterImpl::endElement()
+{
+    JsonNode node = m_stack.top();
+    m_stack.pop();
+
+    switch (node.type)
+    {
+        case PDFOutputFormatter::Element::Root:
+        {
+            QJsonObject root;
+            root.insert(QStringLiteral("name"), node.name);
+            if (!node.description.isEmpty())
+            {
+                root.insert(QStringLiteral("description"), node.description);
+            }
+            root.insert(QStringLiteral("children"), node.children);
+            m_result = QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
+            break;
+        }
+
+        case PDFOutputFormatter::Element::Table:
+        {
+            QJsonObject table;
+            table.insert(QStringLiteral("name"), node.name);
+            if (!node.description.isEmpty())
+            {
+                table.insert(QStringLiteral("description"), node.description);
+            }
+            table.insert(QStringLiteral("rows"), node.tableRows);
+            appendChild(table);
+            break;
+        }
+
+        case PDFOutputFormatter::Element::TableRow:
+        case PDFOutputFormatter::Element::TableHeaderRow:
+        {
+            QJsonObject row;
+            row.insert(QStringLiteral("name"), node.name);
+            if (node.reference > 0)
+            {
+                row.insert(QStringLiteral("ref"), node.reference);
+            }
+            row.insert(QStringLiteral("columns"), m_tableRow);
+            m_tableRow = QJsonArray();
+
+            if (!m_stack.empty())
+            {
+                m_stack.top().tableRows.append(row);
+            }
+            break;
+        }
+
+        case PDFOutputFormatter::Element::TableColumn:
+        case PDFOutputFormatter::Element::TableHeaderColumn:
+        case PDFOutputFormatter::Element::Text:
+        {
+            QJsonObject item;
+            item.insert(QStringLiteral("name"), node.name);
+            item.insert(QStringLiteral("value"), node.description);
+            if (node.reference > 0)
+            {
+                item.insert(QStringLiteral("ref"), node.reference);
+            }
+            appendChild(item);
+            break;
+        }
+
+        case PDFOutputFormatter::Element::Header:
+        {
+            QJsonObject header;
+            header.insert(QStringLiteral("name"), node.name);
+            header.insert(QStringLiteral("value"), node.description);
+            if (node.reference > 0)
+            {
+                header.insert(QStringLiteral("ref"), node.reference);
+            }
+            appendChild(header);
+            break;
+        }
+
+        default:
+            break;
+    }
+}
+
+void PDFJsonOutputFormatterImpl::appendChild(const QJsonObject& child)
+{
+    if (m_stack.empty())
+    {
+        return;
+    }
+
+    JsonNode& parent = m_stack.top();
+    if (parent.type == PDFOutputFormatter::Element::TableRow || parent.type == PDFOutputFormatter::Element::TableHeaderRow)
+    {
+        m_tableRow.append(child);
+    }
+    else
+    {
+        parent.children.append(child);
+    }
+}
+
+QString PDFJsonOutputFormatterImpl::getString() const
+{
+    return m_result;
+}
+
 PDFXmlOutputFormatterImpl::PDFXmlOutputFormatterImpl() :
     m_string(),
     m_streamWriter(&m_string),
@@ -609,6 +759,10 @@ PDFOutputFormatter::PDFOutputFormatter(Style style) :
 
         case Style::Html:
             m_impl = new PDFHtmlOutputFormatterImpl();
+            break;
+
+        case Style::Json:
+            m_impl = new PDFJsonOutputFormatterImpl();
             break;
     }
 
