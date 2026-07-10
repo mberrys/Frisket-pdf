@@ -20,13 +20,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-add_subdirectory(AudioBookPlugin)
-add_subdirectory(DimensionsPlugin)
-add_subdirectory(ObjectInspectorPlugin)
-add_subdirectory(OutputPreviewPlugin)
-add_subdirectory(RedactPlugin)
-add_subdirectory(SignaturePlugin)
-add_subdirectory(SoftProofingPlugin)
-add_subdirectory(EditorPlugin)
-add_subdirectory(FrisketPreflightPlugin)
-add_subdirectory(ScannerPlugin)
+set(FRISKET_PREFLIGHT_PLUGIN_SOURCES
+    frisketpreflightplugin.cpp
+    preflightreportdockwidget.cpp
+    preflightreportmodel.cpp
+    icons.qrc
+)
+
+add_library(FrisketPreflightPlugin SHARED ${FRISKET_PREFLIGHT_PLUGIN_SOURCES})
+
+target_link_libraries(FrisketPreflightPlugin PRIVATE Pdf4QtLibCore Pdf4QtLibWidgets Qt6::Core Qt6::Gui Qt6::Widgets)
+
+target_compile_definitions(FrisketPreflightPlugin PRIVATE
+    FRISKET_PREFLIGHT_EXAMPLE_REPORT="${CMAKE_SOURCE_DIR}/frisket-preflight/examples/report.example.json")
+
+set_target_properties(FrisketPreflightPlugin PROPERTIES
+                      VERSION ${PDF4QT_VERSION}
+                      SOVERSION ${PDF4QT_VERSION}
+                      LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_PLUGINS_DIR}
+                      RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_PLUGINS_DIR})
+
+install(TARGETS FrisketPreflightPlugin RUNTIME DESTINATION ${PDF4QT_PLUGINS_DIR} LIBRARY DESTINATION ${PDF4QT_PLUGINS_DIR})
