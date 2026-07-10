@@ -88,7 +88,9 @@ outcome or report output fails the build.
 | `testdata/fixtures/manifest.json` | Corpus manifest: fixture → profile → expected outcome |
 | `testdata/fixtures/*.pdf` | Fixture PDFs (hand-built or generated; **not** client/job PDFs) |
 | `testdata/snapshots/<id>.json` | Golden report JSON per fixture, normalized (`engine_version`/`pdf` stripped) |
+| `testdata/profiles/*.json` | Test-only profiles referenced by fixtures (e.g. `test-trim-pagesize.json`) |
 | `tools/generate_fixtures.cpp` | Deterministically (re)generates the `bleed-*` fixtures via `pdf::PDFDocumentBuilder` |
+| `tools/generate_fixtures.py` | Deterministically (re)generates the MIC-145 custom-check fixtures via reportlab/Pillow/pikepdf |
 
 ### Manifest entries
 
@@ -107,6 +109,10 @@ outcome or report output fails the build.
 empty for a clean pass. `UnitTestsPreflightCorpus` reads this manifest at test time — no
 code changes are needed to add a fixture, only a new PDF + manifest entry (+ an initial
 snapshot, below).
+
+An optional `"pending": true` marks a fixture whose target check the engine does not implement
+yet: the runner skips it and `expect{}` records the intended future outcome (see "Hand-built
+custom-check fixtures" below).
 
 ### Adding a fixture
 
@@ -138,10 +144,59 @@ still pass/fail the way it's supposed to. The snapshot check (`preflightMatchesS
 the regression gate: did anything about the report's *content* (message text, bbox, severity,
 finding order) change, even if pass/fail didn't. Both run for every corpus entry.
 
-### Public PDF/A corpora and the hand-built check matrix
+### Hand-built custom-check fixtures (MIC-145)
 
-This directory currently seeds only the `bleed` check (the only one `PdfTool preflight`
-implements so far). The full hand-built fixture matrix (trim, page-size, image-resolution,
-color-mode, embedded-fonts) is tracked separately in MIC-145, and a pinned subset of public
-PDF/A corpora (veraPDF-corpus, Isartor, BFO) in MIC-146 — both add entries to this same
-manifest and drop fixtures into `testdata/fixtures/` without needing to change the runner.
+Public corpora (veraPDF, Isartor, GWG — MIC-146) cover standards-backed checks but not
+Frisket Default's custom rules. The custom-check fixtures live in this same corpus. Each is
+minimal and **isolates a single check**: it is built so every *other* check in its profile
+passes, and only the target check is exercised.
+
+| Fixture | Profile | Expect | Check(s) |
+|---------|---------|--------|----------|
+| `color-rgb.pdf` | frisket-default | fail | `color-mode` (DeviceRGB image) |
+| `color-cmyk.pdf` | frisket-default | pass | `color-mode` (DeviceCMYK image) |
+| `image-dpi-low.pdf` | frisket-default | warning | `image-resolution` (~25 DPI) |
+| `image-dpi-ok.pdf` | frisket-default | pass | `image-resolution` (~310 DPI) |
+| `font-not-embedded.pdf` | frisket-default | fail | `embedded-fonts` (Helvetica, no FontFile) |
+| `font-embedded.pdf` | frisket-default | pass | `embedded-fonts` (`/FontFile2` subset) |
+| `trim-pagesize-mismatch.pdf` | test-trim-pagesize | fail | `trim`, `page-size` (540×720 vs 612×792) |
+| `trim-pagesize-ok.pdf` | test-trim-pagesize | pass | `trim`, `page-size` (612×792) |
+
+The `bleed-*` pair above covers the `bleed` check, so every Frisket Default custom check has
+at least one known-pass and one known-fail (or warning) case.
+
+**How they were built.** `tools/generate_fixtures.py` builds them deterministically with
+[`reportlab`](https://pypi.org/project/reportlab/) (pages, text, embedded fonts, raster
+images), [`Pillow`](https://pypi.org/project/pillow/) (DeviceRGB / DeviceCMYK / DeviceGray
+images at chosen pixel sizes) and [`pikepdf`](https://pypi.org/project/pikepdf/) (precise
+`/MediaBox` / `/TrimBox` / `/BleedBox`, stable image names, stripped volatile metadata). They
+are synthetic — **no client or job PDFs**. The trim/page-size pair is checked against a
+test-only profile, `testdata/profiles/test-trim-pagesize.json`, that pins an expected US
+Letter size at error severity (the shipped `frisket-default` profile intentionally leaves the
+expected size unset).
+
+**`pending` and CI.** `PdfTool preflight` currently implements only `bleed`; the five checks
+these fixtures exercise are MIC-134. So each new manifest entry carries `"pending": true`,
+and `UnitTestsPreflightCorpus` **skips** pending rows (both the manifest and snapshot checks).
+Their `expect{}` records the *intended* outcome once the check lands, not today's behavior —
+this keeps CI green while committing the fixtures now. When a MIC-134 check ships:
+
+1. Remove `"pending": true` from that fixture's manifest entry.
+2. `FRISKET_UPDATE_SNAPSHOTS=1 ctest --test-dir build -R UnitTestsPreflightCorpus`, then review
+   and commit the new `testdata/snapshots/<id>.json`.
+
+**To regenerate the PDFs** (only when a fixture's geometry/content must change):
+
+```bash
+pip install reportlab pillow pikepdf
+python3 frisket-preflight/tools/generate_fixtures.py   # writes into testdata/fixtures/
+```
+
+The output is deterministic, so a re-run with no code change produces no diff. Review
+`git status` / `git diff` before committing to confirm no real client file slipped in.
+
+### Public PDF/A corpora (MIC-146)
+
+A pinned subset of public PDF/A corpora (veraPDF-corpus, Isartor, BFO) is tracked in MIC-146.
+Like the fixtures above, it adds entries to this same manifest and drops files into
+`testdata/fixtures/` without needing to change the runner.

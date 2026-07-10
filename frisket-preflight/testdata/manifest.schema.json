@@ -50,6 +50,11 @@
           "enum": ["hand-built", "generated", "public-corpus"],
           "description": "Where the fixture came from (see frisket-preflight/README.md)."
         },
+        "pending": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, UnitTestsPreflightCorpus skips this entry: the check(s) it exercises are not yet implemented in the engine, so its expect{} records the intended future outcome rather than current behavior. Drop this flag (and add a snapshot) once the check lands. See frisket-preflight/README.md ('Hand-built custom-check fixtures')."
+        },
         "notes": {
           "type": "string",
           "description": "Short human-readable description of what the fixture exercises."

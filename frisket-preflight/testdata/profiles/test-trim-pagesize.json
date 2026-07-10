@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "name": "Frisket Test - Trim/Page Size",
+  "description": "Test-only profile for the MIC-145 trim/page-size fixtures. Fixes an expected US Letter trim/page size (612 x 792 pt) at 1 pt tolerance and raises trim/page-size to error severity so a mismatch fails the run. Not a shipped product profile; the bleed check is intentionally omitted so the flat (bleed-less) trim fixtures isolate trim/page-size.",
+  "checks": [
+    { "id": "page-size", "expected_width_pt": 612, "expected_height_pt": 792, "tolerance_pt": 1, "severity": "error" },
+    { "id": "trim", "expected_width_pt": 612, "expected_height_pt": 792, "tolerance_pt": 1, "severity": "error" }
+  ]
+}
