@@ -73,6 +73,12 @@ const char* const s_regenerateHint =
     "FRISKET_UPDATE_SNAPSHOTS=1 ctest -R UnitTestsPreflightCorpus, and commit the "
     "output (see frisket-preflight/README.md, 'Golden corpus & CI').";
 
+const char* const s_pendingHint =
+    "Fixture marked pending: the check(s) it exercises are not yet implemented in "
+    "the engine, so its expect{} records the intended future outcome. Drop the "
+    "\"pending\" flag in manifest.json (and add a snapshot) once the check lands "
+    "(see frisket-preflight/README.md, 'Hand-built custom-check fixtures').";
+
 }   // namespace
 
 class PreflightCorpusTest : public QObject
@@ -118,6 +124,7 @@ void PreflightCorpusTest::populateManifestRows()
     QTest::addColumn<QString>("id");
     QTest::addColumn<QString>("pdf");
     QTest::addColumn<QString>("profile");
+    QTest::addColumn<bool>("pending");
 
     for (const QJsonValue& value : m_manifest)
     {
@@ -125,7 +132,8 @@ void PreflightCorpusTest::populateManifestRows()
         const QString id = entry.value(QStringLiteral("id")).toString();
         QTest::newRow(qPrintable(id)) << id
                                        << entry.value(QStringLiteral("pdf")).toString()
-                                       << entry.value(QStringLiteral("profile")).toString();
+                                       << entry.value(QStringLiteral("profile")).toString()
+                                       << entry.value(QStringLiteral("pending")).toBool(false);
     }
 }
 
@@ -189,6 +197,7 @@ void PreflightCorpusTest::preflightMatchesManifest_data()
     QTest::addColumn<QString>("profile");
     QTest::addColumn<bool>("expectedPass");
     QTest::addColumn<QStringList>("expectedCheckIds");
+    QTest::addColumn<bool>("pending");
 
     for (const QJsonValue& value : m_manifest)
     {
@@ -206,7 +215,8 @@ void PreflightCorpusTest::preflightMatchesManifest_data()
                                        << entry.value(QStringLiteral("pdf")).toString()
                                        << entry.value(QStringLiteral("profile")).toString()
                                        << expect.value(QStringLiteral("pass")).toBool()
-                                       << expectedCheckIds;
+                                       << expectedCheckIds
+                                       << entry.value(QStringLiteral("pending")).toBool(false);
     }
 }
 
@@ -216,6 +226,12 @@ void PreflightCorpusTest::preflightMatchesManifest()
     QFETCH(QString, profile);
     QFETCH(bool, expectedPass);
     QFETCH(QStringList, expectedCheckIds);
+    QFETCH(bool, pending);
+
+    if (pending)
+    {
+        QSKIP(s_pendingHint);
+    }
 
     QString pdfPath;
     QString profilePath;
@@ -249,6 +265,12 @@ void PreflightCorpusTest::preflightMatchesSnapshot()
     QFETCH(QString, id);
     QFETCH(QString, pdf);
     QFETCH(QString, profile);
+    QFETCH(bool, pending);
+
+    if (pending)
+    {
+        QSKIP(s_pendingHint);
+    }
 
     QString pdfPath;
     QString profilePath;

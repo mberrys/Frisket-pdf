@@ -14,5 +14,77 @@
     "expect": { "pass": false, "check_ids": ["bleed"] },
     "source": "generated",
     "notes": "Only MediaBox (200x200) is set; TrimBox/BleedBox/CropBox all fall back to it, so bleed==trim==media -> zero bleed margin -> bleed check fails."
+  },
+  {
+    "id": "color-rgb",
+    "pdf": "color-rgb.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": false, "check_ids": ["color-mode"] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "DeviceRGB image (disallowed) at ~310 DPI on a page with adequate bleed and no fonts, so only color-mode fires. Pending until color-mode lands (MIC-134)."
+  },
+  {
+    "id": "color-cmyk",
+    "pdf": "color-cmyk.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "DeviceCMYK image (allowed) at ~310 DPI, adequate bleed, no fonts -> clean pass. Pending until color-mode lands (MIC-134)."
+  },
+  {
+    "id": "image-dpi-low",
+    "pdf": "image-dpi-low.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": true, "check_ids": ["image-resolution"] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "100x100 px DeviceGray image placed at 4x4 in -> ~25 DPI, below min_dpi 300. image-resolution is severity warning in frisket-default, so it appears in warnings[] and report.pass stays true. Pending until image-resolution lands (MIC-134)."
+  },
+  {
+    "id": "image-dpi-ok",
+    "pdf": "image-dpi-ok.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "1240x1240 px DeviceGray image placed at 4x4 in -> ~310 DPI (>= 300), adequate bleed, no fonts -> clean pass. Pending until image-resolution lands (MIC-134)."
+  },
+  {
+    "id": "font-not-embedded",
+    "pdf": "font-not-embedded.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": false, "check_ids": ["embedded-fonts"] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "Text set in Helvetica (standard-14) with no FontFile, adequate bleed, no images -> only embedded-fonts fires. Pending until embedded-fonts lands (MIC-134)."
+  },
+  {
+    "id": "font-embedded",
+    "pdf": "font-embedded.pdf",
+    "profile": "profiles/frisket-default.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "Text set in a subsetted TrueType font embedded via /FontFile2, adequate bleed, no images -> clean pass. Pending until embedded-fonts lands (MIC-134)."
+  },
+  {
+    "id": "trim-pagesize-mismatch",
+    "pdf": "trim-pagesize-mismatch.pdf",
+    "profile": "testdata/profiles/test-trim-pagesize.json",
+    "expect": { "pass": false, "check_ids": ["trim", "page-size"] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "MediaBox == TrimBox == 540x720, 72 pt off the profile's expected 612x792 (US Letter) on each dimension, far beyond the 1 pt tolerance -> trim and page-size both fail (error severity in the test profile). Pending until trim/page-size land (MIC-134)."
+  },
+  {
+    "id": "trim-pagesize-ok",
+    "pdf": "trim-pagesize-ok.pdf",
+    "profile": "testdata/profiles/test-trim-pagesize.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "hand-built",
+    "pending": true,
+    "notes": "MediaBox == TrimBox == 612x792, matching the profile's expected US Letter size within tolerance -> clean pass. Pending until trim/page-size land (MIC-134)."
   }
 ]
