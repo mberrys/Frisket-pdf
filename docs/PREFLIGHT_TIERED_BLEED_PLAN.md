@@ -4,7 +4,7 @@ Status: **draft — M0, pending review** (locks names before Core code; 2026-07-
 Scope: Frisket-pdf / PDF4QT 1.6.0.0. Phase 1 — CLI engine.
 Primary API names: **`PDFDocumentSession`** (`pdfdocumentsession.*`), **`PDFBleedMarginProbe`** (`pdfbleedmarginprobe.*`), **`PreflightEngine`** (PdfTool orchestrator).
 Finding types: **`content-bleed`**, **`bleed-margin-empty`**, **`needs-auto-bleed`**.
-Profile param: **`raster_confirm`** (per-check bool).
+Profile params: **`raster_confirm`** (bool), **`raster_confirm_dpi`** (default 150), **`raster_white_threshold`** (default 0.9975) — per-check.
 Epic: [MIC-151](https://linear.app/mbx2/issue/MIC-151). This doc: [MIC-152](https://linear.app/mbx2/issue/MIC-152).
 Related: MIC-153 (`PDFDocumentSession`), MIC-155 (`PDFBleedMarginProbe`), MIC-137/136/138 (plugin + overlays), MIC-121/122/141 (`add-bleed` fixup consumers), MIC-134 (box `bleed` check, done).
 
@@ -181,23 +181,27 @@ struct PDFBleedMarginProbeResult
     std::array<QRectF, 4> edgeStrips;   // page user space, per-edge bbox for findings
 };
 PDFBleedMarginProbeResult probe(PDFDocumentSession& session, PDFInteger pageIndex,
-                                const QRectF& trim, const QRectF& bleed, qreal amountPt);
+                                const QRectF& trim, const QRectF& bleed, qreal amountPt,
+                                int dpi = 150, qreal whiteThreshold = 0.9975);
 ```
 
 ## DPI / threshold defaults
 
 Locked here (not in AGENTS.md) per `docs/PLANNING.md`. All reviewable in this M0.
 
-| Setting | Default | Notes |
-|---------|---------|-------|
-| Tier-2 probe DPI | **150** | Half the 300-DPI print minimum; enough to detect empty vs. filled margin, ~¼ the pixels of a 300-DPI probe. |
-| `bleed-margin-empty` coverage threshold | **≥ 0.25% non-background pixels** ⇒ that edge is not empty | **Per-edge**, not an aggregate over the whole perimeter (see below). Tuned in unit tests against fixtures. |
-| Coverage scope | **per-edge** (4 independent strips: top/bottom/left/right) | An aggregate whole-perimeter check lets ink on three sides mask a genuinely blank fourth side; per-edge coverage cannot be masked that way. |
+**Naming reconciliation (found during review):** MIC-155 and MIC-160 already named three profile params — `raster_confirm`, `raster_confirm_dpi` (default **72**), `raster_white_threshold` (default **0.95**) — predating this doc. This M0 doc **adopts their three-param naming** (cleaner than a single implicit bool) but **supersedes both numeric defaults**, reasoned below. MIC-155/MIC-160 descriptions are updated to match as part of this revision.
+
+| Param | Default | Notes |
+|-------|---------|-------|
+| `raster_confirm` | `false` (unset) | Per-check bool; gates whether Tier 2 runs at all. Unset ⇒ default profile behavior/cost unchanged. |
+| `raster_confirm_dpi` | **150** (was 72) | 72 DPI makes a 9pt bleed strip only **~6px** deep (0.125in × 72) — too coarse to distinguish faint content from noise. 150 DPI gives **~19px**, still ¼ the pixels of a 300-DPI probe, but enough to compute a meaningful coverage ratio. |
+| `raster_white_threshold` | **0.9975** (was 0.95) | Fraction of an edge strip that must be background/white before that edge is called empty. 0.95 (the old default) would call a strip "empty" even with **5% ink coverage** — large enough to be genuine bleed content, not noise. 0.9975 (⇔ ≤0.25% non-background) only fires on strips that are *actually* blank within antialiasing/compression noise (~0.01–0.05%), while still clearing faint-but-real bleed (light gradients, watermarks, thin rules) that a laxer 0.95 bar would already have passed anyway — so the practical gap between the two thresholds is at the *strict* end, not the lax end: 0.95 was simply too permissive to catch much of anything. |
+| Coverage scope | **per-edge** (4 independent strips: top/bottom/left/right) | Not an aggregate over the whole perimeter (see below) — that gap in the original MIC-155/160 wording ("strip rects" / no scope stated) is closed here. |
 | Bleed reach | `amount_pt` = **9** | Existing `frisket-default` value (9 pt ≈ 0.125 in). |
 | Bleed/content tolerance | `tolerance_pt` = **0.25** when unset | Promotes today's hard-coded `isBleedAdequate` value to a profile param. |
 | Render features | `ClipToCropBox` off, annotations off | Match `pdfbleedfixup.cpp` strip render; probe the full bleed margin, not the crop. |
 
-**Why 0.25%, and why per-edge is the more consequential lock.** For a Letter page (8.5×11in) at the default 9pt bleed depth and 150 DPI, one edge strip is on the order of tens of thousands of pixels; 0.25% of that is roughly a 0.11×0.11in patch of ink needed *on that edge* before the probe calls it "not empty." Genuinely blank margins sit at a noise floor (antialiasing, compression artifacts) around 0.01–0.05%, well under either 0.25% or 0.5% — so the exact percentage barely changes whether a *truly* empty margin gets caught. Where it matters is faint-but-real bleed (a light gradient, watermark, or thin rule that barely touches the edge): a 0.5% bar could wrongly flag that content as empty, while 0.25% correctly clears it. Switching from one aggregate perimeter number to **four independent per-edge checks** matters more than either percentage: an aggregate metric lets solid bleed on three sides carry a genuinely blank fourth side over the bar, silently missing exactly the defect this check exists to catch.
+**Why per-edge is the more consequential lock, independent of the exact threshold.** For a Letter page (8.5×11in) at 9pt bleed depth and 150 DPI, one edge strip is on the order of tens of thousands of pixels; a 0.25%-non-background bar is roughly a 0.11×0.11in patch of ink needed *on that edge* before the probe calls it "not empty." Genuinely blank margins sit at a noise floor around 0.01–0.05%, well under that bar either way — so the exact percentage mostly matters for faint-but-real bleed, not for catching truly blank margins. Switching from one aggregate perimeter number to **four independent per-edge checks** matters more than the percentage: an aggregate metric lets solid bleed on three sides carry a genuinely blank fourth side over the bar, silently missing exactly the defect this check exists to catch.
 
 Profile example (Sinalite-style, opts into Tier 2):
 
@@ -208,11 +212,13 @@ Profile example (Sinalite-style, opts into Tier 2):
   "amount_pt": 9,
   "tolerance_pt": 0.25,
   "raster_confirm": true,
+  "raster_confirm_dpi": 150,
+  "raster_white_threshold": 0.9975,
   "severity": "error"
 }
 ```
 
-`raster_confirm` fits `profile.schema.json`'s check objects (which allow `additionalProperties: true`); register it in the schema and the README check-params table alongside `amount_pt` / `min_dpi` / `allowed`.
+All three `raster_*` params fit `profile.schema.json`'s check objects (which allow `additionalProperties: true`); register them in the schema and the README check-params table alongside `amount_pt` / `min_dpi` / `allowed`.
 
 ## Editor / canvas reuse notes (MIC-137)
 
