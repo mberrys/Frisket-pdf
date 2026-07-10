@@ -99,4 +99,4 @@ Likely conflict files: `README.md`, `LICENSE`, `.github/**`, `CMakeLists.txt`, `
 
 ### Agent / contributor note
 
-See [AGENTS.md](../AGENTS.md) for build and edit rules. For multi-issue / multi-surface feature planning (shared Core APIs, mode enums), see [PLANNING.md](PLANNING.md). For upstream work: do not run `git fetch upstream` or merge upstream unless the user asks in that session.
+See [AGENTS.md](../AGENTS.md) for build and edit rules. For multi-issue / multi-surface feature planning (shared Core APIs, mode enums), see [PLANNING.md](PLANNING.md). For release packaging and OSS licensing (MIC-140), see [PACKAGING_LICENSING.md](PACKAGING_LICENSING.md). For upstream work: do not run `git fetch upstream` or merge upstream unless the user asks in that session.
