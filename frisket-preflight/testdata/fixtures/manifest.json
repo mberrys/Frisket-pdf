@@ -21,7 +21,8 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": false, "check_ids": ["color-mode"] },
     "source": "hand-built",
-    "notes": "DeviceRGB image (disallowed) at ~310 DPI on a page with adequate bleed and no fonts, so only color-mode fires."
+    "pending": true,
+    "notes": "DeviceRGB image (disallowed) at ~310 DPI on a page with adequate bleed and no fonts, so only color-mode fires. Pending until color-mode check lands (not in MIC-134)."
   },
   {
     "id": "color-cmyk",
@@ -29,7 +30,8 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
-    "notes": "DeviceCMYK image (allowed) at ~310 DPI, adequate bleed, no fonts -> clean pass."
+    "pending": true,
+    "notes": "DeviceCMYK image (allowed) at ~310 DPI, adequate bleed, no fonts -> clean pass. Pending until color-mode check lands (not in MIC-134)."
   },
   {
     "id": "image-dpi-low",
@@ -37,7 +39,8 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": ["image-resolution"] },
     "source": "hand-built",
-    "notes": "100x100 px DeviceGray image placed at 4x4 in -> ~25 DPI, below min_dpi 300. image-resolution is severity warning in frisket-default, so it appears in warnings[] and report.pass stays true."
+    "pending": true,
+    "notes": "100x100 px DeviceGray image placed at 4x4 in -> ~25 DPI, below min_dpi 300. image-resolution is severity warning in frisket-default, so it appears in warnings[] and report.pass stays true. Pending until image-resolution check lands (not in MIC-134)."
   },
   {
     "id": "image-dpi-ok",
@@ -45,7 +48,8 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
-    "notes": "1240x1240 px DeviceGray image placed at 4x4 in -> ~310 DPI (>= 300), adequate bleed, no fonts -> clean pass."
+    "pending": true,
+    "notes": "1240x1240 px DeviceGray image placed at 4x4 in -> ~310 DPI (>= 300), adequate bleed, no fonts -> clean pass. Pending until image-resolution check lands (not in MIC-134)."
   },
   {
     "id": "font-not-embedded",
@@ -53,7 +57,8 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": false, "check_ids": ["embedded-fonts"] },
     "source": "hand-built",
-    "notes": "Text set in Helvetica (standard-14) with no FontFile, adequate bleed, no images -> only embedded-fonts fires."
+    "pending": true,
+    "notes": "Text set in Helvetica (standard-14) with no FontFile, adequate bleed, no images -> only embedded-fonts fires. Pending until embedded-fonts check lands (not in MIC-134)."
   },
   {
     "id": "font-embedded",
@@ -61,7 +66,8 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
-    "notes": "Text set in a subsetted TrueType font embedded via /FontFile2, adequate bleed, no images -> clean pass."
+    "pending": true,
+    "notes": "Text set in a subsetted TrueType font embedded via /FontFile2, adequate bleed, no images -> clean pass. Pending until embedded-fonts check lands (not in MIC-134)."
   },
   {
     "id": "trim-pagesize-mismatch",
