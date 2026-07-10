@@ -37,7 +37,7 @@ Consistent with the **hybrid sidecar** plan of record: all preflight logic lives
 | **Core** `pdftool::preflight` (header-only math) | Tier-1 content-bounds test; existing box math | issue 4 |
 | **PdfTool** `PreflightEngine` | Orchestrates checks over one session; assembles report; dynamic `fixups_available` | issue 3 / 6 |
 | **PdfTool** `preflight` command | Non-interactive harness; PDF + profile → JSON report on stdout | existing |
-| **Editor** (P2 stretch) | Reuses `PDFDocumentSession`; not this epic's core | MIC-159 |
+| **Editor** (P2 stretch) | Reuses `PDFDocumentSession`; not this epic's core | MIC-156 |
 
 ```text
 PdfTool preflight in.pdf --profile p.json
@@ -170,9 +170,9 @@ Backing primitives (all confirmed present in `Pdf4QtLibCore/sources/`):
 - `compiledPage()` compiles via `PDFRenderer::compile(PDFPrecompiledPage*, pageIndex)` into a `QCache<PDFInteger, PDFPrecompiledPage>`, reusing `PDFPrecompiledPage::markAccessed()` / `hasExpired()` for LRU (the same hooks the Editor's `PDFAsynchronousPageCompiler` uses).
 - `decodedStream()` wraps `PDFObjectStorage::getDecodedStream` (via `PDFDocument::getDecodedStream`), keyed by `PDFObjectReference`. **No decode cache exists today** — this LRU is genuinely new (used by Tier-1 content-bounds and Tier-2 to avoid re-filtering the same image/content stream).
 
-**Tier-1 content bounds** come from the compiled page: derive the union of drawn-mark bounds from the `PDFPrecompiledPage` instruction list, in page user space, and feed it to `contentWithinBleed`.
+**Tier-1 content bounds** come from the compiled page via `PDFPrecompiledPage::calculateGraphicPieceInfos(mediaBox, epsilon)` (returns `GraphicPieceInfo`s, each with a `boundingRect` and a `Type` of Text/VectorGraphics/Image/Shading, in page user space). Union the `boundingRect`s into the content-bounds rectangle and feed it to `contentWithinBleed`. This is the concrete API MIC-158 builds on — the per-piece `Type` also lets a later refinement ignore, say, registration marks if needed.
 
-**`PDFBleedMarginProbe` (MIC-155)** takes a `PDFDocumentSession&`, a page index, and probes **each of the four edges independently** (top/bottom/left/right strip rectangles, each `amount_pt` deep along the trim/bleed boundary on that side), rasterizing every strip via `PDFRenderer::render(QPainter*, const QTransform&, pageIndex)` with `ClipToCropBox` **off** — the strip pattern already implemented in `pdfbleedfixup.cpp` (~585–661), which today rasterizes full-page then crops. Each edge gets its own coverage verdict; the probe never averages across the whole perimeter, so a single deficient edge cannot be masked by ink on the other three. Generalizing full-page-then-crop into a true sub-rect render (four strips instead of one) is the P3 stretch (MIC-158); the probe can start by cropping four strips from one full-page raster and swap to true sub-rect rendering later without changing its per-edge signature.
+**`PDFBleedMarginProbe` (MIC-155)** takes a `PDFDocumentSession&`, a page index, and probes **each of the four edges independently** (top/bottom/left/right strip rectangles, each `amount_pt` deep along the trim/bleed boundary on that side), rasterizing every strip via `PDFRenderer::render(QPainter*, const QTransform&, pageIndex)` with `ClipToCropBox` **off** — the strip pattern already implemented in `pdfbleedfixup.cpp` (~585–661), which today rasterizes full-page then crops. Each edge gets its own coverage verdict; the probe never averages across the whole perimeter, so a single deficient edge cannot be masked by ink on the other three. Generalizing full-page-then-crop into a true sub-rect render (four strips instead of one) is the P3 stretch (MIC-159); the probe can start by cropping four strips from one full-page raster and swap to true sub-rect rendering later without changing its per-edge signature.
 
 ```cpp
 struct PDFBleedMarginProbeResult
@@ -227,7 +227,7 @@ All three `raster_*` params fit `profile.schema.json`'s check objects (which all
 - The Editor's de-facto session is spread across `PDFDrawSpaceController` (owns `PDFFontCache`, holds document + `PDFOptionalContentActivity`) and `PDFDrawWidgetProxy` (owns the `PDFAsynchronousPageCompiler` with its `QCache<PDFInteger, PDFPrecompiledPage>`, exposes `getCMSManager`).
 - `PDFDocumentSession` mirrors that getter surface (`document()`, `fontCache()`, `cms()`, `compiledPage()`) so `PDFDrawWidgetProxy` could hold or delegate to a session without changing its callers.
 - The Frisket Preflight plugin (MIC-137, done) currently only displays report JSON produced by the CLI. Once the session exists, an in-process preflight run in the Editor could share the already-compiled pages of the open document instead of recompiling — the payoff of putting the cache in Core.
-- **Actual Editor wiring is the P2 stretch (MIC-159 / issue 8), not this epic's core.** This doc only locks the session's shape so that reuse stays possible.
+- **Actual Editor wiring is the P2 stretch (MIC-156 / issue 8), not this epic's core.** This doc only locks the session's shape so that reuse stays possible.
 
 ## Related code
 
