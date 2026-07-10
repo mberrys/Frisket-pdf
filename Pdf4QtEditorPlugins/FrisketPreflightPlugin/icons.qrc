@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/pdfplugins/frisketpreflight">
+        <file>preflight.svg</file>
+    </qresource>
+</RCC>
