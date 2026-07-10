@@ -56,8 +56,8 @@ Tier 1 always runs. Tier 2 runs **only** when the check's profile entry sets `ra
 | `BleedBox` missing / smaller than `amount_pt` beyond trim | 1 | no | `content-bleed` (box-level), + `needs-auto-bleed` |
 | Content bbox does not reach `amount_pt` into bleed on some edge | 1 | no | `content-bleed` (content-level) |
 | Tier-1 flagged **and** `raster_confirm:false` (or unset) | — | no | Tier-1 finding only; Tier 2 skipped |
-| Tier-1 flagged **and** `raster_confirm:true`, strip has content | 2 | strip | (downgrade) no `bleed-margin-empty`; content actually bleeds |
-| Tier-1 flagged **and** `raster_confirm:true`, strip empty | 2 | strip | `bleed-margin-empty` (confirmed), + `needs-auto-bleed` |
+| Tier-1 flagged **and** `raster_confirm:true`, every edge strip has content | 2 | 4 strips | (downgrade) no `bleed-margin-empty`; content actually bleeds on all sides |
+| Tier-1 flagged **and** `raster_confirm:true`, one or more edge strips empty | 2 | 4 strips | `bleed-margin-empty` per empty edge, + `needs-auto-bleed` |
 
 Truth table for the Tier-2 gate:
 
@@ -65,7 +65,7 @@ Truth table for the Tier-2 gate:
 |---------------|------------------|--------------|-------------|
 | pass | any | no | none |
 | flag | absent / false | no | `content-bleed` (structural, unconfirmed) |
-| flag | true | yes | `bleed-margin-empty` if strip empty, else cleared |
+| flag | true | yes (all 4 edges probed) | `bleed-margin-empty` for each edge below the coverage threshold; edges above it are cleared |
 
 Rationale: the structural Tier-1 finding is enough for a report; `raster_confirm` buys a pixel-level confirmation for shops that want to suppress false positives from content Tier 1 cannot bound. The default profile omits `raster_confirm`, so its behavior and cost are unchanged.
 
@@ -82,10 +82,11 @@ All `type`s are kebab-case per `report.schema.json` (`^[a-z][a-z0-9-]*$`) and ca
 
 ### `bleed-margin-empty`
 - **Severity:** `warning` (default). Tier-2 confirmation of a Tier-1 flag.
-- **Tier:** 2 (raster). Emitted only when `raster_confirm:true` and the probed strip is empty within threshold.
-- **When:** the rasterized bleed-margin strip contains no meaningful content (coverage/luminance below threshold), confirming the margin is genuinely white.
-- **bbox:** the probed strip rectangle in page user space.
-- **Fixup:** contributes `needs-auto-bleed`.
+- **Tier:** 2 (raster). Emitted only when `raster_confirm:true` and a probed **edge** strip is empty within threshold.
+- **When:** one of the four bleed-margin edge strips (top/bottom/left/right, probed independently — see "Per-edge probing" below) contains no meaningful content, confirming that edge's margin is genuinely white.
+- **Per-edge, not one finding per page:** a page can emit **up to four** `bleed-margin-empty` findings, one per empty edge, each naming the edge in its `message` (e.g. "Bleed margin empty on left edge"). A page with bleed on three sides and none on the fourth gets exactly one finding, for the deficient edge — an aggregate whole-perimeter check would let the other three sides mask it.
+- **bbox:** that edge's probed strip rectangle in page user space (not the whole perimeter).
+- **Fixup:** contributes `needs-auto-bleed` (once per page, regardless of how many edges fired — see below).
 
 ### `needs-auto-bleed`
 - **Severity:** `info` (advisory; drives a fixup rather than failing the run).
@@ -94,11 +95,25 @@ All `type`s are kebab-case per `report.schema.json` (`^[a-z][a-z0-9-]*$`) and ca
 - **bbox:** the page media/trim box (page-level advisory).
 - **Fixup:** the presence of this finding is what makes `PreflightEngine` list `add-bleed` in `fixups_available` **dynamically** (see below).
 
-### bbox coordinate convention — LOCK
+### bbox coordinate convention — LOCK (verified, no value change)
 
-Seam to resolve now so new findings do not entrench it: `report.schema.json` `$defs.bbox` documents `[x0, y0, x1, y1]` with the **media-box lower-left origin (y-up)**, but the current emitter (`pdftoolpreflight.cpp` `rectToBbox`) writes `[left, top, right, bottom]` straight from a Qt `QRectF` (top-left origin).
+Re-checked against `PDFDocumentDataLoaderDecorator::readRectangle` (`pdfdocument.cpp:245–277`): page boxes are built as `QRectF(xMin, yMin, xMax - xMin, yMax - yMin)` from the **raw PDF array values, unflipped** — `yMin`/`yMax` are the PDF box's bottom/top y exactly as read. So `rectToBbox()`'s `[left(), top(), right(), bottom()]` (`pdftoolpreflight.cpp`) already emits `[llx, lly, urx, ury]`, which **is** `[x0, y0, x1, y1]` in true PDF user space, media-box-lower-left origin (y-up) — the emitted values already match `report.schema.json` exactly. There is no output bug and no schema-value change needed.
 
-**Lock:** keep the existing emitter behavior (`QRectF` order) as the single source of truth for all findings — changing it would silently move every existing overlay — and **correct the schema description** to match (`[x0, y0, x1, y1]` where the values are the `QRectF` `left/top/right/bottom` in the page's top-left-origin user space). New Tier-1/Tier-2 findings must produce `bbox`es in that same convention. Track the schema-comment fix as part of issue 4.
+**The real hazard is naming, not data:** `QRectF::top()`/`bottom()` conventionally imply Qt's y-down screen space, but this code holds y-up PDF values in them unflipped — `.top()` returns the PDF **bottom** edge, `.bottom()` returns the PDF **top** edge. That's a trap for new bbox-producing code, specifically the Tier-2 raster probe, which does genuine device-space (`QImage`) math that *is* y-down and must map back through `PDFRenderer::createPagePointToDevicePointMatrix()` — reusing `.top()/.bottom()` straight off a rendered strip's rect without that mapping would silently invert y.
+
+**Lock:** no functional change to existing findings. Two documentation additions ride along with issue 4/5 implementation, worded here so the implementer copies them verbatim rather than re-deriving them:
+
+- `report.schema.json` `$defs.bbox.description` gains one clause making the source explicit: *"...Origin is the page's media-box lower-left (PDF convention) — these are the raw PDF box array values, not a screen-space rectangle...."*
+- A code comment lands above `rectToBbox()` in `pdftoolpreflight.cpp`:
+  ```cpp
+  // Page boxes are QRectF(llx, lly, width, height) — PDFDocumentDataLoaderDecorator::
+  // readRectangle loads raw PDF array values unflipped, so QRectF::top()/bottom() here
+  // hold PDF's bottom/top edges (y-up), NOT Qt's usual y-down screen convention. Do not
+  // derive bbox from a rendered QImage's device-space rect without mapping back through
+  // PDFRenderer::createPagePointToDevicePointMatrix() first.
+  ```
+
+New Tier-1/Tier-2 findings must produce `bbox`es via the same unflipped `QRectF` convention (page user space, not device space) so they stay consistent with existing `bleed`/`trim`/`page-size` findings and Phase-2 overlays.
 
 ### Dynamic `fixups_available` — LOCK
 
@@ -157,7 +172,17 @@ Backing primitives (all confirmed present in `Pdf4QtLibCore/sources/`):
 
 **Tier-1 content bounds** come from the compiled page: derive the union of drawn-mark bounds from the `PDFPrecompiledPage` instruction list, in page user space, and feed it to `contentWithinBleed`.
 
-**`PDFBleedMarginProbe` (MIC-155)** takes a `PDFDocumentSession&`, a page index, and a strip rectangle, and rasterizes only that strip via `PDFRenderer::render(QPainter*, const QTransform&, pageIndex)` with `ClipToCropBox` **off** — the strip pattern already implemented in `pdfbleedfixup.cpp` (~585–661), which today rasterizes full-page then crops. Generalizing that into a true sub-rect render is the P3 stretch (MIC-158); the probe can start with the full-page-then-crop approach and swap later without changing its signature.
+**`PDFBleedMarginProbe` (MIC-155)** takes a `PDFDocumentSession&`, a page index, and probes **each of the four edges independently** (top/bottom/left/right strip rectangles, each `amount_pt` deep along the trim/bleed boundary on that side), rasterizing every strip via `PDFRenderer::render(QPainter*, const QTransform&, pageIndex)` with `ClipToCropBox` **off** — the strip pattern already implemented in `pdfbleedfixup.cpp` (~585–661), which today rasterizes full-page then crops. Each edge gets its own coverage verdict; the probe never averages across the whole perimeter, so a single deficient edge cannot be masked by ink on the other three. Generalizing full-page-then-crop into a true sub-rect render (four strips instead of one) is the P3 stretch (MIC-158); the probe can start by cropping four strips from one full-page raster and swap to true sub-rect rendering later without changing its per-edge signature.
+
+```cpp
+struct PDFBleedMarginProbeResult
+{
+    std::array<bool, 4> edgeEmpty;      // indexed by Edge{Top,Bottom,Left,Right}
+    std::array<QRectF, 4> edgeStrips;   // page user space, per-edge bbox for findings
+};
+PDFBleedMarginProbeResult probe(PDFDocumentSession& session, PDFInteger pageIndex,
+                                const QRectF& trim, const QRectF& bleed, qreal amountPt);
+```
 
 ## DPI / threshold defaults
 
@@ -166,10 +191,13 @@ Locked here (not in AGENTS.md) per `docs/PLANNING.md`. All reviewable in this M0
 | Setting | Default | Notes |
 |---------|---------|-------|
 | Tier-2 probe DPI | **150** | Half the 300-DPI print minimum; enough to detect empty vs. filled margin, ~¼ the pixels of a 300-DPI probe. |
-| `bleed-margin-empty` coverage threshold | **≥ 0.5% non-background pixels** ⇒ not empty | Coverage of the strip; tuned in unit tests against fixtures. |
+| `bleed-margin-empty` coverage threshold | **≥ 0.25% non-background pixels** ⇒ that edge is not empty | **Per-edge**, not an aggregate over the whole perimeter (see below). Tuned in unit tests against fixtures. |
+| Coverage scope | **per-edge** (4 independent strips: top/bottom/left/right) | An aggregate whole-perimeter check lets ink on three sides mask a genuinely blank fourth side; per-edge coverage cannot be masked that way. |
 | Bleed reach | `amount_pt` = **9** | Existing `frisket-default` value (9 pt ≈ 0.125 in). |
 | Bleed/content tolerance | `tolerance_pt` = **0.25** when unset | Promotes today's hard-coded `isBleedAdequate` value to a profile param. |
 | Render features | `ClipToCropBox` off, annotations off | Match `pdfbleedfixup.cpp` strip render; probe the full bleed margin, not the crop. |
+
+**Why 0.25%, and why per-edge is the more consequential lock.** For a Letter page (8.5×11in) at the default 9pt bleed depth and 150 DPI, one edge strip is on the order of tens of thousands of pixels; 0.25% of that is roughly a 0.11×0.11in patch of ink needed *on that edge* before the probe calls it "not empty." Genuinely blank margins sit at a noise floor (antialiasing, compression artifacts) around 0.01–0.05%, well under either 0.25% or 0.5% — so the exact percentage barely changes whether a *truly* empty margin gets caught. Where it matters is faint-but-real bleed (a light gradient, watermark, or thin rule that barely touches the edge): a 0.5% bar could wrongly flag that content as empty, while 0.25% correctly clears it. Switching from one aggregate perimeter number to **four independent per-edge checks** matters more than either percentage: an aggregate metric lets solid bleed on three sides carry a genuinely blank fourth side over the bar, silently missing exactly the defect this check exists to catch.
 
 Profile example (Sinalite-style, opts into Tier 2):
 
