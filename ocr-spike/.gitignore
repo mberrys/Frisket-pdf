@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+results/*.png
+results/*.json
+!results/spike_report.json
+fixtures/rasters/
+easyocr_models/

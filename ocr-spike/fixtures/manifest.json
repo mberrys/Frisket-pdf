@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "dpi": 300,
+  "source": "generate_fixtures.py",
+  "fixtures": [
+    {
+      "id": "menu-live-text",
+      "page": 1,
+      "kind": "live-text",
+      "raster": "fixtures/rasters/menu-live-text-p001.png",
+      "ground_truth": "VENUE POSTER MENU\nHouse Lager ................ $6.00\nSeasonal IPA ............... $7.50\nVeggie Handbill ............ $12.00\nSignage Bundle ............. $45.00\nBleed: 0.125 in | Trim: 18 x 24 in",
+      "notes": "Synthetic 300 DPI letter raster; replace via prepare_samples.sh when PdfTool is available."
+    },
+    {
+      "id": "spec-sheet",
+      "page": 1,
+      "kind": "live-text",
+      "raster": "fixtures/rasters/spec-sheet-p001.png",
+      "ground_truth": "FRISKET PRINT SPEC \u2014 JOB #4421\nMedia: 80# gloss text | Color: CMYK | Finish: aqueous coat\nTrim: 8.5 x 11 in | Bleed: 0.125 in all sides | Safe: 0.25 in\nImages must be 300 DPI at final size. Embed all fonts or outline.\nNo RGB spot colors. Registration marks outside bleed only.\nDelivery: PDF/X-1a preferred; accept PDF 1.7 with bleed boxes set.\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.",
+      "notes": "Synthetic 300 DPI letter raster; replace via prepare_samples.sh when PdfTool is available."
+    },
+    {
+      "id": "scan-like-menu",
+      "page": 1,
+      "kind": "scan-like",
+      "raster": "fixtures/rasters/scan-like-menu-p001.png",
+      "ground_truth": "VENUE POSTER MENU\nHouse Lager ................ $6.00\nSeasonal IPA ............... $7.50\nVeggie Handbill ............ $12.00\nSignage Bundle ............. $45.00\nBleed: 0.125 in | Trim: 18 x 24 in",
+      "notes": "Synthetic 300 DPI letter raster; replace via prepare_samples.sh when PdfTool is available."
+    }
+  ]
+}

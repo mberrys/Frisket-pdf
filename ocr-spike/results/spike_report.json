@@ -1,0 +1,662 @@
+{
+  "engine": "easyocr",
+  "lang": "en",
+  "gpu": false,
+  "init_ms": 1409,
+  "fixture_count": 3,
+  "elapsed_ms": {
+    "min": 9705,
+    "max": 10127,
+    "mean": 9977.3,
+    "total": 29932
+  },
+  "schema_parity_mic123": {
+    "text": true,
+    "boxes": true,
+    "confidence": true,
+    "page": true
+  },
+  "pages": [
+    {
+      "page": 1,
+      "text": "VENUE POSTER MENU House Lager $6.00 Seasonal IPA $7.50 Veggie Handbill $12.00 Signage Bundle $45.00 Bleed: 0.125 in Trim: 18 x 24 in",
+      "boxes": [
+        [
+          159.0,
+          205.0,
+          957.0,
+          279.0
+        ],
+        [
+          153.0,
+          439.0,
+          472.0,
+          506.0
+        ],
+        [
+          729.0,
+          438.0,
+          878.0,
+          500.0
+        ],
+        [
+          153.0,
+          568.0,
+          468.0,
+          622.0
+        ],
+        [
+          717.0,
+          568.0,
+          867.0,
+          625.0
+        ],
+        [
+          154.0,
+          696.0,
+          541.0,
+          762.0
+        ],
+        [
+          741.0,
+          697.0,
+          921.0,
+          754.0
+        ],
+        [
+          150.0,
+          820.0,
+          544.0,
+          893.0
+        ],
+        [
+          758.0,
+          822.0,
+          940.0,
+          884.0
+        ],
+        [
+          155.0,
+          952.0,
+          527.0,
+          1006.0
+        ],
+        [
+          563.0,
+          952.0,
+          947.0,
+          1006.0
+        ]
+      ],
+      "confidence": [
+        0.9161722852593502,
+        0.9871026382085282,
+        0.7389445677245562,
+        0.8544707692394957,
+        0.9799356332774244,
+        0.9996299019740701,
+        0.8373756698222146,
+        0.9465574783388457,
+        0.6201074633153445,
+        0.9233525736500091,
+        0.5745462530640681
+      ],
+      "mean_confidence": 0.8526,
+      "detection_count": 11,
+      "elapsed_ms": 10100,
+      "detections": [
+        {
+          "text": "VENUE POSTER MENU",
+          "box": [
+            159.0,
+            205.0,
+            957.0,
+            279.0
+          ],
+          "confidence": 0.9161722852593502
+        },
+        {
+          "text": "House Lager",
+          "box": [
+            153.0,
+            439.0,
+            472.0,
+            506.0
+          ],
+          "confidence": 0.9871026382085282
+        },
+        {
+          "text": "$6.00",
+          "box": [
+            729.0,
+            438.0,
+            878.0,
+            500.0
+          ],
+          "confidence": 0.7389445677245562
+        },
+        {
+          "text": "Seasonal IPA",
+          "box": [
+            153.0,
+            568.0,
+            468.0,
+            622.0
+          ],
+          "confidence": 0.8544707692394957
+        },
+        {
+          "text": "$7.50",
+          "box": [
+            717.0,
+            568.0,
+            867.0,
+            625.0
+          ],
+          "confidence": 0.9799356332774244
+        },
+        {
+          "text": "Veggie Handbill",
+          "box": [
+            154.0,
+            696.0,
+            541.0,
+            762.0
+          ],
+          "confidence": 0.9996299019740701
+        },
+        {
+          "text": "$12.00",
+          "box": [
+            741.0,
+            697.0,
+            921.0,
+            754.0
+          ],
+          "confidence": 0.8373756698222146
+        },
+        {
+          "text": "Signage Bundle",
+          "box": [
+            150.0,
+            820.0,
+            544.0,
+            893.0
+          ],
+          "confidence": 0.9465574783388457
+        },
+        {
+          "text": "$45.00",
+          "box": [
+            758.0,
+            822.0,
+            940.0,
+            884.0
+          ],
+          "confidence": 0.6201074633153445
+        },
+        {
+          "text": "Bleed: 0.125 in",
+          "box": [
+            155.0,
+            952.0,
+            527.0,
+            1006.0
+          ],
+          "confidence": 0.9233525736500091
+        },
+        {
+          "text": "Trim: 18 x 24 in",
+          "box": [
+            563.0,
+            952.0,
+            947.0,
+            1006.0
+          ],
+          "confidence": 0.5745462530640681
+        }
+      ],
+      "raster": "fixtures/rasters/menu-live-text-p001.png",
+      "fixture_id": "menu-live-text",
+      "kind": "live-text",
+      "accuracy": {
+        "token_sort_ratio": 100.0,
+        "partial_ratio": 100.0
+      },
+      "ground_truth_chars": 194
+    },
+    {
+      "page": 1,
+      "text": "FRISKET PRINT SPEC = JOB #4421 Media: 80# gloss text Color: CMYK Finish: aqueous coat Trim: 8.5 X 11 in Bleed: 0.125 in all sides Safe: 0.25 in Images must be 300 DPI at final size. Embed all fonts or outline: No RGB spot colors. Registration marks outside bleed only: Delivery: PDFIX-la preferred; accept PDF 1.7 with bleed boxes set: Lorem ipsum dolor sit amet; consectetur adipiscing elit: Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.",
+      "boxes": [
+        [
+          138.0,
+          182.0,
+          768.0,
+          227.0
+        ],
+        [
+          137.0,
+          269.0,
+          542.0,
+          318.0
+        ],
+        [
+          566.0,
+          272.0,
+          794.0,
+          312.0
+        ],
+        [
+          819.0,
+          272.0,
+          1199.0,
+          317.0
+        ],
+        [
+          136.0,
+          360.0,
+          438.0,
+          402.0
+        ],
+        [
+          463.0,
+          360.0,
+          902.0,
+          402.0
+        ],
+        [
+          927.0,
+          360.0,
+          1165.0,
+          402.0
+        ],
+        [
+          134.0,
+          449.0,
+          1298.0,
+          500.0
+        ],
+        [
+          137.0,
+          539.0,
+          1202.0,
+          591.0
+        ],
+        [
+          136.0,
+          627.0,
+          1339.0,
+          680.0
+        ],
+        [
+          137.0,
+          717.0,
+          2391.0,
+          772.0
+        ],
+        [
+          137.0,
+          768.0,
+          1375.0,
+          823.0
+        ]
+      ],
+      "confidence": [
+        0.6351740022068629,
+        0.7320372639586427,
+        0.9810967096511226,
+        0.9779268090782395,
+        0.8166862033309762,
+        0.9007298651694281,
+        0.7464114805808493,
+        0.7149700641106732,
+        0.7704373152488645,
+        0.5579190364846061,
+        0.784173934344026,
+        0.7448464163516847
+      ],
+      "mean_confidence": 0.7802,
+      "detection_count": 12,
+      "elapsed_ms": 10127,
+      "detections": [
+        {
+          "text": "FRISKET PRINT SPEC = JOB #4421",
+          "box": [
+            138.0,
+            182.0,
+            768.0,
+            227.0
+          ],
+          "confidence": 0.6351740022068629
+        },
+        {
+          "text": "Media: 80# gloss text",
+          "box": [
+            137.0,
+            269.0,
+            542.0,
+            318.0
+          ],
+          "confidence": 0.7320372639586427
+        },
+        {
+          "text": "Color: CMYK",
+          "box": [
+            566.0,
+            272.0,
+            794.0,
+            312.0
+          ],
+          "confidence": 0.9810967096511226
+        },
+        {
+          "text": "Finish: aqueous coat",
+          "box": [
+            819.0,
+            272.0,
+            1199.0,
+            317.0
+          ],
+          "confidence": 0.9779268090782395
+        },
+        {
+          "text": "Trim: 8.5 X 11 in",
+          "box": [
+            136.0,
+            360.0,
+            438.0,
+            402.0
+          ],
+          "confidence": 0.8166862033309762
+        },
+        {
+          "text": "Bleed: 0.125 in all sides",
+          "box": [
+            463.0,
+            360.0,
+            902.0,
+            402.0
+          ],
+          "confidence": 0.9007298651694281
+        },
+        {
+          "text": "Safe: 0.25 in",
+          "box": [
+            927.0,
+            360.0,
+            1165.0,
+            402.0
+          ],
+          "confidence": 0.7464114805808493
+        },
+        {
+          "text": "Images must be 300 DPI at final size. Embed all fonts or outline:",
+          "box": [
+            134.0,
+            449.0,
+            1298.0,
+            500.0
+          ],
+          "confidence": 0.7149700641106732
+        },
+        {
+          "text": "No RGB spot colors. Registration marks outside bleed only:",
+          "box": [
+            137.0,
+            539.0,
+            1202.0,
+            591.0
+          ],
+          "confidence": 0.7704373152488645
+        },
+        {
+          "text": "Delivery: PDFIX-la preferred; accept PDF 1.7 with bleed boxes set:",
+          "box": [
+            136.0,
+            627.0,
+            1339.0,
+            680.0
+          ],
+          "confidence": 0.5579190364846061
+        },
+        {
+          "text": "Lorem ipsum dolor sit amet; consectetur adipiscing elit: Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "box": [
+            137.0,
+            717.0,
+            2391.0,
+            772.0
+          ],
+          "confidence": 0.784173934344026
+        },
+        {
+          "text": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.",
+          "box": [
+            137.0,
+            768.0,
+            1375.0,
+            823.0
+          ],
+          "confidence": 0.7448464163516847
+        }
+      ],
+      "raster": "fixtures/rasters/spec-sheet-p001.png",
+      "fixture_id": "spec-sheet",
+      "kind": "live-text",
+      "accuracy": {
+        "token_sort_ratio": 99.01,
+        "partial_ratio": 99.6
+      },
+      "ground_truth_chars": 535
+    },
+    {
+      "page": 1,
+      "text": "VENUE POSTER MENU House Lager s6.00 Seasonal IPA $7.50 Veggie Handbill $12.00 Signage Bundle $45.00 Bleed: 0.125 in Trim: 18 x 24 in",
+      "boxes": [
+        [
+          125.0,
+          209.0,
+          932.0,
+          305.0
+        ],
+        [
+          131.0,
+          461.0,
+          446.0,
+          524.0
+        ],
+        [
+          702.0,
+          443.0,
+          857.0,
+          511.0
+        ],
+        [
+          131.0,
+          585.0,
+          445.0,
+          648.0
+        ],
+        [
+          692.0,
+          574.0,
+          848.0,
+          639.0
+        ],
+        [
+          132.0,
+          708.0,
+          525.0,
+          786.0
+        ],
+        [
+          718.0,
+          699.0,
+          906.0,
+          766.0
+        ],
+        [
+          135.0,
+          838.0,
+          527.0,
+          913.0
+        ],
+        [
+          739.0,
+          829.0,
+          923.0,
+          895.0
+        ],
+        [
+          140.0,
+          967.0,
+          515.0,
+          1032.0
+        ],
+        [
+          546.0,
+          959.0,
+          935.0,
+          1023.0
+        ]
+      ],
+      "confidence": [
+        0.9616097202000453,
+        0.8450394290424649,
+        0.6449318465490714,
+        0.9975086467596692,
+        0.8197760059572652,
+        0.9439028646544826,
+        0.9167951498442504,
+        0.9925471577623303,
+        0.8220970500043716,
+        0.9286501307594816,
+        0.5572745661119266
+      ],
+      "mean_confidence": 0.8573,
+      "detection_count": 11,
+      "elapsed_ms": 9705,
+      "detections": [
+        {
+          "text": "VENUE POSTER MENU",
+          "box": [
+            125.0,
+            209.0,
+            932.0,
+            305.0
+          ],
+          "confidence": 0.9616097202000453
+        },
+        {
+          "text": "House Lager",
+          "box": [
+            131.0,
+            461.0,
+            446.0,
+            524.0
+          ],
+          "confidence": 0.8450394290424649
+        },
+        {
+          "text": "s6.00",
+          "box": [
+            702.0,
+            443.0,
+            857.0,
+            511.0
+          ],
+          "confidence": 0.6449318465490714
+        },
+        {
+          "text": "Seasonal IPA",
+          "box": [
+            131.0,
+            585.0,
+            445.0,
+            648.0
+          ],
+          "confidence": 0.9975086467596692
+        },
+        {
+          "text": "$7.50",
+          "box": [
+            692.0,
+            574.0,
+            848.0,
+            639.0
+          ],
+          "confidence": 0.8197760059572652
+        },
+        {
+          "text": "Veggie Handbill",
+          "box": [
+            132.0,
+            708.0,
+            525.0,
+            786.0
+          ],
+          "confidence": 0.9439028646544826
+        },
+        {
+          "text": "$12.00",
+          "box": [
+            718.0,
+            699.0,
+            906.0,
+            766.0
+          ],
+          "confidence": 0.9167951498442504
+        },
+        {
+          "text": "Signage Bundle",
+          "box": [
+            135.0,
+            838.0,
+            527.0,
+            913.0
+          ],
+          "confidence": 0.9925471577623303
+        },
+        {
+          "text": "$45.00",
+          "box": [
+            739.0,
+            829.0,
+            923.0,
+            895.0
+          ],
+          "confidence": 0.8220970500043716
+        },
+        {
+          "text": "Bleed: 0.125 in",
+          "box": [
+            140.0,
+            967.0,
+            515.0,
+            1032.0
+          ],
+          "confidence": 0.9286501307594816
+        },
+        {
+          "text": "Trim: 18 x 24 in",
+          "box": [
+            546.0,
+            959.0,
+            935.0,
+            1023.0
+          ],
+          "confidence": 0.5572745661119266
+        }
+      ],
+      "raster": "fixtures/rasters/scan-like-menu-p001.png",
+      "fixture_id": "scan-like-menu",
+      "kind": "scan-like",
+      "accuracy": {
+        "token_sort_ratio": 98.02,
+        "partial_ratio": 99.21
+      },
+      "ground_truth_chars": 194
+    }
+  ]
+}
