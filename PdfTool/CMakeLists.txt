@@ -57,6 +57,7 @@ add_executable(PdfTool
     pdftooladdbleed.h
     pdftoolpreflight.cpp
     pdftoolpreflight.h
+    pdftoolpreflightchecks.h
 )
 
 target_link_libraries(PdfTool PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Xml)

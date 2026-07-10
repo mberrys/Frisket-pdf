@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdftoolpreflight.h"
+#include "pdftoolpreflightchecks.h"
 
 #include "pdfdocument.h"
 #include "pdfpage.h"
@@ -46,6 +47,10 @@ struct PreflightCheckConfig
     bool enabled = true;
     qreal amountPt = 9.0;
     bool required = true;
+    qreal expectedWidthPt = 0.0;
+    qreal expectedHeightPt = 0.0;
+    qreal tolerancePt = 1.0;
+    bool hasExpectedSize = false;
 };
 
 struct PreflightFixupConfig
@@ -149,6 +154,12 @@ bool loadProfile(const QString& profilePath, PreflightProfileData& profile, QStr
         check.enabled = checkObject.value(QStringLiteral("enabled")).toBool(true);
         check.amountPt = checkObject.value(QStringLiteral("amount_pt")).toDouble(check.amountPt);
         check.required = checkObject.value(QStringLiteral("required")).toBool(check.required);
+        check.expectedWidthPt = checkObject.value(QStringLiteral("expected_width_pt")).toDouble(check.expectedWidthPt);
+        check.expectedHeightPt = checkObject.value(QStringLiteral("expected_height_pt")).toDouble(check.expectedHeightPt);
+        check.tolerancePt = checkObject.value(QStringLiteral("tolerance_pt")).toDouble(check.tolerancePt);
+        // Trim / page-size are job-spec dependent: without an expected size there is
+        // nothing to validate against, so the check is skipped (see appendSizeFindings).
+        check.hasExpectedSize = check.expectedWidthPt > 0.0 && check.expectedHeightPt > 0.0;
         profile.checks.push_back(check);
     }
 
@@ -174,29 +185,12 @@ bool loadProfile(const QString& profilePath, PreflightProfileData& profile, QStr
 bool isBleedAdequate(const pdf::PDFPage* page, qreal amountPt, QRectF& bboxForReport)
 {
     const QRectF media = page->getMediaBox().normalized();
-    QRectF trim = page->getTrimBox().normalized();
-    if (trim.isEmpty())
-    {
-        trim = page->getCropBox().normalized();
-    }
-    if (trim.isEmpty())
-    {
-        trim = media;
-    }
-
-    QRectF bleed = page->getBleedBox().normalized();
+    const QRectF trim = preflight::resolveEffectiveBox(page->getTrimBox(), page->getCropBox(), media);
+    const QRectF bleed = page->getBleedBox().normalized();
     bboxForReport = bleed.isEmpty() ? media : bleed;
 
-    if (bleed.isEmpty())
-    {
-        return false;
-    }
-
     const qreal tolerance = 0.25;
-    return (trim.left() - bleed.left() >= amountPt - tolerance)
-        && (trim.top() - bleed.top() >= amountPt - tolerance)
-        && (bleed.right() - trim.right() >= amountPt - tolerance)
-        && (bleed.bottom() - trim.bottom() >= amountPt - tolerance);
+    return preflight::bleedAdequate(trim, bleed, amountPt, tolerance);
 }
 
 void appendBleedFindings(const pdf::PDFDocument& document,
@@ -225,6 +219,67 @@ void appendBleedFindings(const pdf::PDFDocument& document,
         finding.checkId = check.id;
         finding.bbox = bbox;
         finding.message = PDFToolTranslationContext::tr("BleedBox is missing or less than %1 pt on one or more edges").arg(check.amountPt);
+
+        if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
+        {
+            warnings.push_back(finding);
+        }
+        else
+        {
+            errors.push_back(finding);
+        }
+    }
+}
+
+enum class SizeCheckKind
+{
+    Trim,       ///< Measures the TrimBox (with trim -> crop -> media fallback).
+    PageSize    ///< Measures the MediaBox (physical page size).
+};
+
+void appendSizeFindings(const pdf::PDFDocument& document,
+                        const PreflightCheckConfig& check,
+                        SizeCheckKind kind,
+                        QList<PreflightFinding>& errors,
+                        QList<PreflightFinding>& warnings)
+{
+    // Job-spec dependent: no expected dimensions means there is nothing to
+    // validate against, so the check is a no-op (see loadProfile / MIC-134).
+    if (!check.hasExpectedSize)
+    {
+        return;
+    }
+
+    const QString type = (kind == SizeCheckKind::Trim) ? QStringLiteral("trim") : QStringLiteral("page-size");
+
+    const pdf::PDFCatalog* catalog = document.getCatalog();
+    const pdf::PDFInteger pageCount = catalog->getPageCount();
+
+    for (pdf::PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
+    {
+        const pdf::PDFPage* page = catalog->getPage(pageIndex);
+        const QRectF media = page->getMediaBox().normalized();
+        const QRectF box = (kind == SizeCheckKind::Trim)
+                               ? preflight::resolveEffectiveBox(page->getTrimBox(), page->getCropBox(), media)
+                               : media;
+
+        if (preflight::sizeWithinTolerance(box.width(), box.height(), check.expectedWidthPt, check.expectedHeightPt, check.tolerancePt))
+        {
+            continue;
+        }
+
+        PreflightFinding finding;
+        finding.page = int(pageIndex + 1);
+        finding.objectId = QString();
+        finding.type = type;
+        finding.severity = check.severity;
+        finding.checkId = check.id;
+        finding.bbox = box;
+        finding.message = (kind == SizeCheckKind::Trim)
+                              ? PDFToolTranslationContext::tr("TrimBox %1 x %2 pt does not match expected %3 x %4 pt (tolerance %5 pt)")
+                                    .arg(box.width()).arg(box.height()).arg(check.expectedWidthPt).arg(check.expectedHeightPt).arg(check.tolerancePt)
+                              : PDFToolTranslationContext::tr("Page size %1 x %2 pt does not match expected %3 x %4 pt (tolerance %5 pt)")
+                                    .arg(box.width()).arg(box.height()).arg(check.expectedWidthPt).arg(check.expectedHeightPt).arg(check.tolerancePt);
 
         if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
         {
@@ -361,7 +416,15 @@ int PDFToolPreflightApplication::execute(const PDFToolOptions& options)
         {
             appendBleedFindings(document, check, errors, warnings);
         }
-        // Additional checks (fonts, color mode, image DPI, trim, page-size) — MIC-134.
+        else if (check.id == QStringLiteral("trim"))
+        {
+            appendSizeFindings(document, check, SizeCheckKind::Trim, errors, warnings);
+        }
+        else if (check.id == QStringLiteral("page-size"))
+        {
+            appendSizeFindings(document, check, SizeCheckKind::PageSize, errors, warnings);
+        }
+        // Remaining checks (fonts, color mode, image DPI) — future issues.
     }
 
     const QByteArray reportJson = buildReportJson(profile, options.document, errors, warnings);
