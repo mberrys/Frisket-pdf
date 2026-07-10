@@ -175,11 +175,14 @@ test-only profile, `testdata/profiles/test-trim-pagesize.json`, that pins an exp
 Letter size at error severity (the shipped `frisket-default` profile intentionally leaves the
 expected size unset).
 
-**`pending` and CI.** `PdfTool preflight` currently implements only `bleed`; the five checks
-these fixtures exercise are MIC-134. So each new manifest entry carries `"pending": true`,
-and `UnitTestsPreflightCorpus` **skips** pending rows (both the manifest and snapshot checks).
+**`pending` and CI.** MIC-134 shipped `bleed`, `trim`, and `page-size` only (PR #10); the
+`trim-pagesize-*` pair above is promoted and snapshotted (PR #13). `color-mode`,
+`image-resolution`, and `embedded-fonts` are not yet implemented in `PdfTool/pdftoolpreflight.cpp`
+and are tracked as separate follow-ups: MIC-148 (color-mode), MIC-149 (image-resolution), and
+MIC-150 (embedded-fonts). Their fixtures' manifest entries carry `"pending": true`, and
+`UnitTestsPreflightCorpus` **skips** pending rows (both the manifest and snapshot checks).
 Their `expect{}` records the *intended* outcome once the check lands, not today's behavior —
-this keeps CI green while committing the fixtures now. When a MIC-134 check ships:
+this keeps CI green while committing the fixtures now. When one of those checks ships:
 
 1. Remove `"pending": true` from that fixture's manifest entry.
 2. `FRISKET_UPDATE_SNAPSHOTS=1 ctest --test-dir build -R UnitTestsPreflightCorpus`, then review
