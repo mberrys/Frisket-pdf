@@ -25,7 +25,11 @@
 
 #include "pdfplugin.h"
 
+#include <memory>
+
 class QJsonObject;
+class QProcess;
+class QTemporaryDir;
 
 namespace pdfplugin
 {
@@ -42,6 +46,7 @@ private:
 
 public:
     FrisketPreflightPlugin();
+    virtual ~FrisketPreflightPlugin();
 
     virtual void setWidget(pdf::PDFWidget* widget) override;
     virtual void setDocument(const pdf::PDFModifiedDocument& document) override;
@@ -51,16 +56,21 @@ public:
 private:
     void ensureDockWidget();
     void updateActions();
-    void applyReportJson(const QJsonObject& report);
+    bool applyReportJson(const QJsonObject& report, QString* errorMessage = nullptr);
+    void finishPreflightRun();
 
     void onRunPreflightTriggered();
     void onShowPanelTriggered(bool checked);
     void onLoadExampleReportTriggered();
+    void onPreflightProcessFinished(int exitCode, int exitStatus);
+    void onPreflightProcessErrorOccurred();
 
     QAction* m_actionRunPreflight = nullptr;
     QAction* m_actionShowPanel = nullptr;
     QAction* m_actionLoadExample = nullptr;
     PreflightReportDockWidget* m_reportDockWidget = nullptr;
+    QProcess* m_preflightProcess = nullptr;
+    std::unique_ptr<QTemporaryDir> m_preflightTemporaryDirectory;
 };
 
 }   // namespace pdfplugin

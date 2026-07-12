@@ -5,7 +5,7 @@
   "description": "Normalized JSON report written to stdout by frisket-preflight. The Qt plugin consumes this shape only — never backend-specific payloads.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["pass", "profile", "errors", "warnings", "fixups_available"],
+  "required": ["schema_version", "pass", "profile", "errors", "warnings", "fixups_available"],
   "properties": {
     "schema_version": {
       "type": "integer",

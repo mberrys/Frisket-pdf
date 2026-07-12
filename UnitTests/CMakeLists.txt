@@ -79,6 +79,22 @@ set_target_properties(UnitTestsPreflightChecks PROPERTIES
 )
 add_test(UnitTestsPreflightChecks  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsPreflightChecks")
 
+# Locks the Editor plugin's pure sidecar path, exit-code, and report-contract helpers.
+add_executable(UnitTestsPreflightPlugin
+    tst_preflightplugintest.cpp
+)
+
+target_link_libraries(UnitTestsPreflightPlugin PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(UnitTestsPreflightPlugin PRIVATE ${CMAKE_SOURCE_DIR}/Pdf4QtEditorPlugins/FrisketPreflightPlugin)
+
+set_target_properties(UnitTestsPreflightPlugin PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsPreflightPlugin  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsPreflightPlugin")
+
 # Drives `PdfTool preflight` against the frisket-preflight golden corpus, so it needs
 # the PdfTool executable, which is not built in PDF4QT_BUILD_ONLY_CORE_LIBRARY mode.
 if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)

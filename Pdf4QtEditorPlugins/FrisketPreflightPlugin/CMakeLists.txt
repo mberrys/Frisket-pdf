@@ -31,8 +31,13 @@ add_library(FrisketPreflightPlugin SHARED ${FRISKET_PREFLIGHT_PLUGIN_SOURCES})
 
 target_link_libraries(FrisketPreflightPlugin PRIVATE Pdf4QtLibCore Pdf4QtLibWidgets Qt6::Core Qt6::Gui Qt6::Widgets)
 
+set(FRISKET_PREFLIGHT_PROFILES_DIR ${PDF4QT_INSTALL_SHARE_DIR}/frisket/profiles)
+cmake_path(RELATIVE_PATH FRISKET_PREFLIGHT_PROFILES_DIR
+           BASE_DIRECTORY "${PDF4QT_INSTALL_BIN_DIR}"
+           OUTPUT_VARIABLE FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH)
+
 target_compile_definitions(FrisketPreflightPlugin PRIVATE
-    FRISKET_PREFLIGHT_EXAMPLE_REPORT="${CMAKE_SOURCE_DIR}/frisket-preflight/examples/report.example.json")
+    FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH="${FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH}")
 
 set_target_properties(FrisketPreflightPlugin PROPERTIES
                       VERSION ${PDF4QT_VERSION}
@@ -41,3 +46,7 @@ set_target_properties(FrisketPreflightPlugin PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_PLUGINS_DIR})
 
 install(TARGETS FrisketPreflightPlugin RUNTIME DESTINATION ${PDF4QT_PLUGINS_DIR} LIBRARY DESTINATION ${PDF4QT_PLUGINS_DIR})
+install(FILES ${CMAKE_SOURCE_DIR}/frisket-preflight/profiles/frisket-default.json
+        DESTINATION ${FRISKET_PREFLIGHT_PROFILES_DIR})
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/frisket-preflight/schemas/
+        DESTINATION ${FRISKET_PREFLIGHT_PROFILES_DIR}/schemas)
