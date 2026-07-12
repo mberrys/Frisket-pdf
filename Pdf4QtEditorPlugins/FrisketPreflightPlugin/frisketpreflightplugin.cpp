@@ -22,14 +22,26 @@
 
 #include "frisketpreflightplugin.h"
 #include "preflightreportdockwidget.h"
+#include "preflightsidecarutils.h"
+
+#include "pdfdocumentwriter.h"
+#include "pdfdrawwidget.h"
 
 #include <QAction>
+#include <QCoreApplication>
 #include <QFile>
+#include <QFileInfo>
 #include <QIcon>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMainWindow>
 #include <QMessageBox>
+#include <QProcess>
+#include <QTemporaryDir>
+
+#ifndef FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH
+#define FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH "../share/frisket/profiles"
+#endif
 
 namespace pdfplugin
 {
@@ -38,6 +50,21 @@ FrisketPreflightPlugin::FrisketPreflightPlugin() :
     pdf::PDFPlugin(nullptr)
 {
 
+}
+
+FrisketPreflightPlugin::~FrisketPreflightPlugin()
+{
+    if (m_preflightProcess)
+    {
+        disconnect(m_preflightProcess, nullptr, this, nullptr);
+        if (m_preflightProcess->state() != QProcess::NotRunning)
+        {
+            m_preflightProcess->kill();
+            m_preflightProcess->waitForFinished();
+        }
+    }
+
+    m_preflightTemporaryDirectory.reset();
 }
 
 void FrisketPreflightPlugin::setWidget(pdf::PDFWidget* widget)
@@ -124,19 +151,149 @@ void FrisketPreflightPlugin::updateActions()
     {
         m_actionLoadExample->setEnabled(hasDocument);
     }
+
+    if (m_actionRunPreflight)
+    {
+        m_actionRunPreflight->setEnabled(hasDocument && !m_preflightProcess);
+    }
 }
 
-void FrisketPreflightPlugin::applyReportJson(const QJsonObject& report)
+bool FrisketPreflightPlugin::applyReportJson(const QJsonObject& report, QString* errorMessage)
 {
+    if (!preflight::validateNormalizedReport(report, errorMessage))
+    {
+        return false;
+    }
+
     ensureDockWidget();
     m_reportDockWidget->setReport(report);
     m_actionShowPanel->setChecked(true);
     m_reportDockWidget->show();
+    return true;
 }
 
 void FrisketPreflightPlugin::onRunPreflightTriggered()
 {
-    // MIC-136: QProcess -> PdfTool preflight <pdf> --profile <profile.json>
+    if (!m_document || m_preflightProcess)
+    {
+        return;
+    }
+
+    const QString applicationDirectory = QCoreApplication::applicationDirPath();
+    const QString pdfToolPath = preflight::resolveBundlePath(applicationDirectory, preflight::getPdfToolFileName());
+    const QString profilePath = preflight::resolveBundlePath(applicationDirectory, QStringLiteral(FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH "/frisket-default.json"));
+
+    if (!QFileInfo(pdfToolPath).isExecutable())
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
+                              tr("Could not find the PdfTool preflight sidecar at %1.").arg(QDir::toNativeSeparators(pdfToolPath)));
+        return;
+    }
+
+    if (!QFileInfo(profilePath).isFile())
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
+                              tr("Could not find the bundled Frisket Default profile at %1.").arg(QDir::toNativeSeparators(profilePath)));
+        return;
+    }
+
+    auto temporaryDirectory = std::make_unique<QTemporaryDir>();
+    if (!temporaryDirectory->isValid())
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("Could not create a temporary directory for the preflight snapshot."));
+        return;
+    }
+
+    const QString snapshotPath = temporaryDirectory->filePath(QStringLiteral("preflight-snapshot.pdf"));
+    pdf::PDFDocumentWriter writer(nullptr);
+    const pdf::PDFOperationResult writeResult = writer.write(snapshotPath, m_document, false);
+    if (!writeResult)
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
+                              tr("Could not create a preflight snapshot: %1").arg(writeResult.getErrorMessage()));
+        return;
+    }
+
+    m_preflightTemporaryDirectory = std::move(temporaryDirectory);
+    m_preflightProcess = new QProcess(this);
+    m_preflightProcess->setProcessChannelMode(QProcess::SeparateChannels);
+    connect(m_preflightProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this](int exitCode, QProcess::ExitStatus exitStatus) { onPreflightProcessFinished(exitCode, static_cast<int>(exitStatus)); });
+    connect(m_preflightProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error)
+    {
+        if (error == QProcess::FailedToStart)
+        {
+            onPreflightProcessErrorOccurred();
+        }
+    });
+
+    updateActions();
+    m_preflightProcess->start(pdfToolPath, { QStringLiteral("preflight"), snapshotPath, QStringLiteral("--profile"), profilePath });
+}
+
+void FrisketPreflightPlugin::onPreflightProcessFinished(int exitCode, int exitStatus)
+{
+    if (!m_preflightProcess)
+    {
+        return;
+    }
+
+    const QByteArray standardOutput = m_preflightProcess->readAllStandardOutput();
+    const QString standardError = QString::fromLocal8Bit(m_preflightProcess->readAllStandardError()).trimmed();
+    if (exitStatus != QProcess::NormalExit || !preflight::isExpectedPreflightExitCode(exitCode))
+    {
+        QString detail = standardError;
+        if (detail.isEmpty())
+        {
+            detail = tr("PdfTool exited with code %1.").arg(exitCode);
+        }
+
+        finishPreflightRun();
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("Preflight did not complete successfully: %1").arg(detail));
+        return;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument reportDocument = QJsonDocument::fromJson(standardOutput, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !reportDocument.isObject())
+    {
+        QString detail = parseError.error != QJsonParseError::NoError ? parseError.errorString() : tr("The output is not a JSON object.");
+        finishPreflightRun();
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("PdfTool returned an invalid preflight report: %1").arg(detail));
+        return;
+    }
+
+    const QJsonObject report = reportDocument.object();
+    finishPreflightRun();
+    QString validationError;
+    if (!applyReportJson(report, &validationError))
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("PdfTool returned an invalid preflight report: %1").arg(validationError));
+    }
+}
+
+void FrisketPreflightPlugin::onPreflightProcessErrorOccurred()
+{
+    if (!m_preflightProcess)
+    {
+        return;
+    }
+
+    const QString error = m_preflightProcess->errorString();
+    finishPreflightRun();
+    QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("Could not start PdfTool: %1").arg(error));
+}
+
+void FrisketPreflightPlugin::finishPreflightRun()
+{
+    if (m_preflightProcess)
+    {
+        m_preflightProcess->deleteLater();
+        m_preflightProcess = nullptr;
+    }
+
+    m_preflightTemporaryDirectory.reset();
+    updateActions();
 }
 
 void FrisketPreflightPlugin::onShowPanelTriggered(bool checked)
@@ -160,7 +317,7 @@ void FrisketPreflightPlugin::onShowPanelTriggered(bool checked)
 
 void FrisketPreflightPlugin::onLoadExampleReportTriggered()
 {
-    QFile file(QStringLiteral(FRISKET_PREFLIGHT_EXAMPLE_REPORT));
+    QFile file(QStringLiteral(":/pdfplugins/frisketpreflight/report.example.json"));
     if (!file.open(QIODevice::ReadOnly))
     {
         QMessageBox::warning(m_widget, tr("Frisket Preflight"),
@@ -177,7 +334,12 @@ void FrisketPreflightPlugin::onLoadExampleReportTriggered()
         return;
     }
 
-    applyReportJson(document.object());
+    QString validationError;
+    if (!applyReportJson(document.object(), &validationError))
+    {
+        QMessageBox::warning(m_widget, tr("Frisket Preflight"),
+                             tr("Example report does not match the Frisket report contract: %1").arg(validationError));
+    }
 }
 
 }   // namespace pdfplugin
