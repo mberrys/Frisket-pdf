@@ -54,9 +54,9 @@ void PreflightChecksTest::resolveEffectiveBox_prefersTrimThenCropThenMedia()
     const QRectF crop(10, 10, 380, 380);
     const QRectF trim(20, 20, 360, 360);
 
-    QCOMPARE(pdftool::preflight::resolveEffectiveBox(trim, crop, media), trim.normalized());
-    QCOMPARE(pdftool::preflight::resolveEffectiveBox(QRectF(), crop, media), crop.normalized());
-    QCOMPARE(pdftool::preflight::resolveEffectiveBox(QRectF(), QRectF(), media), media.normalized());
+    QCOMPARE(pdf::preflight::resolveEffectiveBox(trim, crop, media), trim.normalized());
+    QCOMPARE(pdf::preflight::resolveEffectiveBox(QRectF(), crop, media), crop.normalized());
+    QCOMPARE(pdf::preflight::resolveEffectiveBox(QRectF(), QRectF(), media), media.normalized());
 }
 
 void PreflightChecksTest::bleedAdequate_sufficientMarginPasses()
@@ -64,13 +64,13 @@ void PreflightChecksTest::bleedAdequate_sufficientMarginPasses()
     // Trim inset 10 pt inside the bleed box on every edge; requirement 9 pt.
     const QRectF bleed(0, 0, 220, 220);
     const QRectF trim(10, 10, 200, 200);
-    QVERIFY(pdftool::preflight::bleedAdequate(trim, bleed, 9.0, 0.25));
+    QVERIFY(pdf::preflight::bleedAdequate(trim, bleed, 9.0, 0.25));
 }
 
 void PreflightChecksTest::bleedAdequate_missingBleedFails()
 {
     const QRectF trim(0, 0, 200, 200);
-    QVERIFY(!pdftool::preflight::bleedAdequate(trim, QRectF(), 9.0, 0.25));
+    QVERIFY(!pdf::preflight::bleedAdequate(trim, QRectF(), 9.0, 0.25));
 }
 
 void PreflightChecksTest::bleedAdequate_shortEdgeFails()
@@ -78,7 +78,7 @@ void PreflightChecksTest::bleedAdequate_shortEdgeFails()
     // Only 5 pt of bleed on the right edge, below the 9 pt requirement.
     const QRectF bleed(0, 0, 205, 220);
     const QRectF trim(10, 10, 190, 200);
-    QVERIFY(!pdftool::preflight::bleedAdequate(trim, bleed, 9.0, 0.25));
+    QVERIFY(!pdf::preflight::bleedAdequate(trim, bleed, 9.0, 0.25));
 }
 
 void PreflightChecksTest::bleedAdequate_withinTolerancePasses()
@@ -86,33 +86,33 @@ void PreflightChecksTest::bleedAdequate_withinTolerancePasses()
     // Exactly 8.8 pt of bleed, which is within 0.25 pt of the 9 pt requirement.
     const QRectF bleed(0.0, 0.0, 217.6, 217.6);
     const QRectF trim(8.8, 8.8, 200.0, 200.0);
-    QVERIFY(pdftool::preflight::bleedAdequate(trim, bleed, 9.0, 0.25));
+    QVERIFY(pdf::preflight::bleedAdequate(trim, bleed, 9.0, 0.25));
 }
 
 void PreflightChecksTest::sizeWithinTolerance_exactMatchPasses()
 {
-    QVERIFY(pdftool::preflight::sizeWithinTolerance(612.0, 792.0, 612.0, 792.0, 1.0));
+    QVERIFY(pdf::preflight::sizeWithinTolerance(612.0, 792.0, 612.0, 792.0, 1.0));
 }
 
 void PreflightChecksTest::sizeWithinTolerance_withinTolerancePasses()
 {
-    QVERIFY(pdftool::preflight::sizeWithinTolerance(611.5, 792.5, 612.0, 792.0, 1.0));
+    QVERIFY(pdf::preflight::sizeWithinTolerance(611.5, 792.5, 612.0, 792.0, 1.0));
 }
 
 void PreflightChecksTest::sizeWithinTolerance_widthOutOfToleranceFails()
 {
-    QVERIFY(!pdftool::preflight::sizeWithinTolerance(610.0, 792.0, 612.0, 792.0, 1.0));
+    QVERIFY(!pdf::preflight::sizeWithinTolerance(610.0, 792.0, 612.0, 792.0, 1.0));
 }
 
 void PreflightChecksTest::sizeWithinTolerance_heightOutOfToleranceFails()
 {
-    QVERIFY(!pdftool::preflight::sizeWithinTolerance(612.0, 795.0, 612.0, 792.0, 1.0));
+    QVERIFY(!pdf::preflight::sizeWithinTolerance(612.0, 795.0, 612.0, 792.0, 1.0));
 }
 
 void PreflightChecksTest::sizeWithinTolerance_swappedOrientationFails()
 {
     // 792 x 612 must not satisfy an expected 612 x 792 (strict orientation).
-    QVERIFY(!pdftool::preflight::sizeWithinTolerance(792.0, 612.0, 612.0, 792.0, 1.0));
+    QVERIFY(!pdf::preflight::sizeWithinTolerance(792.0, 612.0, 612.0, 792.0, 1.0));
 }
 
 QTEST_APPLESS_MAIN(PreflightChecksTest)

@@ -84,5 +84,29 @@
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
     "notes": "MediaBox == TrimBox == 612x792, matching the profile's expected US Letter size within tolerance -> clean pass."
+  },
+  {
+    "id": "content-bleed-adequate",
+    "pdf": "content-bleed-adequate.pdf",
+    "profile": "examples/profile-tiered-bleed.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "hand-built",
+    "notes": "Boxes adequate, artwork extends into all bleed margins -> clean pass. Content-bleed check implemented in MIC-151."
+  },
+  {
+    "id": "content-bleed-missing",
+    "pdf": "content-bleed-missing.pdf",
+    "profile": "examples/profile-tiered-bleed.json",
+    "expect": { "pass": true, "check_ids": ["content-bleed"] },
+    "source": "hand-built",
+    "notes": "Boxes adequate but artwork stops at trim -> content-bleed warning. Content-bleed check implemented in MIC-151."
+  },
+  {
+    "id": "content-bleed-raster-confirm",
+    "pdf": "content-bleed-raster-confirm.pdf",
+    "profile": "examples/profile-tiered-bleed.json",
+    "expect": { "pass": true, "check_ids": ["content-bleed"] },
+    "source": "hand-built",
+    "notes": "Fast bounds flags gap; strip raster confirms missing content. Content-bleed check implemented in MIC-151."
   }
 ]

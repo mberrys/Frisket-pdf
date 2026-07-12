@@ -38,6 +38,7 @@ Plugins are built from `Pdf4QtEditorPlugins/` (AudioBook, Dimensions, Editor, Ob
 | `verify-signatures` | Check digital signatures |
 | `attachments` | List/save embedded files |
 | `statistics` | Document statistics |
+| `preflight` | Run Frisket preflight checks | `frisket-preflight/README.md` |
 
 Shared options on most commands: `--pswd`, page range flags (`--page-first`, `--page-last`, `--page-select`), and `--console-format text|xml|html`.
 

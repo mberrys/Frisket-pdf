@@ -36,6 +36,9 @@ Check params used by Phase 1 plans (open-ended via `additionalProperties`):
 | `required` | `bleed` |
 | `allowed` | `color-mode` |
 | `expected_width_pt` / `expected_height_pt` / `tolerance_pt` | `page-size`, `trim` |
+| `raster_confirm` | `content-bleed` |
+| `probe_dpi` | `content-bleed` |
+| `probe_threshold` | `content-bleed` |
 
 ## Report JSON
 
@@ -55,10 +58,34 @@ Every finding in `errors[]` / `warnings[]` **must** include:
 
 `object_id` is optional (string or null). `fixups_available[]` entries need `id`, `safe`, `description`.
 
+## Two-tier bleed checking
+
+Frisket supports two tiers of bleed validation:
+
+| Tier | Check ID | What it checks | Cost |
+|------|----------|---------------|------|
+| 1 | `bleed` | Box dimensions (BleedBox extends beyond TrimBox) | Free (page dictionary read) |
+| 2 | `content-bleed` | Actual artwork extends into the bleed margin | Rasterization (opt-in, profile-driven) |
+
+Tier-2 runs only when Tier-1 passes (boxes are adequate) and the profile includes a
+`content-bleed` check. It uses a fast vector-content bounds pass first. When
+`raster_confirm: true`, pages flagged by the fast pass undergo a focused strip-raster
+confirmation — no full-page render.
+
+The default `frisket-default` profile does **not** enable Tier-2. Use a separate
+profile to opt in (see `examples/profile-tiered-bleed.json`).
+
+When a document fails either bleed tier, the engine dynamically surfaces the
+`add-bleed` fixup in `fixups_available`.
+
 ## Intended CLI (MIC-133)
 
 ```bash
+# Default profile (Tier-1 bleed only)
 PdfTool preflight document.pdf --profile frisket-preflight/profiles/frisket-default.json
+
+# Tiered bleed profile (Tier-1 + Tier-2 content-bleed)
+PdfTool preflight document.pdf --profile frisket-preflight/examples/profile-tiered-bleed.json
 ```
 
 - Exit `0` when `pass` is true; exit `1` when `errors[]` is non-empty.
@@ -161,6 +188,9 @@ passes, and only the target check is exercised.
 | `font-embedded.pdf` | frisket-default | pass | `embedded-fonts` (`/FontFile2` subset) |
 | `trim-pagesize-mismatch.pdf` | test-trim-pagesize | fail | `trim`, `page-size` (540×720 vs 612×792) |
 | `trim-pagesize-ok.pdf` | test-trim-pagesize | pass | `trim`, `page-size` (612×792) |
+| `content-bleed-adequate.pdf` | tiered-bleed | pass | `content-bleed` (artwork extends into bleed) |
+| `content-bleed-missing.pdf` | tiered-bleed | fail | `content-bleed` (artwork stops at trim) |
+| `content-bleed-raster-confirm.pdf` | tiered-bleed | fail | `content-bleed` (fast bounds + raster confirm) |
 
 The `bleed-*` pair above covers the `bleed` check, so every Frisket Default custom check has
 at least one known-pass and one known-fail (or warning) case.

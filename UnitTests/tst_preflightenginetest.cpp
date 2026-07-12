@@ -1,0 +1,251 @@
+﻿// MIT License
+//
+// Copyright (c) 2018-2025 Jakub Melka and Contributors
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#include "preflightengine.h"
+#include "pdfdocumentbuilder.h"
+#include "pdfdocumentsession.h"
+
+#include <QtTest>
+#include <QJsonArray>
+#include <QJsonObject>
+
+class PreflightEngineTest : public QObject
+{
+    Q_OBJECT
+
+private slots:
+    void parseProfile_rejectsMissingName();
+    void parseProfile_rejectsEmptyChecks();
+    void run_bleedCheckFailsWhenBoxMissing();
+    void run_bleedCheckPassesWhenBoxAdequate();
+    void run_unknownCheckIdIsIgnored();
+    void run_includesProfileFixups();
+    void run_synthesizesAddBleedWhenGapAndNoProfileFixup();
+    void run_removesAddBleedWhenNoGap();
+};
+
+void PreflightEngineTest::parseProfile_rejectsMissingName()
+{
+    pdf::PreflightEngine engine(nullptr);
+    pdf::PreflightProfileData profile;
+    QString errorMessage;
+
+    QVERIFY(!engine.parseProfile(QJsonObject(), profile, errorMessage));
+    QVERIFY(!errorMessage.isEmpty());
+}
+
+void PreflightEngineTest::parseProfile_rejectsEmptyChecks()
+{
+    pdf::PreflightEngine engine(nullptr);
+    pdf::PreflightProfileData profile;
+    QString errorMessage;
+
+    QJsonObject profileObject;
+    profileObject.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    profileObject.insert(QStringLiteral("checks"), QJsonArray());
+
+    QVERIFY(!engine.parseProfile(profileObject, profile, errorMessage));
+    QVERIFY(!errorMessage.isEmpty());
+}
+
+void PreflightEngineTest::run_bleedCheckFailsWhenBoxMissing()
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 200));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("bleed") },
+        { QStringLiteral("amount_pt"), 9 },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+
+    pdf::PreflightResult result = engine.run(profile);
+    QVERIFY(!result.pass);
+    QCOMPARE(result.errors.size(), 1);
+    QCOMPARE(result.errors.first().type, QStringLiteral("bleed"));
+}
+
+void PreflightEngineTest::run_bleedCheckPassesWhenBoxAdequate()
+{
+    pdf::PDFDocumentBuilder builder;
+    const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, 220, 220));
+    builder.setPageTrimBox(page, QRectF(10, 10, 200, 200));
+    builder.setPageBleedBox(page, QRectF(0, 0, 220, 220));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("bleed") },
+        { QStringLiteral("amount_pt"), 9 },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+
+    pdf::PreflightResult result = engine.run(profile);
+    QVERIFY(result.pass);
+    QVERIFY(result.errors.isEmpty());
+}
+
+void PreflightEngineTest::run_unknownCheckIdIsIgnored()
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 200));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("not-a-real-check") },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+
+    pdf::PreflightResult result = engine.run(profile);
+    QVERIFY(result.pass);
+    QVERIFY(result.errors.isEmpty());
+}
+
+void PreflightEngineTest::run_includesProfileFixups()
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 200));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("bleed") },
+        { QStringLiteral("amount_pt"), 9 },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+    QJsonArray fixups;
+    fixups.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("add-bleed") },
+        { QStringLiteral("amount_pt"), 9 }
+    });
+    profile.insert(QStringLiteral("fixups"), fixups);
+
+    pdf::PreflightResult result = engine.run(profile);
+    QCOMPARE(result.fixupsAvailable.size(), 1);
+    QCOMPARE(result.fixupsAvailable.first().id, QStringLiteral("add-bleed"));
+    QCOMPARE(result.fixupsAvailable.first().amountPt, 9.0);
+
+    const QJsonObject report = result.toJson();
+    const QJsonArray reportFixups = report.value(QStringLiteral("fixups_available")).toArray();
+    QCOMPARE(reportFixups.size(), 1);
+    const QJsonObject params = reportFixups.first().toObject().value(QStringLiteral("params")).toObject();
+    QCOMPARE(params.value(QStringLiteral("amount_pt")).toDouble(), 9.0);
+    QCOMPARE(params.value(QStringLiteral("mode")).toString(), QStringLiteral("mirror"));
+}
+
+void PreflightEngineTest::run_synthesizesAddBleedWhenGapAndNoProfileFixup()
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 200));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("bleed") },
+        { QStringLiteral("amount_pt"), 9 },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+
+    pdf::PreflightResult result = engine.run(profile);
+    QCOMPARE(result.fixupsAvailable.size(), 1);
+    QCOMPARE(result.fixupsAvailable.first().id, QStringLiteral("add-bleed"));
+    QCOMPARE(result.fixupsAvailable.first().amountPt, 9.0);
+
+    const QJsonObject report = result.toJson();
+    const QJsonArray reportFixups = report.value(QStringLiteral("fixups_available")).toArray();
+    QCOMPARE(reportFixups.size(), 1);
+    const QJsonObject params = reportFixups.first().toObject().value(QStringLiteral("params")).toObject();
+    QCOMPARE(params.value(QStringLiteral("amount_pt")).toDouble(), 9.0);
+    QCOMPARE(params.value(QStringLiteral("mode")).toString(), QStringLiteral("mirror"));
+}
+
+void PreflightEngineTest::run_removesAddBleedWhenNoGap()
+{
+    pdf::PDFDocumentBuilder builder;
+    const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, 220, 220));
+    builder.setPageTrimBox(page, QRectF(10, 10, 200, 200));
+    builder.setPageBleedBox(page, QRectF(0, 0, 220, 220));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("bleed") },
+        { QStringLiteral("amount_pt"), 9 },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+    QJsonArray fixups;
+    fixups.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("add-bleed") },
+        { QStringLiteral("amount_pt"), 9 }
+    });
+    profile.insert(QStringLiteral("fixups"), fixups);
+
+    pdf::PreflightResult result = engine.run(profile);
+    QVERIFY(result.pass);
+    for (const pdf::PreflightFixupConfig& fixup : result.fixupsAvailable)
+    {
+        QVERIFY(fixup.id != QStringLiteral("add-bleed"));
+    }
+}
+
+QTEST_GUILESS_MAIN(PreflightEngineTest)
+
+#include "tst_preflightenginetest.moc"

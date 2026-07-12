@@ -182,7 +182,8 @@ inline bool validateFixup(const QJsonValue& value, int index, QString* errorMess
     static const QSet<QString> allowedProperties = {
         QStringLiteral("id"),
         QStringLiteral("safe"),
-        QStringLiteral("description")
+        QStringLiteral("description"),
+        QStringLiteral("params")
     };
     if (!hasOnlyProperties(fixup, allowedProperties, context, errorMessage))
     {
@@ -198,6 +199,12 @@ inline bool validateFixup(const QJsonValue& value, int index, QString* errorMess
     if (!fixup.value(QStringLiteral("safe")).isBool())
     {
         return setValidationError(errorMessage, QStringLiteral("%1.safe must be a boolean.").arg(context));
+    }
+
+    const QJsonValue params = fixup.value(QStringLiteral("params"));
+    if (!params.isUndefined() && !params.isNull() && !params.isObject())
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1.params must be an object.").arg(context));
     }
 
     if (!fixup.value(QStringLiteral("description")).isString() || fixup.value(QStringLiteral("description")).toString().isEmpty())
