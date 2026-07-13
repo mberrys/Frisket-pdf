@@ -33,6 +33,7 @@ private slots:
     void resolveBundlePath_combinesApplicationAndRelativePaths();
     void isExpectedPreflightExitCode_acceptsPassAndFindings();
     void isNormalizedReport_requiresTheSidecarContract();
+    void isNormalizedReport_acceptsFixupParams();
 };
 
 void PreflightPluginTest::resolveBundlePath_combinesApplicationAndRelativePaths()
@@ -62,6 +63,32 @@ void PreflightPluginTest::isNormalizedReport_requiresTheSidecarContract()
     QVERIFY(!pdfplugin::preflight::isNormalizedReport(QJsonObject()));
     report.insert(QStringLiteral("warnings"), QStringLiteral("not-an-array"));
     QVERIFY(!pdfplugin::preflight::isNormalizedReport(report));
+}
+
+void PreflightPluginTest::isNormalizedReport_acceptsFixupParams()
+{
+    QJsonObject report;
+    report.insert(QStringLiteral("schema_version"), 1);
+    report.insert(QStringLiteral("pass"), true);
+    report.insert(QStringLiteral("profile"), QStringLiteral("Frisket Default"));
+    report.insert(QStringLiteral("errors"), QJsonArray());
+    report.insert(QStringLiteral("warnings"), QJsonArray());
+
+    QJsonObject params;
+    params.insert(QStringLiteral("mode"), QStringLiteral("mirror"));
+    params.insert(QStringLiteral("amount_pt"), 9.0);
+
+    QJsonObject fixup;
+    fixup.insert(QStringLiteral("id"), QStringLiteral("add-bleed"));
+    fixup.insert(QStringLiteral("safe"), false);
+    fixup.insert(QStringLiteral("description"), QStringLiteral("Extend page boxes / artwork to provide bleed"));
+    fixup.insert(QStringLiteral("params"), params);
+
+    QJsonArray fixups;
+    fixups.append(fixup);
+    report.insert(QStringLiteral("fixups_available"), fixups);
+
+    QVERIFY(pdfplugin::preflight::isNormalizedReport(report));
 }
 
 QTEST_APPLESS_MAIN(PreflightPluginTest)

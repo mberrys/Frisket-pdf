@@ -99,6 +99,23 @@
           "type": "number",
           "minimum": 0,
           "description": "Allowed size mismatch in points."
+        },
+        "raster_confirm": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, run strip-raster confirmation on pages flagged by the fast bounds pass (content-bleed only)."
+        },
+        "probe_dpi": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 150,
+          "description": "DPI for the strip-raster probe (content-bleed only)."
+        },
+        "probe_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "default": 16,
+          "description": "Pixel channel threshold (0-255) that counts as ink in the raster probe (content-bleed only)."
         }
       },
       "additionalProperties": true
@@ -127,6 +144,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Downsample target DPI."
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional parameters for automated fixup application (e.g. mode for add-bleed)."
         }
       },
       "additionalProperties": true

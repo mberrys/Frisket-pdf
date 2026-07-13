@@ -124,3 +124,19 @@ PdfTool add-bleed --mode mirror|pixel-repeat|stretch \
 | PageMaster export | `Pdf4QtPageMaster/mainwindow.cpp` |
 | Planning process | `docs/PLANNING.md` |
 | Prepress note | `NOTES.txt` §14.11 |
+
+## Relationship to preflight
+
+`add-bleed` is the consumer of the dynamic `fixups_available` signal from two-tier
+bleed preflight (MIC-151). When `PdfTool preflight` runs a profile with both Tier-1
+(`bleed`) and Tier-2 (`content-bleed`) checks, the engine dynamically surfaces
+`add-bleed` in `fixups_available` when:
+
+- Tier-1 fails (BleedBox insufficient relative to TrimBox), **or**
+- Tier-2 finds content gaps (artwork does not extend into the bleed margin, even
+  though boxes are technically adequate)
+
+This means the preflight report may surface `add-bleed` even when a casual box
+check would pass — the content-aware Tier-2 closes that gap. PageMaster and the
+Editor plugin consume this signal to offer the fixup without a separate analysis
+step.

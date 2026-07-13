@@ -54,6 +54,48 @@ add_executable(UnitTestsBleedFixup
 
 target_link_libraries(UnitTestsBleedFixup PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
 
+add_executable(UnitTestsDocumentSession
+	tst_documentsessiontest.cpp
+)
+
+target_link_libraries(UnitTestsDocumentSession PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+set_target_properties(UnitTestsDocumentSession PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsDocumentSession "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsDocumentSession")
+
+add_executable(UnitTestsPreflightEngine
+	tst_preflightenginetest.cpp
+)
+
+target_link_libraries(UnitTestsPreflightEngine PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+set_target_properties(UnitTestsPreflightEngine PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsPreflightEngine "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsPreflightEngine")
+
+add_executable(UnitTestsBleedMarginProbe
+	tst_bleedmarginprobetest.cpp
+)
+
+target_link_libraries(UnitTestsBleedMarginProbe PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+set_target_properties(UnitTestsBleedMarginProbe PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsBleedMarginProbe "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsBleedMarginProbe")
+
 set_target_properties(UnitTestsBleedFixup PROPERTIES
     WIN32_EXECUTABLE OFF
     MACOSX_BUNDLE OFF
@@ -69,7 +111,9 @@ add_executable(UnitTestsPreflightChecks
 )
 
 target_link_libraries(UnitTestsPreflightChecks PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
-target_include_directories(UnitTestsPreflightChecks PRIVATE ${CMAKE_SOURCE_DIR}/PdfTool)
+target_include_directories(UnitTestsPreflightChecks PRIVATE
+    ${CMAKE_SOURCE_DIR}/PdfTool
+    ${CMAKE_SOURCE_DIR}/Pdf4QtLibCore/sources)
 
 set_target_properties(UnitTestsPreflightChecks PROPERTIES
     WIN32_EXECUTABLE OFF

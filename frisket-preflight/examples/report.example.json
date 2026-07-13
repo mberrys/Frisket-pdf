@@ -33,6 +33,15 @@
       "message": "Image effective DPI 180 is below min_dpi 300",
       "bbox": [72, 400, 540, 720],
       "check_id": "image-resolution"
+    },
+    {
+      "page": 1,
+      "object_id": null,
+      "type": "content-bleed",
+      "severity": "warning",
+      "message": "Right bleed margin (0–9 pt) lacks artwork; fast bounds pass flagged gap",
+      "bbox": [603, 0, 612, 792],
+      "check_id": "content-bleed"
     }
   ],
   "fixups_available": [
@@ -44,7 +53,8 @@
     {
       "id": "add-bleed",
       "safe": false,
-      "description": "Extend page boxes / artwork to provide 9 pt bleed"
+      "description": "Extend page boxes / artwork to provide 9 pt bleed",
+      "params": { "mode": "mirror" }
     },
     {
       "id": "downsample-images",

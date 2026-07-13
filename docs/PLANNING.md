@@ -36,6 +36,22 @@ See [AGENTS.md](../AGENTS.md) § Page boxes and prepress fixups. In short:
 - PageMaster: geometry before content fixups
 - Prefer one API + mode enum over parallel pipelines
 
+## Worked example: MIC-151
+
+MIC-151 (two-tier bleed preflight) follows the M0-before-code process:
+
+1. **Plan doc:** [PREFLIGHT_TIERED_BLEED_PLAN.md](PREFLIGHT_TIERED_BLEED_PLAN.md) locks the
+   Tier-1/Tier-2 flow, class names (`PDFDocumentSession`, `PreflightEngine`,
+   `PDFBleedMarginProbe`), profile params, and report extensions before any code.
+2. **Related issues:** MIC-154 (PreflightEngine refactor) and MIC-157 (PDFDocumentSession) are
+   scaffolding issues; MIC-158 (content-bleed check) and MIC-159 (strip probe) depend on them.
+   All were blocked until M0 locked the shared shapes.
+3. **Surface order:** PdfTool preflight first (thin driver), then Editor plugin (QProcess),
+   then PageMaster batch. Same order as MIRROR_BLEED_PLAN.md.
+4. **New trap to lock early:** Tier-1 box checks and Tier-2 content checks must share the
+   same reference-box fallback (TrimBox → CropBox → MediaBox). Don't let them diverge — if
+   they pick different boxes, the "skip Tier-2 when Tier-1 passes" gate is unsound.
+
 ## What not to put in AGENTS.md
 
 Keep DPI, sample-pixel defaults, corner policies, CLI flag lists, and issue IDs in the feature plan / Linear — not in agent-wide rules.

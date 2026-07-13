@@ -21,8 +21,7 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": false, "check_ids": ["color-mode"] },
     "source": "hand-built",
-    "pending": true,
-    "notes": "DeviceRGB image (disallowed) at ~310 DPI on a page with adequate bleed and no fonts, so only color-mode fires. Pending until color-mode check lands (not in MIC-134)."
+    "notes": "DeviceRGB image (disallowed) at ~310 DPI on a page with adequate bleed and no fonts, so only color-mode fires. Implemented in MIC-148."
   },
   {
     "id": "color-cmyk",
@@ -30,8 +29,7 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
-    "pending": true,
-    "notes": "DeviceCMYK image (allowed) at ~310 DPI, adequate bleed, no fonts -> clean pass. Pending until color-mode check lands (not in MIC-134)."
+    "notes": "DeviceCMYK image (allowed) at ~310 DPI, adequate bleed, no fonts -> clean pass. Implemented in MIC-148."
   },
   {
     "id": "image-dpi-low",
@@ -39,8 +37,7 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": ["image-resolution"] },
     "source": "hand-built",
-    "pending": true,
-    "notes": "100x100 px DeviceGray image placed at 4x4 in -> ~25 DPI, below min_dpi 300. image-resolution is severity warning in frisket-default, so it appears in warnings[] and report.pass stays true. Pending until image-resolution check lands (not in MIC-134)."
+    "notes": "100x100 px DeviceGray image placed at 4x4 in -> ~25 DPI, below min_dpi 300. image-resolution is severity warning in frisket-default, so it appears in warnings[] and report.pass stays true. Implemented in MIC-149."
   },
   {
     "id": "image-dpi-ok",
@@ -48,8 +45,7 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
-    "pending": true,
-    "notes": "1240x1240 px DeviceGray image placed at 4x4 in -> ~310 DPI (>= 300), adequate bleed, no fonts -> clean pass. Pending until image-resolution check lands (not in MIC-134)."
+    "notes": "1240x1240 px DeviceGray image placed at 4x4 in -> ~310 DPI (>= 300), adequate bleed, no fonts -> clean pass. Implemented in MIC-149."
   },
   {
     "id": "font-not-embedded",
@@ -57,8 +53,7 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": false, "check_ids": ["embedded-fonts"] },
     "source": "hand-built",
-    "pending": true,
-    "notes": "Text set in Helvetica (standard-14) with no FontFile, adequate bleed, no images -> only embedded-fonts fires. Pending until embedded-fonts check lands (not in MIC-134)."
+    "notes": "Text set in Helvetica (standard-14) with no FontFile, adequate bleed, no images -> only embedded-fonts fires. Implemented in MIC-150."
   },
   {
     "id": "font-embedded",
@@ -66,8 +61,7 @@
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
-    "pending": true,
-    "notes": "Text set in a subsetted TrueType font embedded via /FontFile2, adequate bleed, no images -> clean pass. Pending until embedded-fonts check lands (not in MIC-134)."
+    "notes": "Text set in a subsetted TrueType font embedded via /FontFile2, adequate bleed, no images -> clean pass. Implemented in MIC-150."
   },
   {
     "id": "trim-pagesize-mismatch",
@@ -84,5 +78,29 @@
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
     "notes": "MediaBox == TrimBox == 612x792, matching the profile's expected US Letter size within tolerance -> clean pass."
+  },
+  {
+    "id": "content-bleed-adequate",
+    "pdf": "content-bleed-adequate.pdf",
+    "profile": "examples/profile-tiered-bleed.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "hand-built",
+    "notes": "Boxes adequate, artwork extends into all bleed margins -> clean pass. Content-bleed check implemented in MIC-151."
+  },
+  {
+    "id": "content-bleed-missing",
+    "pdf": "content-bleed-missing.pdf",
+    "profile": "examples/profile-tiered-bleed.json",
+    "expect": { "pass": true, "check_ids": ["content-bleed"] },
+    "source": "hand-built",
+    "notes": "Boxes adequate but artwork stops at trim -> content-bleed warning. Content-bleed check implemented in MIC-151."
+  },
+  {
+    "id": "content-bleed-raster-confirm",
+    "pdf": "content-bleed-raster-confirm.pdf",
+    "profile": "examples/profile-tiered-bleed.json",
+    "expect": { "pass": true, "check_ids": ["content-bleed"] },
+    "source": "hand-built",
+    "notes": "Fast bounds flags gap; strip raster confirms missing content. Content-bleed check implemented in MIC-151."
   }
 ]

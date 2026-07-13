@@ -41,7 +41,7 @@
     },
     "fixups_available": {
       "type": "array",
-      "description": "Fixups the engine believes apply to this document given the profile.",
+      "description": "Fixups the engine believes apply to this document given the profile. May be filtered dynamically by the engine; not necessarily identical to profile.fixups.",
       "items": { "$ref": "#/$defs/fixup_available" }
     }
   },
@@ -106,6 +106,11 @@
         "description": {
           "type": "string",
           "minLength": 1
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional parameters for automated fixup invocation (e.g. mode for add-bleed)."
         }
       }
     }

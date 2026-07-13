@@ -1,4 +1,4 @@
-// MIT License
+﻿// MIT License
 //
 // Copyright (c) 2018-2025 Jakub Melka and Contributors
 //
@@ -23,82 +23,9 @@
 #ifndef PDFTOOLPREFLIGHTCHECKS_H
 #define PDFTOOLPREFLIGHTCHECKS_H
 
-// Pure geometry math for the PdfTool `preflight` custom checks (bleed, trim,
-// page-size). Header-only and free of any PDF/document dependency so both the
-// command (pdftoolpreflight.cpp) and the unit test (tst_preflightchecks.cpp)
-// can share the exact same logic. Page-box extraction stays in the command;
-// only rectangle math lives here.
-
-#include <QRectF>
-
-#include <cmath>
-
-namespace pdftool
-{
-
-namespace preflight
-{
-
-/// Resolves the effective content box for a page, applying the trim -> crop ->
-/// media fallback used throughout the preflight checks. Mirrors the box
-/// inheritance in pdf::PDFPage::parse (unset boxes default to the crop box,
-/// which defaults to the media box).
-/// \param trim TrimBox (may be empty)
-/// \param crop CropBox (may be empty)
-/// \param media MediaBox
-inline QRectF resolveEffectiveBox(const QRectF& trim, const QRectF& crop, const QRectF& media)
-{
-    QRectF box = trim.normalized();
-    if (box.isEmpty())
-    {
-        box = crop.normalized();
-    }
-    if (box.isEmpty())
-    {
-        box = media.normalized();
-    }
-    return box;
-}
-
-/// Returns true if the bleed box extends at least \p amountPt beyond the trim
-/// box on every edge (within \p tolerancePt). A missing/empty bleed box is
-/// never adequate.
-/// \param trim Effective trim box
-/// \param bleed BleedBox (may be empty)
-/// \param amountPt Required bleed distance in points
-/// \param tolerancePt Allowed shortfall in points
-inline bool bleedAdequate(const QRectF& trim, const QRectF& bleed, qreal amountPt, qreal tolerancePt)
-{
-    const QRectF normalizedTrim = trim.normalized();
-    const QRectF normalizedBleed = bleed.normalized();
-
-    if (normalizedBleed.isEmpty())
-    {
-        return false;
-    }
-
-    return (normalizedTrim.left() - normalizedBleed.left() >= amountPt - tolerancePt)
-        && (normalizedTrim.top() - normalizedBleed.top() >= amountPt - tolerancePt)
-        && (normalizedBleed.right() - normalizedTrim.right() >= amountPt - tolerancePt)
-        && (normalizedBleed.bottom() - normalizedTrim.bottom() >= amountPt - tolerancePt);
-}
-
-/// Strict per-dimension size comparison for the trim and page-size checks. The
-/// actual width must match the expected width, and the actual height the
-/// expected height, each within \p tolerancePt. Orientation matters: a page
-/// whose dimensions are swapped relative to the expectation does not match.
-inline bool sizeWithinTolerance(qreal actualWidthPt,
-                                qreal actualHeightPt,
-                                qreal expectedWidthPt,
-                                qreal expectedHeightPt,
-                                qreal tolerancePt)
-{
-    return (std::abs(actualWidthPt - expectedWidthPt) <= tolerancePt)
-        && (std::abs(actualHeightPt - expectedHeightPt) <= tolerancePt);
-}
-
-}   // namespace preflight
-
-}   // namespace pdftool
+// Pure geometry math for preflight checks now lives in Core so it can be shared
+// with PreflightEngine. This header remains as a compatibility shim for code
+// that included it from the PdfTool directory.
+#include "pdfpreflightchecks.h"
 
 #endif // PDFTOOLPREFLIGHTCHECKS_H
