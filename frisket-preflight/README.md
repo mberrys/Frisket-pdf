@@ -97,7 +97,7 @@ Other PdfTool commands accept `--console-format json` via `PDFOutputFormatter` (
 
 ## Versioning
 
-Bump `schema_version` only together with engine + plugin releases so the JSON contract stays in sync (see packaging notes in the hybrid sidecar plan).
+Bump `schema_version` only together with engine + plugin releases so the JSON contract stays in sync (see [docs/PACKAGING_LICENSING.md](../docs/PACKAGING_LICENSING.md) and the hybrid sidecar plan in Linear).
 
 ## Golden corpus & CI (MIC-132)
 
