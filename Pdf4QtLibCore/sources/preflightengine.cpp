@@ -1,4 +1,4 @@
-﻿// MIT License
+// MIT License
 //
 // Copyright (c) 2018-2025 Jakub Melka and Contributors
 //
@@ -23,10 +23,18 @@
 #include "preflightengine.h"
 
 #include "pdfbleedmarginprobe.h"
-#include "pdfglobal.h"
 #include "pdfcatalog.h"
+#include "pdfcms.h"
+#include "pdfconstants.h"
 #include "pdfdocument.h"
+#include "pdfexception.h"
+#include "pdffont.h"
+#include "pdfglobal.h"
+#include "pdfimage.h"
+#include "pdfmeshqualitysettings.h"
+#include "pdfoptionalcontent.h"
 #include "pdfpage.h"
+#include "pdfpagecontentprocessor.h"
 #include "pdfpreflightchecks.h"
 
 #include <QCoreApplication>
@@ -36,6 +44,9 @@
 #include <QJsonObject>
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <set>
 
 namespace pdf
 {
@@ -377,6 +388,504 @@ void adjustFixupsAvailable(QList<PreflightFixupConfig>& fixups, bool needsAddBle
     }
 }
 
+void runColorModeCheck(PDFDocumentSession* session,
+                       const PreflightCheckConfig& check,
+                       QList<PreflightFinding>& errors,
+                       QList<PreflightFinding>& warnings)
+{
+    if (check.allowedColorModes.isEmpty())
+    {
+        return;
+    }
+
+    PDFDocument* document = session->getDocument();
+    if (!document)
+    {
+        return;
+    }
+
+    const PDFCatalog* catalog = document->getCatalog();
+    const PDFInteger pageCount = catalog->getPageCount();
+
+    // Build a lookup of allowed color space names ("DeviceRGB", "DeviceCMYK", "DeviceGray").
+    QSet<QString> allowed;
+    for (const QString& mode : check.allowedColorModes)
+    {
+        if (mode.compare(QStringLiteral("RGB"), Qt::CaseInsensitive) == 0)
+        {
+            allowed.insert(QStringLiteral("DeviceRGB"));
+        }
+        else if (mode.compare(QStringLiteral("CMYK"), Qt::CaseInsensitive) == 0)
+        {
+            allowed.insert(QStringLiteral("DeviceCMYK"));
+        }
+        else if (mode.compare(QStringLiteral("Grayscale"), Qt::CaseInsensitive) == 0)
+        {
+            allowed.insert(QStringLiteral("DeviceGray"));
+        }
+    }
+
+    // Per-page resource-dictionary scan using a content-processor walk.
+    // For full accuracy a PDFPageContentProcessor subclass could intercept
+    // CS/cs/RG/rg/K/k operators; this resource-level pass catches all
+    // explicitly declared color spaces plus image color spaces (which cover
+    // the common preflight cases).
+    PDFOptionalContentActivity ocActivity(document, OCUsage::Export, nullptr);
+    PDFFontCache fontCache(DEFAULT_FONT_CACHE_LIMIT, DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    PDFModifiedDocument md(document, &ocActivity);
+    fontCache.setDocument(md);
+    fontCache.setCacheShrinkEnabled(nullptr, false);
+    PDFCMSManager cmsManager(nullptr);
+    cmsManager.setDocument(document);
+    PDFCMSPointer cms = cmsManager.getCurrentCMS();
+    PDFMeshQualitySettings meshQuality;
+
+    class ColorModeProcessor : public PDFPageContentProcessor
+    {
+    public:
+        ColorModeProcessor(const PDFPage* page,
+                           const PDFDocument* doc,
+                           const PDFFontCache* fc,
+                           const PDFCMS* cms_p,
+                           const PDFOptionalContentActivity* oc,
+                           const PDFMeshQualitySettings& mq,
+                           QSet<QString>* disallowed)
+            : PDFPageContentProcessor(page, doc, fc, cms_p, oc, QTransform(), mq)
+            , m_disallowed(disallowed)
+        {
+        }
+
+    protected:
+        bool isContentKindSuppressed(ContentKind kind) const override
+        {
+            switch (kind)
+            {
+                case ContentKind::Images:
+                case ContentKind::Tiling:
+                case ContentKind::Forms:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        bool performOriginalImagePainting(const PDFImage& image,
+                                           const PDFStream* stream,
+                                           PDFObjectReference reference) override
+        {
+            Q_UNUSED(stream);
+            Q_UNUSED(reference);
+            if (isContentSuppressed())
+            {
+                return true;
+            }
+            const PDFAbstractColorSpace* cs = image.getColorSpace().get();
+            while (cs && cs->getColorSpace() == PDFAbstractColorSpace::ColorSpace::Indexed)
+            {
+                cs = static_cast<const PDFIndexedColorSpace*>(cs)->getBaseColorSpace().get();
+            }
+            if (cs)
+            {
+                QString csName;
+                switch (cs->getColorSpace())
+                {
+                    case PDFAbstractColorSpace::ColorSpace::DeviceRGB:  csName = QStringLiteral("DeviceRGB"); break;
+                    case PDFAbstractColorSpace::ColorSpace::DeviceCMYK: csName = QStringLiteral("DeviceCMYK"); break;
+                    case PDFAbstractColorSpace::ColorSpace::DeviceGray: csName = QStringLiteral("DeviceGray"); break;
+                    default: break;
+                }
+                if (!csName.isEmpty() && !m_disallowed->contains(csName))
+                {
+                    m_disallowed->insert(csName);
+                }
+            }
+            return true;
+        }
+
+    private:
+        QSet<QString>* m_disallowed;
+    };
+
+    for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
+    {
+        const PDFPage* page = catalog->getPage(pageIndex);
+        if (!page)
+        {
+            continue;
+        }
+
+        QSet<QString> foundSpaces;
+
+        // 1) Page-level ColorSpace resource dictionary
+        PDFObject resources = document->getObject(page->getResources());
+        if (resources.isDictionary() && resources.getDictionary()->hasKey("ColorSpace"))
+        {
+            const PDFDictionary* csDict = document->getDictionaryFromObject(
+                resources.getDictionary()->get("ColorSpace"));
+            if (csDict)
+            {
+                for (size_t i = 0; i < csDict->getCount(); ++i)
+                {
+                    PDFColorSpacePointer csPtr;
+                    try
+                    {
+                        csPtr = PDFAbstractColorSpace::createColorSpace(
+                            csDict, document, document->getObject(csDict->getValue(i)));
+                    }
+                    catch (const PDFException&)
+                    {
+                        continue;
+                    }
+                    if (!csPtr) continue;
+
+                    QString csName;
+                    switch (csPtr->getColorSpace())
+                    {
+                        case PDFAbstractColorSpace::ColorSpace::DeviceRGB:  csName = QStringLiteral("DeviceRGB"); break;
+                        case PDFAbstractColorSpace::ColorSpace::DeviceCMYK: csName = QStringLiteral("DeviceCMYK"); break;
+                        case PDFAbstractColorSpace::ColorSpace::DeviceGray: csName = QStringLiteral("DeviceGray"); break;
+                        default: break;
+                    }
+                    if (!csName.isEmpty())
+                    {
+                        foundSpaces.insert(csName);
+                    }
+                }
+            }
+        }
+
+        // 2) Image color spaces (content-stream walk)
+        {
+            ColorModeProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &foundSpaces);
+            processor.processContents();
+        }
+
+        // Check if any found color space is NOT in the allowed set.
+        QStringList disallowed;
+        for (const QString& cs : foundSpaces)
+        {
+            if (!allowed.contains(cs))
+            {
+                disallowed.append(cs);
+            }
+        }
+
+        if (!disallowed.isEmpty())
+        {
+            PreflightFinding finding;
+            finding.page = int(pageIndex + 1);
+            finding.type = QStringLiteral("color-mode");
+            finding.severity = check.severity;
+            finding.checkId = check.id;
+            finding.bbox = QRectF();
+            QString modeList;
+            for (const QString& mode : check.allowedColorModes)
+            {
+                if (!modeList.isEmpty()) modeList += QStringLiteral(", ");
+                modeList += mode;
+            }
+            finding.message = PDFTranslationContext::tr(
+                "Disallowed color space(s) found on page %1: %2 (allowed: %3)")
+                .arg(pageIndex + 1)
+                .arg(disallowed.join(QStringLiteral(", ")))
+                .arg(modeList);
+
+            if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
+            {
+                warnings.push_back(finding);
+            }
+            else
+            {
+                errors.push_back(finding);
+            }
+        }
+    }
+}
+
+// LOW CONFIDENCE NOTE: This function scans only page-level Font resource
+// dictionaries. Form XObjects and appearance streams can contain their own
+// Font dictionaries that are not checked. A full content-stream walk via
+// PDFPageContentProcessor would catch those, but the resource-dict scan
+// covers the vast majority of real-world cases.
+void runEmbeddedFontsCheck(PDFDocumentSession* session,
+                            const PreflightCheckConfig& check,
+                            QList<PreflightFinding>& errors,
+                            QList<PreflightFinding>& warnings)
+{
+    PDFDocument* document = session->getDocument();
+    if (!document)
+    {
+        return;
+    }
+
+    const PDFCatalog* catalog = document->getCatalog();
+    const PDFInteger pageCount = catalog->getPageCount();
+    std::set<PDFObjectReference> processedFonts;
+
+    for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
+    {
+        const PDFPage* page = catalog->getPage(pageIndex);
+        if (!page)
+        {
+            continue;
+        }
+
+        PDFObject resources = document->getObject(page->getResources());
+        if (!resources.isDictionary())
+        {
+            continue;
+        }
+
+        const PDFDictionary* fontsDict = document->getDictionaryFromObject(
+            resources.getDictionary()->get("Font"));
+        if (!fontsDict)
+        {
+            continue;
+        }
+
+        for (size_t i = 0; i < fontsDict->getCount(); ++i)
+        {
+            PDFObject fontObj = fontsDict->getValue(i);
+            PDFObjectReference ref;
+            if (fontObj.isReference())
+            {
+                ref = fontObj.getReference();
+                if (processedFonts.contains(ref))
+                {
+                    continue;
+                }
+                processedFonts.insert(ref);
+            }
+
+            try
+            {
+                PDFFontPointer font = PDFFont::createFont(
+                    fontObj, fontsDict->getKey(i).getString(), document);
+                if (!font)
+                {
+                    continue;
+                }
+
+                // Type 3 fonts are always considered embedded.
+                if (font->getFontType() == FontType::Type3)
+                {
+                    continue;
+                }
+
+                const FontDescriptor* fd = font->getFontDescriptor();
+                if (!fd)
+                {
+                    // No descriptor at all -- treat as not embedded.
+                    PreflightFinding finding;
+                    finding.page = int(pageIndex + 1);
+                    finding.type = QStringLiteral("embedded-fonts");
+                    finding.severity = check.severity;
+                    finding.checkId = check.id;
+                    finding.bbox = QRectF();
+                    finding.message = PDFTranslationContext::tr(
+                        "Font '%1' on page %2 has no font descriptor (not embedded)")
+                        .arg(QString::fromLatin1(fontsDict->getKey(i).getString()))
+                        .arg(pageIndex + 1);
+
+                    if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
+                    {
+                        warnings.push_back(finding);
+                    }
+                    else
+                    {
+                        errors.push_back(finding);
+                    }
+                    continue;
+                }
+
+                if (!fd->isEmbedded())
+                {
+                    QString fontName = fd->fontName.isEmpty()
+                        ? QString::fromLatin1(fontsDict->getKey(i).getString())
+                        : fd->fontName;
+
+                    PreflightFinding finding;
+                    finding.page = int(pageIndex + 1);
+                    finding.type = QStringLiteral("embedded-fonts");
+                    finding.severity = check.severity;
+                    finding.checkId = check.id;
+                    finding.bbox = QRectF();
+                    finding.message = PDFTranslationContext::tr(
+                        "Font '%1' on page %2 is not embedded")
+                        .arg(fontName)
+                        .arg(pageIndex + 1);
+
+                    if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
+                    {
+                        warnings.push_back(finding);
+                    }
+                    else
+                    {
+                        errors.push_back(finding);
+                    }
+                }
+            }
+            catch (const PDFException&)
+            {
+                // Skip malformed fonts.
+            }
+        }
+    }
+}
+
+// LOW CONFIDENCE NOTE: DPI calculation uses getCurrentTransformationMatrix()
+// from the PDFPageContentProcessor state, which is in PDF user space.
+// This matches the existing PDFImageCollectorProcessor pattern in
+// pdfimagecompressor.cpp. The identity QTransform passed to the processor
+// constructor is correct because we only read the CTM from content stream
+// operators, not render to a device. Page rotation is not explicitly handled
+// but the existing pattern in calculateDpi works with the CTM as-is.
+void runImageResolutionCheck(PDFDocumentSession* session,
+                              const PreflightCheckConfig& check,
+                              QList<PreflightFinding>& errors,
+                              QList<PreflightFinding>& warnings)
+{
+    if (check.minDpi <= 0)
+    {
+        return;
+    }
+
+    PDFDocument* document = session->getDocument();
+    if (!document)
+    {
+        return;
+    }
+
+    const PDFCatalog* catalog = document->getCatalog();
+    const PDFInteger pageCount = catalog->getPageCount();
+
+    PDFOptionalContentActivity ocActivity(document, OCUsage::Export, nullptr);
+    PDFFontCache fontCache(DEFAULT_FONT_CACHE_LIMIT, DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    PDFModifiedDocument md(document, &ocActivity);
+    fontCache.setDocument(md);
+    fontCache.setCacheShrinkEnabled(nullptr, false);
+    PDFCMSManager cmsManager(nullptr);
+    cmsManager.setDocument(document);
+    PDFCMSPointer cms = cmsManager.getCurrentCMS();
+    PDFMeshQualitySettings meshQuality;
+
+    class ImageDpiProcessor : public PDFPageContentProcessor
+    {
+    public:
+        struct ImageDpiInfo
+        {
+            PDFObjectReference ref;
+            qreal minDpiX = std::numeric_limits<qreal>::max();
+            qreal minDpiY = std::numeric_limits<qreal>::max();
+        };
+
+        ImageDpiProcessor(const PDFPage* page,
+                          const PDFDocument* doc,
+                          const PDFFontCache* fc,
+                          const PDFCMS* cms_p,
+                          const PDFOptionalContentActivity* oc,
+                          const PDFMeshQualitySettings& mq,
+                          std::vector<ImageDpiInfo>* results)
+            : PDFPageContentProcessor(page, doc, fc, cms_p, oc, QTransform(), mq)
+            , m_results(results)
+        {
+        }
+
+    protected:
+        bool isContentKindSuppressed(ContentKind kind) const override
+        {
+            switch (kind)
+            {
+                case ContentKind::Images:
+                case ContentKind::Tiling:
+                case ContentKind::Forms:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        bool performOriginalImagePainting(const PDFImage& image,
+                                           const PDFStream* stream,
+                                           PDFObjectReference reference) override
+        {
+            Q_UNUSED(stream);
+            if (isContentSuppressed())
+            {
+                return true;
+            }
+
+            const QTransform ctm = getGraphicState()->getCurrentTransformationMatrix();
+
+            const auto axisLength = [](qreal x, qreal y) -> double {
+                return std::hypot(static_cast<double>(x), static_cast<double>(y)) * PDF_POINT_TO_INCH;
+            };
+
+            const double widthInches = axisLength(ctm.m11(), ctm.m12());
+            const double heightInches = axisLength(ctm.m21(), ctm.m22());
+
+            if (widthInches <= std::numeric_limits<double>::epsilon() ||
+                heightInches <= std::numeric_limits<double>::epsilon())
+            {
+                return true;
+            }
+
+            ImageDpiInfo info;
+            info.ref = reference;
+            info.minDpiX = static_cast<qreal>(image.getImageData().getWidth()) / widthInches;
+            info.minDpiY = static_cast<qreal>(image.getImageData().getHeight()) / heightInches;
+            m_results->push_back(info);
+            return true;
+        }
+
+    private:
+        std::vector<ImageDpiInfo>* m_results;
+    };
+
+    for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
+    {
+        const PDFPage* page = catalog->getPage(pageIndex);
+        if (!page)
+        {
+            continue;
+        }
+
+        std::vector<ImageDpiProcessor::ImageDpiInfo> images;
+        ImageDpiProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &images);
+        processor.processContents();
+
+        for (const auto& img : images)
+        {
+            const qreal dpi = qMin(img.minDpiX, img.minDpiY);
+            if (dpi < static_cast<qreal>(check.minDpi))
+            {
+                PreflightFinding finding;
+                finding.page = int(pageIndex + 1);
+                finding.objectId = img.ref.isValid()
+                    ? QString::number(img.ref.objectNumber) : QString();
+                finding.type = QStringLiteral("image-resolution");
+                finding.severity = check.severity;
+                finding.checkId = check.id;
+                finding.bbox = QRectF();
+                finding.message = PDFTranslationContext::tr(
+                    "Image resolution %1 DPI is below minimum %2 DPI on page %3")
+                    .arg(qRound(dpi))
+                    .arg(check.minDpi)
+                    .arg(pageIndex + 1);
+
+                if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
+                {
+                    warnings.push_back(finding);
+                }
+                else
+                {
+                    errors.push_back(finding);
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 QJsonObject PreflightResult::toJson(const QString& pdfPath) const
@@ -582,6 +1091,14 @@ bool PreflightEngine::parseProfile(const QJsonObject& profileObject, PreflightPr
         check.probeDpi = checkObject.value(QStringLiteral("probe_dpi")).toInt(150);
         check.probeThreshold = checkObject.value(QStringLiteral("probe_threshold")).toInt(16);
 
+        check.minDpi = checkObject.value(QStringLiteral("min_dpi")).toInt(0);
+
+        const QJsonArray allowedModes = checkObject.value(QStringLiteral("allowed")).toArray();
+        for (const QJsonValue& val : allowedModes)
+        {
+            check.allowedColorModes.append(val.toString());
+        }
+
         profile.checks.push_back(check);
     }
 
@@ -634,11 +1151,35 @@ void PreflightEngine::registerBuiltInChecks()
     };
 
     m_checks[QStringLiteral("content-bleed")] = [](PDFDocumentSession* session,
-                                                    const PreflightCheckConfig& check,
-                                                    QList<PreflightFinding>& errors,
-                                                    QList<PreflightFinding>& warnings)
+                                                     const PreflightCheckConfig& check,
+                                                     QList<PreflightFinding>& errors,
+                                                     QList<PreflightFinding>& warnings)
     {
         runContentBleedCheck(session, check, errors, warnings);
+    };
+
+    m_checks[QStringLiteral("color-mode")] = [](PDFDocumentSession* session,
+                                                  const PreflightCheckConfig& check,
+                                                  QList<PreflightFinding>& errors,
+                                                  QList<PreflightFinding>& warnings)
+    {
+        runColorModeCheck(session, check, errors, warnings);
+    };
+
+    m_checks[QStringLiteral("embedded-fonts")] = [](PDFDocumentSession* session,
+                                                     const PreflightCheckConfig& check,
+                                                     QList<PreflightFinding>& errors,
+                                                     QList<PreflightFinding>& warnings)
+    {
+        runEmbeddedFontsCheck(session, check, errors, warnings);
+    };
+
+    m_checks[QStringLiteral("image-resolution")] = [](PDFDocumentSession* session,
+                                                       const PreflightCheckConfig& check,
+                                                       QList<PreflightFinding>& errors,
+                                                       QList<PreflightFinding>& warnings)
+    {
+        runImageResolutionCheck(session, check, errors, warnings);
     };
 }
 

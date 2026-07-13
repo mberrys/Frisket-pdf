@@ -207,13 +207,21 @@ set(PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_
 message("PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY" ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY})
 message("PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY" ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY})
 
-qt_add_translations(TARGETS Pdf4QtEditor Pdf4QtViewer Pdf4QtPageMaster Pdf4QtDiff PdfTool
-                    SOURCE_TARGETS ${i18n_targets}
-                    MERGE_QT_TRANSLATIONS
-                    LUPDATE_OPTIONS -no-obsolete
-                    TS_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY}
-                    QM_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY}
-                    QM_FILES_OUTPUT_VARIABLE PDF4QT_QM_FILES)
+# Only add translation targets for targets that actually exist in this build.
+foreach(_tgt Pdf4QtEditor Pdf4QtViewer Pdf4QtPageMaster Pdf4QtDiff PdfTool)
+    if(TARGET ${_tgt})
+        list(APPEND _existing_translation_targets ${_tgt})
+    endif()
+endforeach()
+if(_existing_translation_targets)
+    qt_add_translations(TARGETS ${_existing_translation_targets}
+                        SOURCE_TARGETS ${i18n_targets}
+                        MERGE_QT_TRANSLATIONS
+                        LUPDATE_OPTIONS -no-obsolete
+                        TS_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY}
+                        QM_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY}
+                        QM_FILES_OUTPUT_VARIABLE PDF4QT_QM_FILES)
+endif()
 
 if(WIN32)
     set(PDF4QT_LUPDATE_TARGET "${PROJECT_NAME}_lupdate")

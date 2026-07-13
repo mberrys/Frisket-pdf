@@ -55,6 +55,12 @@ struct PDF4QTLIBCORESHARED_EXPORT PreflightCheckConfig
     bool rasterConfirm = false;
     int probeDpi = 150;
     int probeThreshold = 16;
+
+    // image-resolution parameters.
+    int minDpi = 0;
+
+    // color-mode parameters (e.g. ["CMYK", "Grayscale"]).
+    QStringList allowedColorModes;
 };
 
 /// Configuration for a single advertised fixup, parsed from a profile.
