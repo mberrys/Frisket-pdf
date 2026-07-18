@@ -67,6 +67,7 @@ set_target_properties(UnitTestsDocumentSession PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
 )
 
+
 add_executable(UnitTestsFontEncoding
 	tst_fontencodingtest.cpp
 )
