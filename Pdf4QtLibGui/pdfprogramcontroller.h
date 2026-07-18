@@ -156,6 +156,7 @@ public:
         CreateHyperlinkToThisPDFFitBV,
         CreateHyperlinkToThisPDFXYZ,
         CreateHyperlinkToThisPDFXYZInheritZoom,
+        InsertPageNumbers,
         CreateInlineText,
         CreateStraightLine,
         CreatePolyline,

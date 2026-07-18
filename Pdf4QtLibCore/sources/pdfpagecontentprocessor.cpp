@@ -2265,14 +2265,17 @@ void PDFPageContentProcessor::operatorEndSubpath()
 
 void PDFPageContentProcessor::operatorRectangle(PDFReal x, PDFReal y, PDFReal width, PDFReal height)
 {
-    const PDFReal xMin = qMin(x, x + width);
-    const PDFReal xMax = qMax(x, x + width);
-    const PDFReal yMin = qMin(y, y + height);
-    const PDFReal yMax = qMax(y, y + height);
-    const PDFReal correctedWidth = xMax - xMin;
-    const PDFReal correctedHeight = yMax - yMin;
-
-    m_currentPath.addRect(QRectF(xMin, yMin, correctedWidth, correctedHeight));
+    // Trace the rectangle in the order defined by the PDF specification (8.5.2.1),
+    // instead of normalizing it into a QRectF and using QPainterPath::addRect.
+    // addRect always emits the same winding direction, which would destroy the
+    // orientation encoded by the sign of width/height - orientation that PDF
+    // producers rely on to carve holes out of overlapping rectangles using the
+    // nonzero winding fill rule.
+    m_currentPath.moveTo(x, y);
+    m_currentPath.lineTo(x + width, y);
+    m_currentPath.lineTo(x + width, y + height);
+    m_currentPath.lineTo(x, y + height);
+    m_currentPath.closeSubpath();
 }
 
 void PDFPageContentProcessor::operatorPathStroke()
@@ -3279,7 +3282,19 @@ void PDFPageContentProcessor::drawText(const TextSequence& textSequence)
                         if (!glyphPath.isEmpty())
                         {
                             QPainterPath transformedGlyph = textRenderingMatrix.map(glyphPath);
-                            processPathPainting(transformedGlyph, stroke, fill, true, transformedGlyph.fillRule());
+
+                            bool handledAsRealText = false;
+                            if (fill && !stroke && isHorizontalWritingSystem && !item.character.isNull() &&
+                                !getGraphicState()->getFillColorSpace()->asPatternColorSpace())
+                            {
+                                PDFRealTextDrawInfo realTextDrawInfo{ item.character, m_graphicState.getTextFont(), fontSize, textRenderingMatrix };
+                                handledAsRealText = performTextCharacterDrawing(realTextDrawInfo);
+                            }
+
+                            if (!handledAsRealText)
+                            {
+                                processPathPainting(transformedGlyph, stroke, fill, true, transformedGlyph.fillRule());
+                            }
 
                             if (clipped)
                             {
