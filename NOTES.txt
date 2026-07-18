@@ -95,9 +95,14 @@ Section 14: Issues
  - 14.5 Page-piece dictionaries not implemented
  - 14.9 Accessibility support not implemented
  - 14.10 Web capture not implemented
- - 14.11 Prepress support not implemented at all, only
-   basic functionality works (media box, crop box, or,
-   for example, reading output intents)
+ - 14.11 Prepress support is still incomplete: output intents
+   and page boxes are available, and Frisket adds a raster
+   bleed fixup (PDFBleedFixup / PdfTool add-bleed) for mirror,
+    pixel-repeat, and stretch edge fills. Frisket also supports
+    two-tier bleed preflight (box check + content-aware artwork
+    check) via PdfTool preflight, with dynamic add-bleed fixup
+    surfacing. Full PDF/X prepress
+    workflows are not implemented.
  - 14.12 Document parts not implemented
 
 Annex F: Not implemented

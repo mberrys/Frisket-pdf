@@ -1,0 +1,39 @@
+{
+    "errors": [
+        {
+            "bbox": [
+                0,
+                0,
+                540,
+                720
+            ],
+            "check_id": "page-size",
+            "message": "Page size 540 x 720 pt does not match expected 612 x 792 pt (tolerance 1 pt)",
+            "object_id": null,
+            "page": 1,
+            "severity": "error",
+            "type": "page-size"
+        },
+        {
+            "bbox": [
+                0,
+                0,
+                540,
+                720
+            ],
+            "check_id": "trim",
+            "message": "TrimBox 540 x 720 pt does not match expected 612 x 792 pt (tolerance 1 pt)",
+            "object_id": null,
+            "page": 1,
+            "severity": "error",
+            "type": "trim"
+        }
+    ],
+    "fixups_available": [
+    ],
+    "pass": false,
+    "profile": "Frisket Test - Trim/Page Size",
+    "schema_version": 1,
+    "warnings": [
+    ]
+}

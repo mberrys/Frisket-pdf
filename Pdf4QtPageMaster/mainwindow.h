@@ -25,6 +25,7 @@
 
 #include "pdficontheme.h"
 #include "pdfpagegeometry.h"
+#include "pdfbleedfixup.h"
 #include "pdfprogress.h"
 
 #include "pageitemmodel.h"
@@ -45,6 +46,7 @@ class MainWindow;
 }
 
 class QAbstractItemView;
+class QAction;
 class QEvent;
 class QFrame;
 class QLabel;
@@ -133,6 +135,7 @@ public:
         InsertEmptyPage,
         InsertPDF,
         ConfigurePageGeometry,
+        ConfigureBleedFixup,
         InsertPDFPages,
 
         RegroupEvenOdd,
@@ -264,6 +267,9 @@ private:
     bool m_isChangingExportProgressStep = false;
     bool m_hasPageGeometrySettings = false;
     pdf::PDFPageGeometrySettings m_pageGeometrySettings;
+    bool m_hasBleedFixupSettings = false;
+    pdf::PDFBleedFixupSettings m_bleedFixupSettings;
+    QAction* m_actionBleedFixup = nullptr;
 
     struct WorkspaceCheckpoint
     {

@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frisket.dev/schemas/preflight/profile.schema.json",
+  "title": "Frisket Preflight Profile",
+  "description": "Declarative preflight profile (YAML or JSON). Profiles are data, not code — the Qt plugin stays engine-agnostic.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "checks"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Profile contract version. Bump only with a coordinated engine + plugin release."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable profile name (also referenced by report.profile)."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional summary of when to use this profile."
+    },
+    "job_types": {
+      "type": "array",
+      "description": "Frisket job categories this profile applies to.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "checks": {
+      "type": "array",
+      "description": "Ordered list of checks to run. Unknown ids are ignored or reported by the engine (implementation-defined).",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "fixups": {
+      "type": "array",
+      "description": "Optional fixups advertised for this profile. Fixups are opt-in; never auto-applied.",
+      "items": { "$ref": "#/$defs/fixup" }
+    }
+  },
+  "$defs": {
+    "severity": {
+      "type": "string",
+      "enum": ["error", "warning", "info"],
+      "description": "Finding severity when the check fails. Defaults to error if omitted."
+    },
+    "check": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Stable check identifier (kebab-case)."
+        },
+        "severity": { "$ref": "#/$defs/severity" },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When false, skip this check without removing it from the profile."
+        },
+        "min_dpi": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Minimum effective image DPI (image-resolution)."
+        },
+        "amount_pt": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Bleed or similar length in PDF points (1 pt = 1/72 in). 9 pt ≈ 0.125 in."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the checked feature must be present (e.g. bleed)."
+        },
+        "allowed": {
+          "type": "array",
+          "description": "Allow-list for categorical checks (e.g. color-mode).",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "expected_width_pt": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Expected trim/page width in points (page-size / trim)."
+        },
+        "expected_height_pt": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Expected trim/page height in points (page-size / trim)."
+        },
+        "tolerance_pt": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Allowed size mismatch in points."
+        },
+        "raster_confirm": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, run strip-raster confirmation on pages flagged by the fast bounds pass (content-bleed only)."
+        },
+        "probe_dpi": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 150,
+          "description": "DPI for the strip-raster probe (content-bleed only)."
+        },
+        "probe_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "default": 16,
+          "description": "Pixel channel threshold (0-255) that counts as ink in the raster probe (content-bleed only)."
+        }
+      },
+      "additionalProperties": true
+    },
+    "fixup": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Stable fixup identifier (kebab-case)."
+        },
+        "confirm": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true (default), UI must confirm before applying. Destructive fixups must set confirm: true."
+        },
+        "amount_pt": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Fixup length in points (e.g. add-bleed)."
+        },
+        "target_dpi": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Downsample target DPI."
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional parameters for automated fixup application (e.g. mode for add-bleed)."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

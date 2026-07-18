@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frisket.dev/schemas/preflight/manifest.schema.json",
+  "title": "Frisket Preflight Golden Corpus Manifest",
+  "description": "Maps golden fixture PDFs to the profile they are checked against and the outcome frisket-preflight is expected to produce. Consumed by UnitTestsPreflightCorpus.",
+  "type": "array",
+  "items": { "$ref": "#/$defs/entry" },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pdf", "profile", "expect"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Stable fixture id (kebab-case). Also used as the snapshot file name."
+        },
+        "pdf": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Fixture PDF file name, relative to frisket-preflight/testdata/fixtures/."
+        },
+        "profile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Profile JSON path, relative to frisket-preflight/."
+        },
+        "expect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pass"],
+          "properties": {
+            "pass": {
+              "type": "boolean",
+              "description": "Expected top-level report.pass value."
+            },
+            "check_ids": {
+              "type": "array",
+              "description": "check_id values that must appear in report.errors[] or report.warnings[]. Leave empty for a clean pass.",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true,
+              "default": []
+            }
+          }
+        },
+        "source": {
+          "type": "string",
+          "enum": ["hand-built", "generated", "public-corpus"],
+          "description": "Where the fixture came from (see frisket-preflight/README.md)."
+        },
+        "pending": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, UnitTestsPreflightCorpus skips this entry: the check(s) it exercises are not yet implemented in the engine, so its expect{} records the intended future outcome rather than current behavior. Drop this flag (and add a snapshot) once the check lands. See frisket-preflight/README.md ('Hand-built custom-check fixtures')."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Short human-readable description of what the fixture exercises."
+        }
+      }
+    }
+  }
+}

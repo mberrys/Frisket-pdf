@@ -47,20 +47,20 @@ jobs:
         run: |
           COMMIT_HASH=$(git rev-parse HEAD)
           echo "Current commit hash: $COMMIT_HASH"
-          sed -i "s/PDF4QT_LAST_COMMIT/$COMMIT_HASH/g" ./Flatpak/io.github.JakubMelka.Pdf4qt.json
+          sed -i "s/PDF4QT_LAST_COMMIT/$COMMIT_HASH/g" ./Flatpak/io.github.mberrys.Frisket-pdf.json
 
       - name: Build Flatpak
         run: |
-          flatpak-builder --repo=repo --sandbox --force-clean  build-dir ./Flatpak/io.github.JakubMelka.Pdf4qt.json 
+          flatpak-builder --repo=repo --sandbox --force-clean  build-dir ./Flatpak/io.github.mberrys.Frisket-pdf.json 
 
       - name: Build Flatpak Package
         run: |
-          flatpak build-bundle repo io.github.JakubMelka.Pdf4qt.flatpak io.github.JakubMelka.Pdf4qt
+          flatpak build-bundle repo io.github.mberrys.Frisket-pdf.flatpak io.github.mberrys.Frisket-pdf
 
       - name: Upload Flatpak Package
         uses: actions/upload-artifact@v4
         with:
-          name: io.github.JakubMelka.Pdf4qt.flatpak
-          path: ./io.github.JakubMelka.Pdf4qt.flatpak
+          name: io.github.mberrys.Frisket-pdf.flatpak
+          path: ./io.github.mberrys.Frisket-pdf.flatpak
           retention-days: 30
           compression-level: 0

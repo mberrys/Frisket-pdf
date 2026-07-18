@@ -1,43 +1,21 @@
-[![CI](https://github.com/JakubMelka/PDF4QT/actions/workflows/ci.yml/badge.svg)](https://github.com/JakubMelka/PDF4QT/actions/workflows/ci.yml)
+# Frisket-PDF
 
-# PDF4QT
+[![CI](https://github.com/mberrys/Frisket-pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/mberrys/Frisket-pdf/actions/workflows/ci.yml)
 
-**(c) Jakub Melka 2018-2025**
-
-**Mgr.Jakub.Melka@gmail.com**
-
-**https://jakubmelka.github.io/**
-
-This software is consisting of PDF rendering library, and several
-applications, such as advanced document viewer, command line tool,
-and document page manipulator application. Software is implementing PDF
-functionality based on PDF Reference 2.0. It is written and maintained
-by Jakub Melka.
+(c) Michael Berry 2026 Frisket PDF
 
 *Software works on Microsoft Windows / Linux.*
 
-Software is provided without any warranty of any kind.
-
-Should you find this software beneficial, your support would be greatly appreciated [:heart: Sponsor](https://github.com/sponsors/JakubMelka)!
+Software is provided without any license or warranty of any kind. This software also uses several third-party libraries, and users must comply with the licenses of those third-party components.
 
 ## 1. ACKNOWLEDGEMENTS
 
-This software is based in part on the work of the Independent JPEG Group.
+a. This software is based on Jakub Melka's PDF4QT and is licensed under the MIT license. 
 
-Portions of this software are copyright © 2019 The FreeType
-Project (www.freetype.org). All rights reserved.
+Portions of this software are copyright © 2019 The FreeType  
+Project ([www.freetype.org](http://www.freetype.org)). All rights reserved.
 
-## 2. LEGAL ISSUES
-
-This software was originally licensed under the GNU Lesser General Public License version 3 (LGPLv3).
-As of April 27, 2025, the project has been relicensed under the MIT License by the original author.
-The change to the MIT License was made to provide greater freedom and flexibility for both open-source and commercial use, reduce legal complexity, and encourage broader adoption and contribution.
-
-Please see the attached LICENSE.txt file for details.
-
-This software also uses several third-party libraries, and users must comply with the licenses of those third-party components.
-
-## 3. FEATURES
+## 2. FEATURES
 
 Software have following features (the list is not complete):
 
@@ -61,20 +39,35 @@ Software have following features (the list is not complete):
 - [x] electronically/digitally sign documents
 - [x] public key security encryption
 
+## 3. ARCHITECTURE
+
+Frisket-PDF uses multiple apps on one core library:
+
+- **Pdf4QtEditor** — primary interactive app; hosts editor plugins (preflight, ObjectInspector, etc.)
+- **PdfTool** — command-line companion for pipelines and batch automation
+- **Pdf4QtPageMaster** — batch page geometry, assembly, and export (including bleed-box settings)
+- **Pdf4QtViewer** — lighter read-only viewer (not the primary product shell)
+
+See `AGENTS.md` for contributor and agent placement rules.
+
 ## 4. THIRD PARTY LIBRARIES
 
 Several third-party libraries are used.
 
-1. libjpeg, see https://www.ijg.org/
-2. FreeType, see https://www.freetype.org/index.html, FTL license used
-3. OpenJPEG, implementing Jpeg2000, see https://www.openjpeg.org/, 2-clause MIT license
-4. Qt, https://www.qt.io/, LGPL license used
-5. OpenSSL, https://www.openssl.org/, Apache 2.0 license
-6. LittleCMS, http://www.littlecms.com/
-7. zlib, https://zlib.net/
-8. Blend2D, https://blend2d.com/
+1. libjpeg, see [https://www.ijg.org/](https://www.ijg.org/)
+2. FreeType, see [https://www.freetype.org/index.html](https://www.freetype.org/index.html), FTL license used
+3. OpenJPEG, implementing Jpeg2000, see [https://www.openjpeg.org/](https://www.openjpeg.org/), 2-clause MIT license
+4. Qt, [https://www.qt.io/](https://www.qt.io/), LGPL license used
+5. OpenSSL, [https://www.openssl.org/](https://www.openssl.org/), Apache 2.0 license
+6. LittleCMS, [http://www.littlecms.com/](http://www.littlecms.com/)
+7. zlib, [https://zlib.net/](https://zlib.net/)
+8. Blend2D, [https://blend2d.com/](https://blend2d.com/)
+
+8. Blend2D, [https://blend2d.com/](https://blend2d.com/)
 
 ## 5. CONTRIBUTIONS
+
+Fork and upstream policy: see [docs/REPO_MAP.md](docs/REPO_MAP.md).
 
 Contributions are welcome!
 
@@ -203,3 +196,4 @@ to be able to built Debug build on MS Windows.
 ## 8. DISCLAIMER
 
 I wrote this project in my free time. I hope you will find it useful!
+

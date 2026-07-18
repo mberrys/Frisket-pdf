@@ -94,13 +94,13 @@ jobs:
       - name: Rezip zip file
         id: rezip_zip_file
         run: |
-          cd artifacts/PDF4QT-Windows-${{ env.pdf4qt_version }}.zip
-          zip -r ../PDF4QT-Windows-${{ env.pdf4qt_version }}.zip.backup *
+          cd artifacts/Frisket-pdf-Windows-${{ env.pdf4qt_version }}.zip
+          zip -r ../Frisket-pdf-Windows-${{ env.pdf4qt_version }}.zip.backup *
 
       - name: Rename zip archive
         run: |
-          rm -rf artifacts/PDF4QT-Windows-${{ env.pdf4qt_version }}.zip/
-          mv artifacts/PDF4QT-Windows-${{ env.pdf4qt_version }}.zip.backup artifacts/PDF4QT-Windows-${{ env.pdf4qt_version }}.zip
+          rm -rf artifacts/Frisket-pdf-Windows-${{ env.pdf4qt_version }}.zip/
+          mv artifacts/Frisket-pdf-Windows-${{ env.pdf4qt_version }}.zip.backup artifacts/Frisket-pdf-Windows-${{ env.pdf4qt_version }}.zip
           
       - name: Correct file paths
         run: |
@@ -120,7 +120,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: 'v${{ env.pdf4qt_version }}' 
-          name: "Release of PDF4QT ${{ env.pdf4qt_version }} (Draft)"
+          name: "Release of Frisket-pdf ${{ env.pdf4qt_version }} (Draft)"
           draft: true
           prerelease: false
           generate_release_notes: true

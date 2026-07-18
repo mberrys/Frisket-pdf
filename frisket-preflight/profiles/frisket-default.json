@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "name": "Frisket Default",
+  "description": "Default prepress profile for Frisket print jobs (Venue Poster, Handbill, Signage).",
+  "job_types": ["Venue Poster", "Handbill", "Signage"],
+  "checks": [
+    { "id": "embedded-fonts", "severity": "error" },
+    { "id": "image-resolution", "min_dpi": 300, "severity": "warning" },
+    { "id": "bleed", "required": true, "amount_pt": 9, "severity": "error" },
+    { "id": "trim", "severity": "warning", "tolerance_pt": 1 },
+    { "id": "page-size", "severity": "warning", "tolerance_pt": 1 },
+    { "id": "color-mode", "allowed": ["CMYK", "Grayscale"], "severity": "error" }
+  ],
+  "fixups": [
+    { "id": "rgb-to-cmyk", "confirm": true },
+    { "id": "add-bleed", "amount_pt": 9, "confirm": true },
+    { "id": "downsample-images", "target_dpi": 300, "confirm": true }
+  ]
+}

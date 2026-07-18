@@ -1,0 +1,279 @@
+********* Start testing of PreflightCorpusTest *********
+Config: Using QtTest library 6.9.0, Qt 6.9.0 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022), windows 11
+INFO   : PreflightCorpusTest::initTestCase() entering
+INFO   : PreflightCorpusTest::initTestCase() QVERIFY(manifestFile.open(QIODevice::ReadOnly))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(111) : message location
+INFO   : PreflightCorpusTest::initTestCase() QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(115) : message location
+INFO   : PreflightCorpusTest::initTestCase() QVERIFY(document.isArray())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(116) : message location
+INFO   : PreflightCorpusTest::initTestCase() QVERIFY(!m_manifest.isEmpty())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(119) : message location
+PASS   : PreflightCorpusTest::initTestCase()
+INFO   : PreflightCorpusTest::preflightMatchesManifest() entering
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-adequate) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-adequate) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-adequate) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-adequate) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-adequate) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-adequate) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+PASS   : PreflightCorpusTest::preflightMatchesManifest(bleed-adequate)
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing) QVERIFY(actualCheckIds.contains(expectedCheckId))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(254) : message location
+PASS   : PreflightCorpusTest::preflightMatchesManifest(bleed-missing)
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-rgb) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-rgb) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-rgb) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-rgb) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-rgb) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+FAIL!  : PreflightCorpusTest::preflightMatchesManifest(color-rgb) Compared values are not the same
+   Actual   (report.value(QStringLiteral("pass")).toBool()): 1
+   Expected (expectedPass)                                 : 0
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : failure location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-cmyk) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-cmyk) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-cmyk) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-cmyk) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-cmyk) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(color-cmyk) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+PASS   : PreflightCorpusTest::preflightMatchesManifest(color-cmyk)
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) QVERIFY(actualCheckIds.contains(expectedCheckId))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(254) : message location
+FAIL!  : PreflightCorpusTest::preflightMatchesManifest(image-dpi-low) 'actualCheckIds.contains(expectedCheckId)' returned FALSE. (Expected check_id 'image-resolution' not found in report)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(254) : failure location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-ok) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-ok) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-ok) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-ok) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-ok) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-ok) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+PASS   : PreflightCorpusTest::preflightMatchesManifest(image-dpi-ok)
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-not-embedded) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-not-embedded) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-not-embedded) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-not-embedded) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-not-embedded) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+FAIL!  : PreflightCorpusTest::preflightMatchesManifest(font-not-embedded) Compared values are not the same
+   Actual   (report.value(QStringLiteral("pass")).toBool()): 1
+   Expected (expectedPass)                                 : 0
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : failure location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-embedded) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-embedded) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-embedded) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-embedded) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-embedded) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(font-embedded) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+PASS   : PreflightCorpusTest::preflightMatchesManifest(font-embedded)
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QVERIFY(actualCheckIds.contains(expectedCheckId))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(254) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch) QVERIFY(actualCheckIds.contains(expectedCheckId))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(254) : message location
+PASS   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-mismatch)
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-ok) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-ok) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-ok) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-ok) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-ok) QCOMPARE(report.value(QStringLiteral("pass")).toBool(), expectedPass)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(247) : message location
+INFO   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-ok) QCOMPARE(exitCode, expectedPass ? 0 : 1)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(248) : message location
+PASS   : PreflightCorpusTest::preflightMatchesManifest(trim-pagesize-ok)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot() entering
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-adequate) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-adequate) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-adequate) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-adequate) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-adequate) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(bleed-adequate) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/bleed-adequate.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-adequate)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-missing) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-missing) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-missing) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-missing) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-missing) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(bleed-missing) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/bleed-missing.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(bleed-missing)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-rgb) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-rgb) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-rgb) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-rgb) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-rgb) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(color-rgb) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/color-rgb.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(color-rgb)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-cmyk) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-cmyk) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-cmyk) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-cmyk) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(color-cmyk) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(color-cmyk) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/color-cmyk.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(color-cmyk)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-low) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-low) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-low) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-low) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-low) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-low) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/image-dpi-low.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-low)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-ok) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-ok) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-ok) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-ok) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-ok) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-ok) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/image-dpi-ok.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(image-dpi-ok)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-not-embedded) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-not-embedded) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-not-embedded) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-not-embedded) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-not-embedded) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(font-not-embedded) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/font-not-embedded.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(font-not-embedded)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-embedded) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-embedded) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-embedded) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-embedded) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(font-embedded) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(font-embedded) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/font-embedded.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(font-embedded)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-mismatch) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-mismatch) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-mismatch) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-mismatch) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-mismatch) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-mismatch) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/trim-pagesize-mismatch.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-mismatch)
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-ok) QVERIFY(process.waitForFinished(30000))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(157) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-ok) QCOMPARE(process.exitStatus(), QProcess::NormalExit)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(158) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-ok) QVERIFY(parseError.error == QJsonParseError::NoError)
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(164) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-ok) QVERIFY(document.isObject())
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(165) : message location
+INFO   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-ok) QVERIFY(snapshotFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+C:\.dev\frisket\pdf-tools\UnitTests\tst_preflightcorpus.cpp(294) : message location
+QINFO  : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-ok) Updated snapshot 'C:/.dev/frisket/pdf-tools/frisket-preflight/testdata/snapshots/trim-pagesize-ok.json'
+PASS   : PreflightCorpusTest::preflightMatchesSnapshot(trim-pagesize-ok)
+INFO   : PreflightCorpusTest::cleanupTestCase() entering
+PASS   : PreflightCorpusTest::cleanupTestCase()
+Totals: 19 passed, 3 failed, 0 skipped, 0 blacklisted, 829ms
+********* Finished testing of PreflightCorpusTest *********

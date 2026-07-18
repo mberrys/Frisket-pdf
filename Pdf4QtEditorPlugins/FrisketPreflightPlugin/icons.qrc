@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/pdfplugins/frisketpreflight">
+        <file>preflight.svg</file>
+        <file alias="report.example.json">../../frisket-preflight/examples/report.example.json</file>
+    </qresource>
+</RCC>

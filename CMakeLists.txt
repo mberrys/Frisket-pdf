@@ -182,6 +182,7 @@ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
     add_subdirectory(JBIG2_Viewer)
     add_subdirectory(PdfExampleGenerator)
     add_subdirectory(PdfTool)
+    add_subdirectory(frisket-preflight/tools)
     add_subdirectory(Pdf4QtLibGui)
     add_subdirectory(Pdf4QtEditorPlugins)
     add_subdirectory(Pdf4QtEditor)
@@ -206,13 +207,21 @@ set(PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_
 message("PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY" ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY})
 message("PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY" ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY})
 
-qt_add_translations(TARGETS Pdf4QtEditor Pdf4QtViewer Pdf4QtPageMaster Pdf4QtDiff PdfTool
-                    SOURCE_TARGETS ${i18n_targets}
-                    MERGE_QT_TRANSLATIONS
-                    LUPDATE_OPTIONS -no-obsolete
-                    TS_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY}
-                    QM_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY}
-                    QM_FILES_OUTPUT_VARIABLE PDF4QT_QM_FILES)
+# Only add translation targets for targets that actually exist in this build.
+foreach(_tgt Pdf4QtEditor Pdf4QtViewer Pdf4QtPageMaster Pdf4QtDiff PdfTool)
+    if(TARGET ${_tgt})
+        list(APPEND _existing_translation_targets ${_tgt})
+    endif()
+endforeach()
+if(_existing_translation_targets)
+    qt_add_translations(TARGETS ${_existing_translation_targets}
+                        SOURCE_TARGETS ${i18n_targets}
+                        MERGE_QT_TRANSLATIONS
+                        LUPDATE_OPTIONS -no-obsolete
+                        TS_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY}
+                        QM_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY}
+                        QM_FILES_OUTPUT_VARIABLE PDF4QT_QM_FILES)
+endif()
 
 if(WIN32)
     set(PDF4QT_LUPDATE_TARGET "${PROJECT_NAME}_lupdate")
@@ -252,24 +261,24 @@ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
     else()
         configure_file(make-package.sh.in make-package.sh)
 
-        install(FILES Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtDiff.desktop
-                      Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtPageMaster.desktop
-                      Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtViewer.desktop
-                      Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtEditor.desktop
-                      Desktop/io.github.JakubMelka.Pdf4qt.desktop
+        install(FILES Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtDiff.desktop
+                      Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtPageMaster.desktop
+                      Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtViewer.desktop
+                      Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtEditor.desktop
+                      Desktop/io.github.mberrys.Frisket-pdf.desktop
                       DESTINATION ${PDF4QT_INSTALL_SHARE_DIR}/applications)
-        install(FILES Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtDiff.svg
-                      Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtPageMaster.svg
-                      Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtViewer.svg
-                      Desktop/io.github.JakubMelka.Pdf4qt.Pdf4QtEditor.svg
-                      Desktop/io.github.JakubMelka.Pdf4qt.svg
+        install(FILES Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtDiff.svg
+                      Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtPageMaster.svg
+                      Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtViewer.svg
+                      Desktop/io.github.mberrys.Frisket-pdf.Pdf4QtEditor.svg
+                      Desktop/io.github.mberrys.Frisket-pdf.svg
                       DESTINATION ${PDF4QT_INSTALL_SHARE_DIR}/icons/hicolor/scalable/apps)
-        install(FILES Desktop/io.github.JakubMelka.Pdf4qt.appdata.xml DESTINATION ${PDF4QT_INSTALL_SHARE_DIR}/metainfo)
-        install(FILES Desktop/128x128/io.github.JakubMelka.Pdf4qt.Pdf4QtDiff.png
-                      Desktop/128x128/io.github.JakubMelka.Pdf4qt.Pdf4QtPageMaster.png
-                      Desktop/128x128/io.github.JakubMelka.Pdf4qt.Pdf4QtViewer.png
-                      Desktop/128x128/io.github.JakubMelka.Pdf4qt.Pdf4QtEditor.png
-                      Desktop/128x128/io.github.JakubMelka.Pdf4qt.png
+        install(FILES Desktop/io.github.mberrys.Frisket-pdf.appdata.xml DESTINATION ${PDF4QT_INSTALL_SHARE_DIR}/metainfo)
+        install(FILES Desktop/128x128/io.github.mberrys.Frisket-pdf.Pdf4QtDiff.png
+                      Desktop/128x128/io.github.mberrys.Frisket-pdf.Pdf4QtPageMaster.png
+                      Desktop/128x128/io.github.mberrys.Frisket-pdf.Pdf4QtViewer.png
+                      Desktop/128x128/io.github.mberrys.Frisket-pdf.Pdf4QtEditor.png
+                      Desktop/128x128/io.github.mberrys.Frisket-pdf.png
                       DESTINATION ${PDF4QT_INSTALL_SHARE_DIR}/icons/hicolor/128x128/apps)
     endif()
 

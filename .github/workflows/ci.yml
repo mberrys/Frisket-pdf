@@ -73,6 +73,11 @@ jobs:
           cmake --build build --target all release_translations --config Release -j6
           cmake --install build
 
+      - name: Run unit tests
+        working-directory: pdf4qt/build
+        run: |
+          ctest --output-on-failure
+
       - name: Make DEB package
         working-directory: pdf4qt/build
         run: |

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Sinalite Tiered Bleed",
+  "description": "Tiered bleed profile: Tier-1 box check (error) + Tier-2 content check (warning) with fast bounds pass only.",
+  "checks": [
+    { "id": "bleed", "required": true, "amount_pt": 9, "severity": "error" },
+    { "id": "content-bleed", "amount_pt": 9, "severity": "warning", "raster_confirm": false }
+  ],
+  "fixups": [
+    { "id": "add-bleed", "amount_pt": 9, "confirm": true }
+  ]
+}
