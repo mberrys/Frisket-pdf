@@ -89,15 +89,71 @@ inline bool isContractIdentifier(const QString& value)
     return expression.match(value).hasMatch();
 }
 
-inline bool validateFinding(const QJsonValue& value, const QString& section, int index, QString* errorMessage)
+inline bool isSupportedSchemaVersion(int schemaVersion)
 {
-    const QString context = QStringLiteral("%1[%2]").arg(section).arg(index);
-    if (!value.isObject())
+    return schemaVersion == 1 || schemaVersion == 2;
+}
+
+inline bool validateBboxValue(const QJsonValue& bboxValue, const QString& context, QString* errorMessage)
+{
+    if (!bboxValue.isArray() || bboxValue.toArray().size() != 4)
     {
-        return setValidationError(errorMessage, QStringLiteral("%1 must be an object.").arg(context));
+        return setValidationError(errorMessage, QStringLiteral("%1.bbox must contain four numbers.").arg(context));
     }
 
-    const QJsonObject finding = value.toObject();
+    const QJsonArray bbox = bboxValue.toArray();
+    for (const QJsonValue& coordinate : bbox)
+    {
+        if (!coordinate.isDouble())
+        {
+            return setValidationError(errorMessage, QStringLiteral("%1.bbox must contain four numbers.").arg(context));
+        }
+    }
+
+    if (bbox.at(0).toDouble() > bbox.at(2).toDouble() || bbox.at(1).toDouble() > bbox.at(3).toDouble())
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1.bbox coordinates are not ordered.").arg(context));
+    }
+
+    return true;
+}
+
+inline bool validateFindingCommonFields(const QJsonObject& finding, const QString& context, QString* errorMessage)
+{
+    const QString type = finding.value(QStringLiteral("type")).toString();
+    if (!finding.value(QStringLiteral("type")).isString() || !isContractIdentifier(type))
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1.type must be a non-empty kebab-case identifier.").arg(context));
+    }
+
+    const QString severity = finding.value(QStringLiteral("severity")).toString();
+    if (severity != QStringLiteral("error") && severity != QStringLiteral("warning") && severity != QStringLiteral("info"))
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1.severity is invalid.").arg(context));
+    }
+
+    if (!finding.value(QStringLiteral("message")).isString() || finding.value(QStringLiteral("message")).toString().isEmpty())
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1.message must be a non-empty string.").arg(context));
+    }
+
+    const QJsonValue objectId = finding.value(QStringLiteral("object_id"));
+    if (!objectId.isUndefined() && !objectId.isNull() && !objectId.isString())
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1.object_id must be a string or null.").arg(context));
+    }
+
+    const QJsonValue checkId = finding.value(QStringLiteral("check_id"));
+    if (!checkId.isUndefined() && !checkId.isString())
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1.check_id must be a string.").arg(context));
+    }
+
+    return true;
+}
+
+inline bool validateFindingV1(const QJsonObject& finding, const QString& context, QString* errorMessage)
+{
     static const QSet<QString> allowedProperties = {
         QStringLiteral("page"),
         QStringLiteral("object_id"),
@@ -118,56 +174,105 @@ inline bool validateFinding(const QJsonValue& value, const QString& section, int
         return setValidationError(errorMessage, QStringLiteral("%1.page must be a positive integer.").arg(context));
     }
 
-    const QString type = finding.value(QStringLiteral("type")).toString();
-    if (!finding.value(QStringLiteral("type")).isString() || !isContractIdentifier(type))
+    if (!validateFindingCommonFields(finding, context, errorMessage))
     {
-        return setValidationError(errorMessage, QStringLiteral("%1.type must be a non-empty kebab-case identifier.").arg(context));
+        return false;
     }
 
-    const QString severity = finding.value(QStringLiteral("severity")).toString();
-    if (severity != QStringLiteral("error") && severity != QStringLiteral("warning") && severity != QStringLiteral("info"))
+    return validateBboxValue(finding.value(QStringLiteral("bbox")), context, errorMessage);
+}
+
+inline bool validateFindingV2(const QJsonObject& finding, const QString& context, QString* errorMessage)
+{
+    static const QSet<QString> allowedProperties = {
+        QStringLiteral("scope"),
+        QStringLiteral("page"),
+        QStringLiteral("object_id"),
+        QStringLiteral("type"),
+        QStringLiteral("severity"),
+        QStringLiteral("message"),
+        QStringLiteral("bbox"),
+        QStringLiteral("check_id")
+    };
+    if (!hasOnlyProperties(finding, allowedProperties, context, errorMessage))
     {
-        return setValidationError(errorMessage, QStringLiteral("%1.severity is invalid.").arg(context));
+        return false;
     }
 
-    if (!finding.value(QStringLiteral("message")).isString() || finding.value(QStringLiteral("message")).toString().isEmpty())
+    const QString scope = finding.value(QStringLiteral("scope")).toString();
+    if (scope != QStringLiteral("document") && scope != QStringLiteral("page") && scope != QStringLiteral("object"))
     {
-        return setValidationError(errorMessage, QStringLiteral("%1.message must be a non-empty string.").arg(context));
+        return setValidationError(errorMessage, QStringLiteral("%1.scope must be document, page, or object.").arg(context));
     }
 
-    const QJsonValue bboxValue = finding.value(QStringLiteral("bbox"));
-    if (!bboxValue.isArray() || bboxValue.toArray().size() != 4)
+    if (!validateFindingCommonFields(finding, context, errorMessage))
     {
-        return setValidationError(errorMessage, QStringLiteral("%1.bbox must contain four numbers.").arg(context));
+        return false;
     }
 
-    const QJsonArray bbox = bboxValue.toArray();
-    for (const QJsonValue& coordinate : bbox)
+    const bool hasPage = finding.contains(QStringLiteral("page"));
+    const bool hasBbox = finding.contains(QStringLiteral("bbox"));
+
+    if (scope == QStringLiteral("document"))
     {
-        if (!coordinate.isDouble())
+        if (hasPage)
         {
-            return setValidationError(errorMessage, QStringLiteral("%1.bbox must contain four numbers.").arg(context));
+            return setValidationError(errorMessage, QStringLiteral("%1.page must be absent for document scope.").arg(context));
         }
+
+        if (hasBbox)
+        {
+            return setValidationError(errorMessage, QStringLiteral("%1.bbox must be absent for document scope.").arg(context));
+        }
+
+        return true;
     }
 
-    if (bbox.at(0).toDouble() > bbox.at(2).toDouble() || bbox.at(1).toDouble() > bbox.at(3).toDouble())
+    const QJsonValue page = finding.value(QStringLiteral("page"));
+    if (!isInteger(page) || page.toInt() < 1)
     {
-        return setValidationError(errorMessage, QStringLiteral("%1.bbox coordinates are not ordered.").arg(context));
+        return setValidationError(errorMessage, QStringLiteral("%1.page must be a positive integer for page/object scope.").arg(context));
     }
 
-    const QJsonValue objectId = finding.value(QStringLiteral("object_id"));
-    if (!objectId.isUndefined() && !objectId.isNull() && !objectId.isString())
+    if (hasBbox && !validateBboxValue(finding.value(QStringLiteral("bbox")), context, errorMessage))
     {
-        return setValidationError(errorMessage, QStringLiteral("%1.object_id must be a string or null.").arg(context));
-    }
-
-    const QJsonValue checkId = finding.value(QStringLiteral("check_id"));
-    if (!checkId.isUndefined() && !checkId.isString())
-    {
-        return setValidationError(errorMessage, QStringLiteral("%1.check_id must be a string.").arg(context));
+        return false;
     }
 
     return true;
+}
+
+inline bool findingHasVisualOverlay(const QJsonObject& finding, int schemaVersion)
+{
+    if (schemaVersion == 1)
+    {
+        return finding.contains(QStringLiteral("bbox"));
+    }
+
+    const QString scope = finding.value(QStringLiteral("scope")).toString();
+    if (scope == QStringLiteral("document"))
+    {
+        return false;
+    }
+
+    return finding.contains(QStringLiteral("bbox"));
+}
+
+inline bool validateFinding(const QJsonValue& value, const QString& section, int index, int schemaVersion, QString* errorMessage)
+{
+    const QString context = QStringLiteral("%1[%2]").arg(section).arg(index);
+    if (!value.isObject())
+    {
+        return setValidationError(errorMessage, QStringLiteral("%1 must be an object.").arg(context));
+    }
+
+    const QJsonObject finding = value.toObject();
+    if (schemaVersion == 1)
+    {
+        return validateFindingV1(finding, context, errorMessage);
+    }
+
+    return validateFindingV2(finding, context, errorMessage);
 }
 
 inline bool validateFixup(const QJsonValue& value, int index, QString* errorMessage)
@@ -238,10 +343,12 @@ inline bool validateNormalizedReport(const QJsonObject& report, QString* errorMe
     }
 
     const QJsonValue schemaVersion = report.value(QStringLiteral("schema_version"));
-    if (!isInteger(schemaVersion) || schemaVersion.toInt() != 1)
+    if (!isInteger(schemaVersion) || !isSupportedSchemaVersion(schemaVersion.toInt()))
     {
-        return setValidationError(errorMessage, QStringLiteral("schema_version must be 1."));
+        return setValidationError(errorMessage, QStringLiteral("schema_version must be 1 or 2."));
     }
+
+    const int schemaVersionValue = schemaVersion.toInt();
 
     if (!report.value(QStringLiteral("pass")).isBool())
     {
@@ -273,7 +380,7 @@ inline bool validateNormalizedReport(const QJsonObject& report, QString* errorMe
         const QJsonArray findings = sectionValue.toArray();
         for (int i = 0; i < findings.size(); ++i)
         {
-            if (!validateFinding(findings.at(i), section, i, errorMessage))
+            if (!validateFinding(findings.at(i), section, i, schemaVersionValue, errorMessage))
             {
                 return false;
             }

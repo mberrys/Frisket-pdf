@@ -59,26 +59,39 @@ QJsonArray rectToBbox(const QRectF& rect)
     return QJsonArray{ rect.left(), rect.top(), rect.right(), rect.bottom() };
 }
 
+bool hasMeaningfulBbox(const QRectF& rect)
+{
+    return rect.isValid() && rect.width() > 0.0 && rect.height() > 0.0;
+}
+
 QJsonObject findingToJson(const PreflightFinding& finding)
 {
     QJsonObject object;
-    object.insert(QStringLiteral("page"), finding.page);
-    if (finding.objectId.isNull())
-    {
-        object.insert(QStringLiteral("object_id"), QJsonValue::Null);
-    }
-    else
-    {
-        object.insert(QStringLiteral("object_id"), finding.objectId);
-    }
+    object.insert(QStringLiteral("scope"), finding.scope);
     object.insert(QStringLiteral("type"), finding.type);
     object.insert(QStringLiteral("severity"), finding.severity);
     object.insert(QStringLiteral("message"), finding.message);
-    object.insert(QStringLiteral("bbox"), rectToBbox(finding.bbox));
+
+    if (finding.scope != QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_DOCUMENT))
+    {
+        object.insert(QStringLiteral("page"), finding.page);
+    }
+
+    if (!finding.objectId.isNull())
+    {
+        object.insert(QStringLiteral("object_id"), finding.objectId.isEmpty() ? QJsonValue::Null : QJsonValue(finding.objectId));
+    }
+
+    if (hasMeaningfulBbox(finding.bbox))
+    {
+        object.insert(QStringLiteral("bbox"), rectToBbox(finding.bbox));
+    }
+
     if (!finding.checkId.isEmpty())
     {
         object.insert(QStringLiteral("check_id"), finding.checkId);
     }
+
     return object;
 }
 
@@ -135,6 +148,7 @@ void runBleedCheck(PDFDocumentSession* session,
         }
 
         PreflightFinding finding;
+        finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_PAGE);
         finding.page = int(pageIndex + 1);
         finding.objectId = QString();
         finding.type = QStringLiteral("bleed");
@@ -195,6 +209,7 @@ void runSizeCheck(SizeCheckKind kind,
         }
 
         PreflightFinding finding;
+        finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_PAGE);
         finding.page = int(pageIndex + 1);
         finding.objectId = QString();
         finding.type = type;
@@ -308,12 +323,13 @@ void runContentBleedCheck(PDFDocumentSession* session,
         }
 
         PreflightFinding finding;
+        finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
         finding.page = int(pageIndex + 1);
         finding.objectId = QString();
         finding.type = QStringLiteral("content-bleed");
         finding.severity = check.severity;
         finding.checkId = check.id;
-        finding.bbox = unionMissingBbox.isValid() ? unionMissingBbox : QRectF(0, 0, 0, 0);
+        finding.bbox = unionMissingBbox.isValid() ? unionMissingBbox : QRectF();
         finding.message = PDFTranslationContext::tr("Artwork does not extend into bleed margin on %1").arg(missingSides.join(QStringLiteral(", ")));
 
         if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
@@ -573,6 +589,7 @@ void runColorModeCheck(PDFDocumentSession* session,
         if (!disallowed.isEmpty())
         {
             PreflightFinding finding;
+            finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_PAGE);
             finding.page = int(pageIndex + 1);
             finding.type = QStringLiteral("color-mode");
             finding.severity = check.severity;
@@ -677,6 +694,7 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
                 {
                     // No descriptor at all -- treat as not embedded.
                     PreflightFinding finding;
+                    finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
                     finding.page = int(pageIndex + 1);
                     finding.type = QStringLiteral("embedded-fonts");
                     finding.severity = check.severity;
@@ -705,6 +723,7 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
                         : fd->fontName;
 
                     PreflightFinding finding;
+                    finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
                     finding.page = int(pageIndex + 1);
                     finding.type = QStringLiteral("embedded-fonts");
                     finding.severity = check.severity;
@@ -860,6 +879,7 @@ void runImageResolutionCheck(PDFDocumentSession* session,
             if (dpi < static_cast<qreal>(check.minDpi))
             {
                 PreflightFinding finding;
+                finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
                 finding.page = int(pageIndex + 1);
                 finding.objectId = img.ref.isValid()
                     ? QString::number(img.ref.objectNumber) : QString();
@@ -924,7 +944,7 @@ QJsonObject PreflightResult::toJson(const QString& pdfPath) const
     }
 
     QJsonObject root;
-    root.insert(QStringLiteral("schema_version"), 1);
+    root.insert(QStringLiteral("schema_version"), PREFLIGHT_REPORT_SCHEMA_VERSION);
     root.insert(QStringLiteral("pass"), errors.isEmpty());
     root.insert(QStringLiteral("profile"), profileName);
     root.insert(QStringLiteral("engine_version"), QCoreApplication::applicationVersion());
@@ -968,7 +988,7 @@ PreflightResult PreflightEngine::run(const QJsonObject& profile)
         result.profileName = profile.value(QStringLiteral("name")).toString();
 
         PreflightFinding finding;
-        finding.page = 1;
+        finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_DOCUMENT);
         finding.type = QStringLiteral("profile");
         finding.severity = QStringLiteral("error");
         finding.message = errorMessage;

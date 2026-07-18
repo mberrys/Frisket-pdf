@@ -9,8 +9,8 @@
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 1,
-      "description": "Report contract version. Bump only with a coordinated engine + plugin release."
+      "enum": [1, 2],
+      "description": "Report contract version. Version 1 required page and bbox on every finding. Version 2 adds explicit scope and optional location fields. Bump only with a coordinated engine + plugin release."
     },
     "pass": {
       "type": "boolean",
@@ -48,12 +48,12 @@
   "$defs": {
     "bbox": {
       "type": "array",
-      "description": "Axis-aligned box in PDF user space (points), page coordinates: [x0, y0, x1, y1] with x0 <= x1 and y0 <= y1. Origin is the page's media-box lower-left (PDF convention). Required on every finding so Phase 2 overlays can highlight without a second pass. For page-level issues, use the relevant page box (typically MediaBox or TrimBox).",
+      "description": "Axis-aligned box in PDF user space (points), page coordinates: [x0, y0, x1, y1] with x0 <= x1 and y0 <= y1. Origin is the page media-box lower-left (PDF convention). Present only when the engine has a meaningful page-space region to highlight.",
       "minItems": 4,
       "maxItems": 4,
       "items": { "type": "number" }
     },
-    "finding": {
+    "finding_v1": {
       "type": "object",
       "additionalProperties": false,
       "required": ["page", "type", "severity", "message", "bbox"],
@@ -88,6 +88,53 @@
           "description": "Optional profile check id that produced this finding."
         }
       }
+    },
+    "finding_v2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "type", "severity", "message"],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["document", "page", "object"],
+          "description": "document: no page location; page: page-level condition; object: page object or region when bbox/object_id are known."
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Required for page and object scope. Absent for document scope."
+        },
+        "object_id": {
+          "type": ["string", "null"],
+          "description": "Optional PDF object / resource identifier when known. Never substitutes for scope."
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Machine-readable finding type (kebab-case), often matching a check id."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning", "info"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable description for the report panel."
+        },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "check_id": {
+          "type": "string",
+          "description": "Optional profile check id that produced this finding."
+        }
+      }
+    },
+    "finding": {
+      "oneOf": [
+        { "$ref": "#/$defs/finding_v1" },
+        { "$ref": "#/$defs/finding_v2" }
+      ]
     },
     "fixup_available": {
       "type": "object",

@@ -24,6 +24,7 @@
 
 #include <QtTest>
 #include <QJsonArray>
+#include <QJsonObject>
 
 class PreflightPluginTest : public QObject
 {
@@ -34,7 +35,76 @@ private slots:
     void isExpectedPreflightExitCode_acceptsPassAndFindings();
     void isNormalizedReport_requiresTheSidecarContract();
     void isNormalizedReport_acceptsFixupParams();
+    void isNormalizedReport_acceptsSchemaV2ScopeFixtures();
+    void isNormalizedReport_rejectsInvalidScopeCombinations();
+    void findingHasVisualOverlay_respectsScopeAndBbox();
 };
+
+namespace
+{
+
+QJsonObject documentScopeFinding()
+{
+    return QJsonObject{
+        { QStringLiteral("scope"), QStringLiteral("document") },
+        { QStringLiteral("type"), QStringLiteral("encrypted") },
+        { QStringLiteral("severity"), QStringLiteral("error") },
+        { QStringLiteral("message"), QStringLiteral("Document is password-protected and cannot be fully inspected") },
+        { QStringLiteral("check_id"), QStringLiteral("document-access") }
+    };
+}
+
+QJsonObject pageScopeFinding()
+{
+    return QJsonObject{
+        { QStringLiteral("scope"), QStringLiteral("page") },
+        { QStringLiteral("page"), 2 },
+        { QStringLiteral("type"), QStringLiteral("color-mode") },
+        { QStringLiteral("severity"), QStringLiteral("error") },
+        { QStringLiteral("message"), QStringLiteral("Disallowed color space(s) found on page 2: DeviceRGB (allowed: CMYK, Grayscale)") },
+        { QStringLiteral("check_id"), QStringLiteral("color-mode") }
+    };
+}
+
+QJsonObject objectScopeFinding()
+{
+    return QJsonObject{
+        { QStringLiteral("scope"), QStringLiteral("object") },
+        { QStringLiteral("page"), 1 },
+        { QStringLiteral("object_id"), QStringLiteral("87") },
+        { QStringLiteral("type"), QStringLiteral("image-resolution") },
+        { QStringLiteral("severity"), QStringLiteral("warning") },
+        { QStringLiteral("message"), QStringLiteral("Image effective DPI 180 is below min_dpi 300") },
+        { QStringLiteral("bbox"), QJsonArray{ 72.0, 400.0, 540.0, 720.0 } },
+        { QStringLiteral("check_id"), QStringLiteral("image-resolution") }
+    };
+}
+
+QJsonObject scopeFixtureReport(const QJsonObject& finding, bool pass)
+{
+    QJsonArray errors;
+    if (!pass)
+    {
+        errors.append(finding);
+    }
+
+    QJsonArray warnings;
+    if (pass)
+    {
+        warnings.append(finding);
+    }
+
+    return QJsonObject{
+        { QStringLiteral("schema_version"), 2 },
+        { QStringLiteral("pass"), pass },
+        { QStringLiteral("profile"), QStringLiteral("Frisket Default") },
+        { QStringLiteral("errors"), errors },
+        { QStringLiteral("warnings"), warnings },
+        { QStringLiteral("fixups_available"), QJsonArray() }
+    };
+}
+
+} // namespace
 
 void PreflightPluginTest::resolveBundlePath_combinesApplicationAndRelativePaths()
 {
@@ -89,6 +159,29 @@ void PreflightPluginTest::isNormalizedReport_acceptsFixupParams()
     report.insert(QStringLiteral("fixups_available"), fixups);
 
     QVERIFY(pdfplugin::preflight::isNormalizedReport(report));
+}
+
+void PreflightPluginTest::isNormalizedReport_acceptsSchemaV2ScopeFixtures()
+{
+    QVERIFY(pdfplugin::preflight::isNormalizedReport(scopeFixtureReport(documentScopeFinding(), false)));
+    QVERIFY(pdfplugin::preflight::isNormalizedReport(scopeFixtureReport(pageScopeFinding(), false)));
+    QVERIFY(pdfplugin::preflight::isNormalizedReport(scopeFixtureReport(objectScopeFinding(), true)));
+}
+
+void PreflightPluginTest::isNormalizedReport_rejectsInvalidScopeCombinations()
+{
+    QJsonObject finding = documentScopeFinding();
+    finding.insert(QStringLiteral("page"), 1);
+    QJsonObject report = scopeFixtureReport(finding, false);
+
+    QVERIFY(!pdfplugin::preflight::isNormalizedReport(report));
+}
+
+void PreflightPluginTest::findingHasVisualOverlay_respectsScopeAndBbox()
+{
+    QVERIFY(!pdfplugin::preflight::findingHasVisualOverlay(documentScopeFinding(), 2));
+    QVERIFY(!pdfplugin::preflight::findingHasVisualOverlay(pageScopeFinding(), 2));
+    QVERIFY(pdfplugin::preflight::findingHasVisualOverlay(objectScopeFinding(), 2));
 }
 
 QTEST_APPLESS_MAIN(PreflightPluginTest)

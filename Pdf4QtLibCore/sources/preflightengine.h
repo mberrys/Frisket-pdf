@@ -38,6 +38,14 @@
 namespace pdf
 {
 
+/// Report contract version emitted by PreflightResult::toJson().
+inline constexpr int PREFLIGHT_REPORT_SCHEMA_VERSION = 2;
+
+/// Finding location scope in normalized preflight reports.
+inline constexpr QLatin1String PREFLIGHT_FINDING_SCOPE_DOCUMENT("document");
+inline constexpr QLatin1String PREFLIGHT_FINDING_SCOPE_PAGE("page");
+inline constexpr QLatin1String PREFLIGHT_FINDING_SCOPE_OBJECT("object");
+
 /// Configuration for a single preflight check, parsed from a profile.
 struct PDF4QTLIBCORESHARED_EXPORT PreflightCheckConfig
 {
@@ -76,6 +84,7 @@ struct PDF4QTLIBCORESHARED_EXPORT PreflightFixupConfig
 /// A single preflight finding (error or warning).
 struct PDF4QTLIBCORESHARED_EXPORT PreflightFinding
 {
+    QString scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_PAGE);
     int page = 1;
     QString objectId;
     QString type;

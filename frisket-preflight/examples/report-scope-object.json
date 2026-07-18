@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "pass": true,
+  "profile": "Frisket Default",
+  "errors": [],
+  "warnings": [
+    {
+      "scope": "object",
+      "page": 1,
+      "object_id": "87",
+      "type": "image-resolution",
+      "severity": "warning",
+      "message": "Image effective DPI 180 is below min_dpi 300",
+      "bbox": [72, 400, 540, 720],
+      "check_id": "image-resolution"
+    }
+  ],
+  "fixups_available": []
+}
