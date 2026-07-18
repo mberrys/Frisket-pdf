@@ -11,7 +11,6 @@
             "message": "Page size 540 x 720 pt does not match expected 612 x 792 pt (tolerance 1 pt)",
             "object_id": null,
             "page": 1,
-            "scope": "page",
             "severity": "error",
             "type": "page-size"
         },
@@ -26,7 +25,6 @@
             "message": "TrimBox 540 x 720 pt does not match expected 612 x 792 pt (tolerance 1 pt)",
             "object_id": null,
             "page": 1,
-            "scope": "page",
             "severity": "error",
             "type": "trim"
         }
@@ -35,7 +33,7 @@
     ],
     "pass": false,
     "profile": "Frisket Test - Trim/Page Size",
-    "schema_version": 2,
+    "schema_version": 1,
     "warnings": [
     ]
 }

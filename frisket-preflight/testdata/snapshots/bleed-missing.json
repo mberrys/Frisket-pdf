@@ -11,7 +11,6 @@
             "message": "BleedBox is missing or less than 9 pt on one or more edges",
             "object_id": null,
             "page": 1,
-            "scope": "page",
             "severity": "error",
             "type": "bleed"
         }
@@ -23,19 +22,23 @@
             "safe": false
         },
         {
-            "description": "Extend page boxes / artwork to provide bleed",
-            "id": "add-bleed",
+            "description": "Downsample images above target DPI",
+            "id": "downsample-images",
             "safe": false
         },
         {
-            "description": "Downsample images above target DPI",
-            "id": "downsample-images",
+            "description": "Extend page boxes / artwork to provide bleed",
+            "id": "add-bleed",
+            "params": {
+                "amount_pt": 9,
+                "mode": "mirror"
+            },
             "safe": false
         }
     ],
     "pass": false,
     "profile": "Frisket Default",
-    "schema_version": 2,
+    "schema_version": 1,
     "warnings": [
     ]
 }
