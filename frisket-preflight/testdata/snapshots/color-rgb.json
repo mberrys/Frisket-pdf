@@ -1,5 +1,19 @@
 {
     "errors": [
+        {
+            "bbox": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "check_id": "color-mode",
+            "message": "Disallowed color space(s) found on page 1: DeviceRGB (allowed: CMYK, Grayscale)",
+            "object_id": null,
+            "page": 1,
+            "severity": "error",
+            "type": "color-mode"
+        }
     ],
     "fixups_available": [
         {
@@ -13,7 +27,7 @@
             "safe": false
         }
     ],
-    "pass": true,
+    "pass": false,
     "profile": "Frisket Default",
     "schema_version": 1,
     "warnings": [

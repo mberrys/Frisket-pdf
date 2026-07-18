@@ -1,5 +1,19 @@
 {
     "errors": [
+        {
+            "bbox": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "check_id": "embedded-fonts",
+            "message": "Font 'F1' on page 1 is not embedded",
+            "object_id": null,
+            "page": 1,
+            "severity": "error",
+            "type": "embedded-fonts"
+        }
     ],
     "fixups_available": [
         {
@@ -13,7 +27,7 @@
             "safe": false
         }
     ],
-    "pass": true,
+    "pass": false,
     "profile": "Frisket Default",
     "schema_version": 1,
     "warnings": [

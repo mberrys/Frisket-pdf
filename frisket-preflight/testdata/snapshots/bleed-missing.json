@@ -22,13 +22,17 @@
             "safe": false
         },
         {
-            "description": "Extend page boxes / artwork to provide bleed",
-            "id": "add-bleed",
+            "description": "Downsample images above target DPI",
+            "id": "downsample-images",
             "safe": false
         },
         {
-            "description": "Downsample images above target DPI",
-            "id": "downsample-images",
+            "description": "Extend page boxes / artwork to provide bleed",
+            "id": "add-bleed",
+            "params": {
+                "amount_pt": 9,
+                "mode": "mirror"
+            },
             "safe": false
         }
     ],
