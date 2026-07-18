@@ -1,0 +1,17 @@
+{
+  "schema_version": 2,
+  "pass": false,
+  "profile": "Frisket Default",
+  "errors": [
+    {
+      "scope": "page",
+      "page": 2,
+      "type": "color-mode",
+      "severity": "error",
+      "message": "Disallowed color space(s) found on page 2: DeviceRGB (allowed: CMYK, Grayscale)",
+      "check_id": "color-mode"
+    }
+  ],
+  "warnings": [],
+  "fixups_available": []
+}

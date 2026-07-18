@@ -22,6 +22,8 @@
 
 #include "preflightreportmodel.h"
 
+#include "preflightsidecarutils.h"
+
 namespace pdfplugin
 {
 
@@ -65,7 +67,7 @@ QVariant PreflightReportModel::data(const QModelIndex& index, int role) const
         switch (index.column())
         {
             case Page:
-                return finding.page;
+                return finding.page > 0 ? QVariant(finding.page) : QVariant();
 
             case Severity:
                 return finding.severity;
@@ -126,6 +128,7 @@ void PreflightReportModel::setReport(const QJsonObject& report)
     m_hasReport = true;
     m_pass = report.value(QStringLiteral("pass")).toBool(true);
     m_profileName = report.value(QStringLiteral("profile")).toString();
+    m_schemaVersion = report.value(QStringLiteral("schema_version")).toInt(1);
     m_errorCount = 0;
     m_warningCount = 0;
 
@@ -156,6 +159,7 @@ void PreflightReportModel::clear()
     m_hasReport = false;
     m_pass = true;
     m_profileName.clear();
+    m_schemaVersion = 2;
     m_errorCount = 0;
     m_warningCount = 0;
     endResetModel();
@@ -167,11 +171,32 @@ void PreflightReportModel::appendFindings(const QJsonArray& findings)
     {
         const QJsonObject findingObject = findingValue.toObject();
         PreflightFindingEntry finding;
+
+        if (m_schemaVersion >= 2)
+        {
+            finding.scope = findingObject.value(QStringLiteral("scope")).toString();
+        }
+        else
+        {
+            finding.scope = QStringLiteral("page");
+        }
+
         finding.page = findingObject.value(QStringLiteral("page")).toInt();
         finding.severity = findingObject.value(QStringLiteral("severity")).toString();
         finding.type = findingObject.value(QStringLiteral("type")).toString();
         finding.message = findingObject.value(QStringLiteral("message")).toString();
         finding.checkId = findingObject.value(QStringLiteral("check_id")).toString();
+        finding.hasVisualOverlay = pdfplugin::preflight::findingHasVisualOverlay(findingObject, m_schemaVersion);
+
+        if (finding.hasVisualOverlay)
+        {
+            const QJsonArray bbox = findingObject.value(QStringLiteral("bbox")).toArray();
+            finding.bbox = QRectF(bbox.at(0).toDouble(),
+                                  bbox.at(1).toDouble(),
+                                  bbox.at(2).toDouble() - bbox.at(0).toDouble(),
+                                  bbox.at(3).toDouble() - bbox.at(1).toDouble());
+        }
+
         m_findings.push_back(finding);
     }
 }

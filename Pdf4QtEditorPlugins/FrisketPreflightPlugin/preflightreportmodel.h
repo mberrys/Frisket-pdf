@@ -26,6 +26,7 @@
 #include <QAbstractTableModel>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QRectF>
 #include <QString>
 #include <QVector>
 
@@ -41,11 +42,14 @@ struct PreflightFixupEntry
 
 struct PreflightFindingEntry
 {
+    QString scope;
     int page = 0;
     QString severity;
     QString type;
     QString message;
     QString checkId;
+    QRectF bbox;
+    bool hasVisualOverlay = false;
 };
 
 class PreflightReportModel : public QAbstractTableModel
@@ -78,7 +82,9 @@ public:
     QString profileName() const { return m_profileName; }
     int errorCount() const { return m_errorCount; }
     int warningCount() const { return m_warningCount; }
+    int schemaVersion() const { return m_schemaVersion; }
     const QVector<PreflightFixupEntry>& fixups() const { return m_fixups; }
+    const QVector<PreflightFindingEntry>& findings() const { return m_findings; }
 
 private:
     void appendFindings(const QJsonArray& findings);
@@ -88,6 +94,7 @@ private:
     bool m_hasReport = false;
     bool m_pass = true;
     QString m_profileName;
+    int m_schemaVersion = 2;
     int m_errorCount = 0;
     int m_warningCount = 0;
 };

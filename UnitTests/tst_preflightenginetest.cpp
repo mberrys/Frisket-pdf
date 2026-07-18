@@ -41,6 +41,7 @@ private slots:
     void run_includesProfileFixups();
     void run_synthesizesAddBleedWhenGapAndNoProfileFixup();
     void run_removesAddBleedWhenNoGap();
+    void run_invalidProfileEmitsDocumentScopeFinding();
 };
 
 void PreflightEngineTest::parseProfile_rejectsMissingName()
@@ -244,6 +245,26 @@ void PreflightEngineTest::run_removesAddBleedWhenNoGap()
     {
         QVERIFY(fixup.id != QStringLiteral("add-bleed"));
     }
+}
+
+void PreflightEngineTest::run_invalidProfileEmitsDocumentScopeFinding()
+{
+    pdf::PreflightEngine engine(nullptr);
+    const pdf::PreflightResult result = engine.run(QJsonObject{
+        { QStringLiteral("name"), QStringLiteral("Broken") }
+    });
+
+    QVERIFY(!result.pass);
+    QCOMPARE(result.errors.size(), 1);
+    QCOMPARE(result.errors.first().scope, QString::fromLatin1(pdf::PREFLIGHT_FINDING_SCOPE_DOCUMENT));
+    QVERIFY(!result.errors.first().bbox.isValid());
+
+    const QJsonObject report = result.toJson();
+    QCOMPARE(report.value(QStringLiteral("schema_version")).toInt(), pdf::PREFLIGHT_REPORT_SCHEMA_VERSION);
+    const QJsonObject finding = report.value(QStringLiteral("errors")).toArray().at(0).toObject();
+    QCOMPARE(finding.value(QStringLiteral("scope")).toString(), QStringLiteral("document"));
+    QVERIFY(!finding.contains(QStringLiteral("page")));
+    QVERIFY(!finding.contains(QStringLiteral("bbox")));
 }
 
 QTEST_GUILESS_MAIN(PreflightEngineTest)

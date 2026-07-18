@@ -9,7 +9,7 @@ This directory currently locks the **contract** (MIC-131). The CLI binary itself
 | Path | Purpose |
 |------|---------|
 | `schemas/profile.schema.json` | JSON Schema for declarative profiles (YAML or JSON) |
-| `schemas/report.schema.json` | JSON Schema for stdout report JSON (`bbox` required on every finding) |
+| `schemas/report.schema.json` | JSON Schema for stdout report JSON (`scope` + conditional `page`/`bbox` in v2) |
 | `profiles/frisket-default.yaml` | Bundled **Frisket Default** profile (Venue Poster / Handbill / Signage) |
 | `examples/report.example.json` | Example failing report matching the report schema |
 
@@ -44,19 +44,22 @@ Check params used by Phase 1 plans (open-ended via `additionalProperties`):
 
 Required top-level fields: `pass`, `profile`, `errors`, `warnings`, `fixups_available`.
 
+`schema_version` is currently **2**. Version 1 required `page` and `bbox` on every finding; the plugin still accepts v1 reports for backward compatibility.
+
 Every finding in `errors[]` / `warnings[]` **must** include:
 
 | Field | Notes |
 |-------|-------|
-| `page` | 1-based |
+| `scope` | `document` \| `page` \| `object` (v2) |
 | `type` | kebab-case machine id |
 | `severity` | `error` \| `warning` \| `info` |
 | `message` | human text for the dock panel |
-| `bbox` | `[x0, y0, x1, y1]` in PDF user space (points), media-box lower-left origin |
+| `page` | 1-based; required for `page` and `object` scope, absent for `document` |
+| `bbox` | optional `[x0, y0, x1, y1]` in PDF user space (points), media-box lower-left origin; include only when a meaningful region exists |
 
-`bbox` is mandatory from day one so Phase 2 overlays (`IDocumentDrawInterface`) do not need a second geometry pass. Page-level issues should use the relevant page box (typically MediaBox or TrimBox).
+`bbox` coordinates use PDF user space (points) with the page MediaBox lower-left as origin. Page-level issues without a specific region omit `bbox`. Regional/object issues include `bbox` when known.
 
-`object_id` is optional (string or null). `fixups_available[]` entries need `id`, `safe`, `description`.
+`object_id` is optional (string or null) and never substitutes for `scope`. `fixups_available[]` entries need `id`, `safe`, `description`.
 
 ## Two-tier bleed checking
 

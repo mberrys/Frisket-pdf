@@ -1,11 +1,12 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "pass": false,
   "profile": "Frisket Default",
   "engine_version": "0.0.0-dev",
   "pdf": "example-venue-poster.pdf",
   "errors": [
     {
+      "scope": "object",
       "page": 1,
       "object_id": "42",
       "type": "font-missing",
@@ -15,6 +16,7 @@
       "check_id": "embedded-fonts"
     },
     {
+      "scope": "page",
       "page": 1,
       "object_id": null,
       "type": "bleed",
@@ -22,19 +24,35 @@
       "message": "BleedBox is missing or less than 9 pt on one or more edges",
       "bbox": [0, 0, 612, 792],
       "check_id": "bleed"
+    },
+    {
+      "scope": "document",
+      "type": "encrypted",
+      "severity": "error",
+      "message": "Document is password-protected and cannot be fully inspected",
+      "check_id": "document-access"
     }
   ],
   "warnings": [
     {
+      "scope": "object",
       "page": 1,
       "object_id": "87",
       "type": "image-resolution",
       "severity": "warning",
       "message": "Image effective DPI 180 is below min_dpi 300",
-      "bbox": [72, 400, 540, 720],
       "check_id": "image-resolution"
     },
     {
+      "scope": "page",
+      "page": 2,
+      "type": "color-mode",
+      "severity": "warning",
+      "message": "Disallowed color space(s) found on page 2: DeviceRGB (allowed: CMYK, Grayscale)",
+      "check_id": "color-mode"
+    },
+    {
+      "scope": "object",
       "page": 1,
       "object_id": null,
       "type": "content-bleed",
