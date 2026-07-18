@@ -1,0 +1,37 @@
+{
+    "cmake.configureSettings": {
+        "PDF4QT_INSTALL_QT_DEPENDENCIES": "0",
+        "CMAKE_TOOLCHAIN_FILE": "/opt/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_INSTALLED_DIR": "/opt/vcpkg_installed",
+        "VCPKG_MANIFEST_INSTALL": "OFF",
+        "CMAKE_BUILD_TYPE": "Release",
+        "PDF4QT_QT_ROOT": "/opt/Qt/6.9.1/gcc_64"
+    },
+    "cmake.generator": "Ninja",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.environment": {
+        "CC": "gcc",
+        "CXX": "g++",
+        "VCPKG_OVERLAY_PORTS": "${workspaceFolder}/vcpkg/overlays/linux:${workspaceFolder}/vcpkg/overlays/general",
+        "VCPKG_ROOT": "/opt/vcpkg",
+        "VCPKG_INSTALLED_DIR": "/opt/vcpkg_installed",
+        "CMAKE_PREFIX_PATH": "/opt/Qt/6.9.1/gcc_64",
+        "LD_LIBRARY_PATH": "/opt/Qt/6.9.1/gcc_64/lib",
+        "QT_QPA_PLATFORM": "offscreen"
+    },
+    "terminal.integrated.env.linux": {
+        "CC": "gcc",
+        "CXX": "g++",
+        "VCPKG_ROOT": "/opt/vcpkg",
+        "VCPKG_INSTALLED_DIR": "/opt/vcpkg_installed",
+        "VCPKG_OVERLAY_PORTS": "${workspaceFolder}/vcpkg/overlays/linux:${workspaceFolder}/vcpkg/overlays/general",
+        "PDF4QT_QT_ROOT": "/opt/Qt/6.9.1/gcc_64",
+        "QT_ROOT_DIR": "/opt/Qt/6.9.1/gcc_64",
+        "CMAKE_PREFIX_PATH": "/opt/Qt/6.9.1/gcc_64",
+        "LD_LIBRARY_PATH": "/opt/Qt/6.9.1/gcc_64/lib",
+        "QT_QPA_PLATFORM": "offscreen",
+        "PATH": "${workspaceFolder}/build/usr/bin:${env:PATH}"
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "files.eol": "\r\n"
+}
