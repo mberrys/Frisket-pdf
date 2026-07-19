@@ -1,35 +1,19 @@
 {
     "errors": [
         {
-            "bbox": [
-                0,
-                0,
-                0,
-                0
-            ],
             "check_id": "color-mode",
             "message": "Disallowed color space(s) found on page 1: DeviceRGB (allowed: CMYK, Grayscale)",
-            "object_id": null,
             "page": 1,
+            "scope": "page",
             "severity": "error",
             "type": "color-mode"
         }
     ],
     "fixups_available": [
-        {
-            "description": "Convert all RGB colors to CMYK",
-            "id": "rgb-to-cmyk",
-            "safe": false
-        },
-        {
-            "description": "Downsample images above target DPI",
-            "id": "downsample-images",
-            "safe": false
-        }
     ],
     "pass": false,
     "profile": "Frisket Default",
-    "schema_version": 1,
+    "schema_version": 2,
     "warnings": [
     ]
 }

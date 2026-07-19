@@ -329,7 +329,8 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeRaster(const PDFPage* page,
         }
 
         PDFBleedMarginProbeEdgeResult edgeResult;
-        edgeResult.hasContent = inkCount > 0;
+        const qreal inkCoverage = pixelCount > 0 ? static_cast<qreal>(inkCount) / static_cast<qreal>(pixelCount) : 0.0;
+        edgeResult.hasContent = inkCoverage > (1.0 - settings.whiteCoverageThreshold);
         edgeResult.inkPixels = inkCount;
         edgeResult.totalPixels = pixelCount;
         edgeResult.stripRect = stripRect;

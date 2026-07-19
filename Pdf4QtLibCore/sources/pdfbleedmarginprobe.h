@@ -36,6 +36,7 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFBleedMarginProbeSettings
 {
     int dpi = 150;
     int threshold = 16;
+    qreal whiteCoverageThreshold = 0.9975;
     PDFBleedFixupSettings::ReferenceBox referenceBox = PDFBleedFixupSettings::ReferenceBox::TrimBox;
     QMarginsF bleedMM = QMarginsF(3.0, 3.0, 3.0, 3.0);
     bool fastOnly = false;

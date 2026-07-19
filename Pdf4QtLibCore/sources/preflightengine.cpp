@@ -245,6 +245,63 @@ QString sideNameForFinding(PDFBleedFixupSide side)
     return QStringLiteral("unknown");
 }
 
+void pushPreflightFinding(const PreflightFinding& finding,
+                          const QString& severity,
+                          QList<PreflightFinding>& errors,
+                          QList<PreflightFinding>& warnings)
+{
+    if (severity == QStringLiteral("warning") || severity == QStringLiteral("info"))
+    {
+        warnings.push_back(finding);
+    }
+    else
+    {
+        errors.push_back(finding);
+    }
+}
+
+bool edgeHasContent(const PDFBleedMarginProbeResult& result, PDFBleedFixupSide side)
+{
+    switch (side)
+    {
+        case PDFBleedFixupSide::Left: return result.left.hasContent;
+        case PDFBleedFixupSide::Right: return result.right.hasContent;
+        case PDFBleedFixupSide::Top: return result.top.hasContent;
+        case PDFBleedFixupSide::Bottom: return result.bottom.hasContent;
+    }
+    return false;
+}
+
+QRectF edgeStripRect(const PDFBleedMarginProbeResult& result, PDFBleedFixupSide side)
+{
+    switch (side)
+    {
+        case PDFBleedFixupSide::Left: return result.left.stripRect;
+        case PDFBleedFixupSide::Right: return result.right.stripRect;
+        case PDFBleedFixupSide::Top: return result.top.stripRect;
+        case PDFBleedFixupSide::Bottom: return result.bottom.stripRect;
+    }
+    return QRectF();
+}
+
+void emitNeedsAutoBleedFinding(int pageNumber,
+                               const QRectF& pageBbox,
+                               const PreflightCheckConfig& check,
+                               QList<PreflightFinding>& errors,
+                               QList<PreflightFinding>& warnings)
+{
+    PreflightFinding finding;
+    finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_PAGE);
+    finding.page = pageNumber;
+    finding.objectId = QString();
+    finding.type = QStringLiteral("needs-auto-bleed");
+    finding.severity = QStringLiteral("info");
+    finding.checkId = check.id;
+    finding.bbox = pageBbox;
+    finding.message = PDFTranslationContext::tr("Page is a candidate for the add-bleed fixup");
+    pushPreflightFinding(finding, finding.severity, errors, warnings);
+}
+
 void runContentBleedCheck(PDFDocumentSession* session,
                            const PreflightCheckConfig& check,
                            QList<PreflightFinding>& errors,
@@ -268,6 +325,7 @@ void runContentBleedCheck(PDFDocumentSession* session,
     probeSettings.bleedMM = QMarginsF(bleedMm, bleedMm, bleedMm, bleedMm);
     probeSettings.dpi = check.probeDpi;
     probeSettings.threshold = check.probeThreshold;
+    probeSettings.whiteCoverageThreshold = check.rasterWhiteThreshold;
     probeSettings.fastOnly = !check.rasterConfirm;
 
     const PDFCatalog* catalog = document->getCatalog();
@@ -293,52 +351,73 @@ void runContentBleedCheck(PDFDocumentSession* session,
             PDFBleedFixupSide::Top, PDFBleedFixupSide::Bottom
         };
 
-        QStringList missingSides;
-        QRectF unionMissingBbox;
-        for (PDFBleedFixupSide side : sides)
-        {
-            bool hasContent = false;
-            QRectF stripRect;
-            switch (side)
-            {
-                case PDFBleedFixupSide::Left: hasContent = result.left.hasContent; stripRect = result.left.stripRect; break;
-                case PDFBleedFixupSide::Right: hasContent = result.right.hasContent; stripRect = result.right.stripRect; break;
-                case PDFBleedFixupSide::Top: hasContent = result.top.hasContent; stripRect = result.top.stripRect; break;
-                case PDFBleedFixupSide::Bottom: hasContent = result.bottom.hasContent; stripRect = result.bottom.stripRect; break;
-            }
+        bool pageHasBleedGap = false;
 
-            if (!hasContent)
+        if (check.rasterConfirm)
+        {
+            for (PDFBleedFixupSide side : sides)
             {
+                if (edgeHasContent(result, side))
+                {
+                    continue;
+                }
+
+                const QRectF stripRect = edgeStripRect(result, side);
+                PreflightFinding finding;
+                finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
+                finding.page = int(pageIndex + 1);
+                finding.objectId = QString();
+                finding.type = QStringLiteral("bleed-margin-empty");
+                finding.severity = check.severity;
+                finding.checkId = check.id;
+                finding.bbox = stripRect.isValid() ? stripRect : QRectF();
+                finding.message = PDFTranslationContext::tr("Bleed margin empty on %1 edge").arg(sideNameForFinding(side));
+                pushPreflightFinding(finding, check.severity, errors, warnings);
+                pageHasBleedGap = true;
+            }
+        }
+        else
+        {
+            QStringList missingSides;
+            QRectF unionMissingBbox;
+            for (PDFBleedFixupSide side : sides)
+            {
+                if (edgeHasContent(result, side))
+                {
+                    continue;
+                }
+
                 missingSides.append(sideNameForFinding(side));
+                const QRectF stripRect = edgeStripRect(result, side);
                 if (stripRect.isValid())
                 {
                     unionMissingBbox = unionMissingBbox.united(stripRect);
                 }
             }
+
+            if (missingSides.isEmpty())
+            {
+                continue;
+            }
+
+            PreflightFinding finding;
+            finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
+            finding.page = int(pageIndex + 1);
+            finding.objectId = QString();
+            finding.type = QStringLiteral("content-bleed");
+            finding.severity = check.severity;
+            finding.checkId = check.id;
+            finding.bbox = unionMissingBbox.isValid() ? unionMissingBbox : QRectF();
+            finding.message = PDFTranslationContext::tr("Artwork does not extend into bleed margin on %1").arg(missingSides.join(QStringLiteral(", ")));
+            pushPreflightFinding(finding, check.severity, errors, warnings);
+            pageHasBleedGap = true;
         }
 
-        if (missingSides.isEmpty())
+        if (pageHasBleedGap)
         {
-            continue;
-        }
-
-        PreflightFinding finding;
-        finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
-        finding.page = int(pageIndex + 1);
-        finding.objectId = QString();
-        finding.type = QStringLiteral("content-bleed");
-        finding.severity = check.severity;
-        finding.checkId = check.id;
-        finding.bbox = unionMissingBbox.isValid() ? unionMissingBbox : QRectF();
-        finding.message = PDFTranslationContext::tr("Artwork does not extend into bleed margin on %1").arg(missingSides.join(QStringLiteral(", ")));
-
-        if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
-        {
-            warnings.push_back(finding);
-        }
-        else
-        {
-            errors.push_back(finding);
+            const QRectF media = page->getMediaBox().normalized();
+            const QRectF pageBbox = preflight::resolveEffectiveBox(page->getTrimBox(), page->getCropBox(), media);
+            emitNeedsAutoBleedFinding(int(pageIndex + 1), pageBbox, check, errors, warnings);
         }
     }
 }
@@ -347,7 +426,10 @@ bool hasBleedGapFinding(const QList<PreflightFinding>& findings)
 {
     for (const PreflightFinding& finding : findings)
     {
-        if (finding.checkId == QStringLiteral("bleed") || finding.checkId == QStringLiteral("content-bleed"))
+        if (finding.checkId == QStringLiteral("bleed")
+            || finding.type == QStringLiteral("content-bleed")
+            || finding.type == QStringLiteral("bleed-margin-empty")
+            || finding.type == QStringLiteral("needs-auto-bleed"))
         {
             return true;
         }
@@ -370,10 +452,12 @@ void adjustFixupsAvailable(QList<PreflightFixupConfig>& fixups, bool needsAddBle
         }
     }
 
-    // Remove all add-bleed entries; they will be re-added below if needed.
+    // Remove advertised fixups; only implemented fixups are re-added below.
     auto it = std::remove_if(fixups.begin(), fixups.end(), [](const PreflightFixupConfig& fixup)
     {
-        return fixup.id == QStringLiteral("add-bleed");
+        return fixup.id == QStringLiteral("add-bleed")
+            || fixup.id == QStringLiteral("rgb-to-cmyk")
+            || fixup.id == QStringLiteral("downsample-images");
     });
     fixups.erase(it, fixups.end());
 
@@ -1110,6 +1194,7 @@ bool PreflightEngine::parseProfile(const QJsonObject& profileObject, PreflightPr
         check.rasterConfirm = checkObject.value(QStringLiteral("raster_confirm")).toBool(false);
         check.probeDpi = checkObject.value(QStringLiteral("probe_dpi")).toInt(150);
         check.probeThreshold = checkObject.value(QStringLiteral("probe_threshold")).toInt(16);
+        check.rasterWhiteThreshold = checkObject.value(QStringLiteral("raster_white_threshold")).toDouble(0.9975);
 
         check.minDpi = checkObject.value(QStringLiteral("min_dpi")).toInt(0);
 

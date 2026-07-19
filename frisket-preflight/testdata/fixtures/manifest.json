@@ -102,5 +102,13 @@
     "expect": { "pass": true, "check_ids": ["content-bleed"] },
     "source": "hand-built",
     "notes": "Fast bounds flags gap; strip raster confirms missing content. Content-bleed check implemented in MIC-151."
+  },
+  {
+    "id": "content-bleed-three-of-four",
+    "pdf": "content-bleed-three-of-four.pdf",
+    "profile": "examples/profile-tiered-bleed.json",
+    "expect": { "pass": true, "check_ids": ["content-bleed"] },
+    "source": "generated",
+    "notes": "Artwork into left/right/top bleed strips only; Tier-1 emits exactly one content-bleed on the bottom edge."
   }
 ]

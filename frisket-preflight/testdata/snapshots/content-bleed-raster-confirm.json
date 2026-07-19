@@ -1,0 +1,48 @@
+{
+    "errors": [
+    ],
+    "fixups_available": [
+        {
+            "description": "Extend page boxes / artwork to provide bleed",
+            "id": "add-bleed",
+            "params": {
+                "amount_pt": 9,
+                "mode": "mirror"
+            },
+            "safe": false
+        }
+    ],
+    "pass": true,
+    "profile": "Sinalite Tiered Bleed",
+    "schema_version": 2,
+    "warnings": [
+        {
+            "bbox": [
+                1,
+                1,
+                219,
+                219
+            ],
+            "check_id": "content-bleed",
+            "message": "Artwork does not extend into bleed margin on left, right, top, bottom",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "content-bleed"
+        },
+        {
+            "bbox": [
+                10,
+                10,
+                210,
+                210
+            ],
+            "check_id": "content-bleed",
+            "message": "Page is a candidate for the add-bleed fixup",
+            "page": 1,
+            "scope": "page",
+            "severity": "info",
+            "type": "needs-auto-bleed"
+        }
+    ]
+}
