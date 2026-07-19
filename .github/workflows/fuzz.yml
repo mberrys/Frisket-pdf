@@ -63,12 +63,12 @@ jobs:
             --clean-packages-after-build
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@b3ea5275e37b734d027040e2c7fe7a10ea2ef946
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
         with:
           version: "6.9.0"
           host: "linux"
           target: "desktop"
-          arch: "gcc_64"
+          dir: "${{ github.workspace }}/qt/"
           install-deps: "true"
           modules: "qtimageformats"
           cache: "true"
@@ -90,7 +90,7 @@ jobs:
             -DPDF4QT_ENABLE_SENTRY=OFF \
             -DPDF4QT_ENABLE_SANITIZERS=ON \
             -DPDF4QT_BUILD_FUZZERS=ON \
-            -DPDF4QT_QT_ROOT="${Qt6_DIR%/lib/cmake/Qt6}"
+            -DPDF4QT_QT_ROOT="${{ github.workspace }}/qt/Qt/6.9.0/gcc_64"
 
       - name: Build fuzz harnesses
         run: |
