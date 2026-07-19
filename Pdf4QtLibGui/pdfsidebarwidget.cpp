@@ -39,6 +39,7 @@
 #include "pdfwidgetutils.h"
 #include "pdfbookmarkui.h"
 #include "pdfwidgetannotation.h"
+#include "pdffilenamesanitizer.h"
 
 #include <QMenu>
 #include <QAction>
@@ -951,7 +952,7 @@ void PDFSidebarWidget::onAttachmentCustomContextMenuRequested(const QPoint& pos)
             const pdf::PDFEmbeddedFile* platformFile = fileSpecification->getPlatformFile();
             if (platformFile && platformFile->isValid())
             {
-                QString defaultFileName = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + QDir::separator() + fileSpecification->getPlatformFileName();
+                QString defaultFileName = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + QDir::separator() + pdf::PDFFilenameSanitizer::sanitize(fileSpecification->getPlatformFileName());
                 QString saveFileName = QFileDialog::getSaveFileName(this, tr("Save attachment"), defaultFileName);
                 if (!saveFileName.isEmpty())
                 {

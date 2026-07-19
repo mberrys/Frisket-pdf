@@ -22,7 +22,9 @@
 
 #include "pdftoolattachments.h"
 #include "pdfexception.h"
+#include "pdffilenamesanitizer.h"
 
+#include <QDir>
 #include <QFile>
 #include <QMimeDatabase>
 
@@ -170,7 +172,7 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
                 continue;
             }
 
-            QString outputFile = info.fileName;
+            QString outputFile = pdf::PDFFilenameSanitizer::sanitize(info.fileName);
             if (!options.attachmentsTargetFile.isEmpty())
             {
                 outputFile = options.attachmentsTargetFile;
@@ -179,6 +181,12 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
             if (!options.attachmentsOutputDirectory.isEmpty())
             {
                 outputFile = QString("%1/%2").arg(options.attachmentsOutputDirectory, outputFile);
+
+                if (!pdf::PDFFilenameSanitizer::isPathContained(outputFile, options.attachmentsOutputDirectory))
+                {
+                    PDFConsole::writeError(PDFToolTranslationContext::tr("Attachment filename '%1' would escape the target directory. Skipping.").arg(info.fileName), options.outputCodec);
+                    continue;
+                }
             }
 
             try
