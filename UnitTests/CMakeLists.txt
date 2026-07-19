@@ -120,6 +120,20 @@ set_target_properties(UnitTestsBleedFixup PROPERTIES
 )
 add_test(UnitTestsBleedFixup  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsBleedFixup")
 
+add_executable(UnitTestsFilenameSanitizer
+	tst_filenamesanitizertest.cpp
+)
+
+target_link_libraries(UnitTestsFilenameSanitizer PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Test)
+
+set_target_properties(UnitTestsFilenameSanitizer PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsFilenameSanitizer "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsFilenameSanitizer")
+
 # Pure geometry math for the preflight custom checks (bleed / trim / page-size).
 # Header-only, so it only needs the PdfTool include dir - no Core or PdfTool link.
 add_executable(UnitTestsPreflightChecks
