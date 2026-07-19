@@ -11,8 +11,9 @@ Automated coverage lives in `UnitTests/tst_operatoracceptance.cpp` (`ctest -R Un
 | Clean pass | `bleed-adequate.pdf` | Pass |
 | Missing / short bleed | `bleed-missing.pdf` | Fail (`bleed`), `add-bleed` advertised |
 | Live text (embedded font) | `font-embedded.pdf` | Pass |
+| Live text (not embedded) | `font-not-embedded.pdf` | Fail (`embedded-fonts`) |
 | Image-only raster | `image-dpi-ok.pdf` | Pass |
-| Malformed / unsupported | `malformed-not-pdf.pdf` | Non-zero exit (not findings exit code 1) |
+| Malformed / unsupported | `malformed-not-pdf.pdf` | Non-zero exit (not findings exit code 1); no `%PDF` header |
 
 Additional stress fixtures (`ai-art-*.pdf`) are exercised by `UnitTestsBleedStress`.
 
@@ -20,14 +21,15 @@ Additional stress fixtures (`ai-art-*.pdf`) are exercised by `UnitTestsBleedStre
 
 - Runs `PdfTool preflight` on each corpus file with `profiles/frisket-default.json`
 - Validates normalized report contract (`preflightsidecarutils.h`)
-- Full operator loop on `bleed-missing.pdf`: preflight → `add-bleed` (mirror, 9 pt) → re-preflight pass
+- Full operator loop on `bleed-missing.pdf`: preflight → `add-bleed` (params from `fixups_available`) → re-preflight pass with plugin report validation
 - Verifies the source PDF SHA-256 is unchanged after fixup (save-as semantics)
-- Unicode + space path: `shop files/café poster.pdf`
+- Unicode + space paths for preflight input and `add-bleed` output (`shop files/café poster.pdf`)
 - Invalid profile JSON returns actionable stderr (not exit code 1)
+- Valid JSON profile with semantic mismatch (empty `checks`) returns exit code 1 with `type: profile` finding accepted by the plugin contract
 - Unsupported `schema_version` and invalid scope combinations are rejected with explicit errors
 - Visual vs non-visual finding classification (`bleed` page bbox vs `embedded-fonts` object without bbox)
-- Sidecar cancellation: start preflight, kill process, verify clean termination
-- Logs wall-time and peak-memory baseline for the corpus (informational; not a perf gate)
+- Sidecar cancellation: start preflight, wait for I/O, kill process, verify non-success termination
+- Logs wall-time baseline for the corpus; on Linux also samples peak PdfTool child `VmHWM` (informational; not a perf gate)
 
 ## Manual operator checklist (Editor)
 

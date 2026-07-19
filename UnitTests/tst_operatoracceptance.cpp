@@ -32,6 +32,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -43,7 +44,7 @@ namespace
 {
 
 constexpr char DEFAULT_PROFILE_REL[] = "profiles/frisket-default.json";
-constexpr char BLEED_MM[] = "3.175"; // 9 pt
+constexpr qreal POINTS_PER_MM = 72.0 / 25.4;
 
 struct OperatorCorpusEntry
 {
@@ -51,14 +52,16 @@ struct OperatorCorpusEntry
     const char* pdf;
     bool expectPass;
     const char* expectCheckId;
+    bool skipPreflightJson;
 };
 
 constexpr OperatorCorpusEntry OPERATOR_CORPUS[] = {
-    { "clean-adequate-bleed", "bleed-adequate.pdf", true, nullptr },
-    { "missing-bleed", "bleed-missing.pdf", false, "bleed" },
-    { "live-text-embedded", "font-embedded.pdf", true, nullptr },
-    { "image-only-raster", "image-dpi-ok.pdf", true, nullptr },
-    { "malformed-input", "malformed-not-pdf.pdf", false, nullptr },
+    { "clean-adequate-bleed", "bleed-adequate.pdf", true, nullptr, false },
+    { "missing-bleed", "bleed-missing.pdf", false, "bleed", false },
+    { "live-text-embedded", "font-embedded.pdf", true, nullptr, false },
+    { "live-text-not-embedded", "font-not-embedded.pdf", false, "embedded-fonts", false },
+    { "image-only-raster", "image-dpi-ok.pdf", true, nullptr, false },
+    { "malformed-input", "malformed-not-pdf.pdf", false, nullptr, true },
 };
 
 QString fixturesDir()
@@ -89,31 +92,78 @@ QStringList checkIdsOf(const QJsonObject& report)
     return ids;
 }
 
-bool hasAddBleedFixup(const QJsonObject& report)
+QJsonObject findingWithCheckId(const QJsonObject& report, const QString& checkId)
+{
+    for (const QString& section : { QStringLiteral("errors"), QStringLiteral("warnings") })
+    {
+        for (const QJsonValue& findingValue : report.value(section).toArray())
+        {
+            const QJsonObject finding = findingValue.toObject();
+            if (finding.value(QStringLiteral("check_id")).toString() == checkId)
+            {
+                return finding;
+            }
+        }
+    }
+
+    return QJsonObject();
+}
+
+bool hasAddBleedFixup(const QJsonObject& report, QJsonObject* fixupObject = nullptr)
 {
     for (const QJsonValue& fixupValue : report.value(QStringLiteral("fixups_available")).toArray())
     {
-        if (fixupValue.toObject().value(QStringLiteral("id")).toString() == QStringLiteral("add-bleed"))
+        const QJsonObject fixup = fixupValue.toObject();
+        if (fixup.value(QStringLiteral("id")).toString() == QStringLiteral("add-bleed"))
         {
+            if (fixupObject)
+            {
+                *fixupObject = fixup;
+            }
             return true;
         }
     }
     return false;
 }
 
-qint64 currentPeakMemoryKb()
+bool advertisedAddBleedParams(const QJsonObject& report, QString* mode, QString* bleedMm)
 {
+    QJsonObject fixup;
+    if (!hasAddBleedFixup(report, &fixup))
+    {
+        return false;
+    }
+
+    const QJsonObject params = fixup.value(QStringLiteral("params")).toObject();
+    const qreal amountPt = params.value(QStringLiteral("amount_pt")).toDouble(fixup.value(QStringLiteral("amount_pt")).toDouble(9.0));
+
+    if (mode)
+    {
+        *mode = params.value(QStringLiteral("mode")).toString(QStringLiteral("mirror"));
+    }
+
+    if (bleedMm)
+    {
+        *bleedMm = QString::number(amountPt / POINTS_PER_MM, 'f', 3);
+    }
+
+    return amountPt > 0.0;
+}
+
 #ifdef Q_OS_LINUX
-    QFile statusFile(QStringLiteral("/proc/self/status"));
+qint64 readProcessMemoryFieldKb(qint64 processId, const char* fieldName)
+{
+    QFile statusFile(QStringLiteral("/proc/%1/status").arg(processId));
     if (!statusFile.open(QIODevice::ReadOnly))
     {
         return -1;
     }
 
     const QList<QByteArray> lines = statusFile.readAll().split('\n');
+    const QByteArray prefix = QByteArray(fieldName) + ':';
     for (const QByteArray& line : lines)
     {
-        if (line.startsWith("VmHWM:"))
+        if (line.startsWith(prefix))
         {
             const QList<QByteArray> parts = line.simplified().split(' ');
             if (parts.size() >= 2)
@@ -122,13 +172,10 @@ qint64 currentPeakMemoryKb()
             }
         }
     }
+
     return -1;
-#elif defined(Q_OS_WIN)
-    return -1;
-#else
-    return -1;
-#endif
 }
+#endif
 
 QByteArray fileSha256(const QString& path)
 {
@@ -158,10 +205,11 @@ private slots:
     void operatorLoop_bleedFixupAndRevalidate();
     void operatorLoop_preservesOriginalBytes();
 
-    void unicodeAndSpacePaths_preflightSucceeds();
+    void unicodeAndSpacePaths_preflightAndAddBleedSucceed();
 
     void malformedInput_failsWithoutCrash();
     void invalidProfile_returnsActionableError();
+    void profileSemanticMismatch_returnsProfileFinding();
 
     void reportContract_rejectsUnsupportedSchema();
     void reportContract_classifiesVisualOverlays();
@@ -171,12 +219,26 @@ private slots:
     void corpus_performanceBaseline();
 
 private:
-    bool runPdfTool(const QStringList& arguments, QByteArray* stdOut, QByteArray* stdErr, int* exitCode) const;
-    bool runPreflight(const QString& pdfPath, const QString& profilePath, QJsonObject* report, int* exitCode) const;
-    bool runAddBleed(const QString& inputPath, const QString& outputPath, int* exitCode) const;
+    bool runPdfTool(const QStringList& arguments,
+                    QByteArray* stdOut,
+                    QByteArray* stdErr,
+                    int* exitCode,
+                    qint64* peakChildMemoryKb = nullptr) const;
+    bool runPreflight(const QString& pdfPath,
+                      const QString& profilePath,
+                      QJsonObject* report,
+                      int* exitCode,
+                      qint64* peakChildMemoryKb = nullptr) const;
+    bool runAddBleed(const QString& inputPath,
+                     const QString& outputPath,
+                     const QString& mode,
+                     const QString& bleedMm,
+                     int* exitCode) const;
     QString fixturePath(const QString& pdf) const;
+    void assertMalformedPreflightFailure(const QString& pdfPath) const;
 
     QString m_defaultProfilePath;
+    QString m_pdfToolPath;
 };
 
 void OperatorAcceptanceTest::initTestCase()
@@ -184,21 +246,56 @@ void OperatorAcceptanceTest::initTestCase()
     m_defaultProfilePath = defaultProfilePath();
     QVERIFY2(QFile::exists(m_defaultProfilePath),
              qPrintable(QStringLiteral("Missing default profile at %1").arg(m_defaultProfilePath)));
+
+    m_pdfToolPath = QStringLiteral(PDFTOOL_EXECUTABLE_PATH);
+    QVERIFY2(QFileInfo(m_pdfToolPath).isExecutable(),
+             qPrintable(QStringLiteral("PdfTool not found or not executable at %1").arg(m_pdfToolPath)));
 }
 
-bool OperatorAcceptanceTest::runPdfTool(const QStringList& arguments, QByteArray* stdOut, QByteArray* stdErr, int* exitCode) const
+bool OperatorAcceptanceTest::runPdfTool(const QStringList& arguments,
+                                        QByteArray* stdOut,
+                                        QByteArray* stdErr,
+                                        int* exitCode,
+                                        qint64* peakChildMemoryKb) const
 {
     QProcess process;
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     environment.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
     process.setProcessEnvironment(environment);
-    process.start(QStringLiteral(PDFTOOL_EXECUTABLE_PATH), arguments);
-    if (!process.waitForFinished(120000))
+    process.start(m_pdfToolPath, arguments);
+    if (!process.waitForStarted(10000))
     {
-        process.kill();
-        process.waitForFinished(5000);
         return false;
     }
+
+    qint64 peakMemoryKb = -1;
+    QElapsedTimer runTimer;
+    runTimer.start();
+    while (!process.waitForFinished(250))
+    {
+        if (runTimer.elapsed() > 120000)
+        {
+            process.kill();
+            process.waitForFinished(5000);
+            return false;
+        }
+
+#ifdef Q_OS_LINUX
+        const qint64 sample = readProcessMemoryFieldKb(process.processId(), "VmHWM");
+        if (sample > peakMemoryKb)
+        {
+            peakMemoryKb = sample;
+        }
+#endif
+    }
+
+#ifdef Q_OS_LINUX
+    const qint64 finalSample = readProcessMemoryFieldKb(process.processId(), "VmHWM");
+    if (finalSample > peakMemoryKb)
+    {
+        peakMemoryKb = finalSample;
+    }
+#endif
 
     if (exitCode)
     {
@@ -215,13 +312,26 @@ bool OperatorAcceptanceTest::runPdfTool(const QStringList& arguments, QByteArray
         *stdErr = process.readAllStandardError();
     }
 
+    if (peakChildMemoryKb)
+    {
+        *peakChildMemoryKb = peakMemoryKb;
+    }
+
     return process.exitStatus() == QProcess::NormalExit;
 }
 
-bool OperatorAcceptanceTest::runPreflight(const QString& pdfPath, const QString& profilePath, QJsonObject* report, int* exitCode) const
+bool OperatorAcceptanceTest::runPreflight(const QString& pdfPath,
+                                          const QString& profilePath,
+                                          QJsonObject* report,
+                                          int* exitCode,
+                                          qint64* peakChildMemoryKb) const
 {
     QByteArray stdOut;
-    if (!runPdfTool({ QStringLiteral("preflight"), pdfPath, QStringLiteral("--profile"), profilePath }, &stdOut, nullptr, exitCode))
+    if (!runPdfTool({ QStringLiteral("preflight"), pdfPath, QStringLiteral("--profile"), profilePath },
+                    &stdOut,
+                    nullptr,
+                    exitCode,
+                    peakChildMemoryKb))
     {
         return false;
     }
@@ -241,7 +351,11 @@ bool OperatorAcceptanceTest::runPreflight(const QString& pdfPath, const QString&
     return true;
 }
 
-bool OperatorAcceptanceTest::runAddBleed(const QString& inputPath, const QString& outputPath, int* exitCode) const
+bool OperatorAcceptanceTest::runAddBleed(const QString& inputPath,
+                                         const QString& outputPath,
+                                         const QString& mode,
+                                         const QString& bleedMm,
+                                         int* exitCode) const
 {
     return runPdfTool({
                           QStringLiteral("add-bleed"),
@@ -249,9 +363,9 @@ bool OperatorAcceptanceTest::runAddBleed(const QString& inputPath, const QString
                           QStringLiteral("--output"),
                           outputPath,
                           QStringLiteral("--mode"),
-                          QStringLiteral("mirror"),
+                          mode,
                           QStringLiteral("--bleed-mm"),
-                          QString::fromLatin1(BLEED_MM),
+                          bleedMm,
                           QStringLiteral("--force"),
                       },
                       nullptr,
@@ -264,19 +378,33 @@ QString OperatorAcceptanceTest::fixturePath(const QString& pdf) const
     return QDir(fixturesDir()).filePath(pdf);
 }
 
+void OperatorAcceptanceTest::assertMalformedPreflightFailure(const QString& pdfPath) const
+{
+    int exitCode = -1;
+    QByteArray stdErr;
+    QVERIFY(runPdfTool({ QStringLiteral("preflight"), pdfPath, QStringLiteral("--profile"), m_defaultProfilePath },
+                       nullptr,
+                       &stdErr,
+                       &exitCode));
+    QVERIFY2(exitCode != 0, "Malformed input must not report a successful preflight run.");
+    QVERIFY2(exitCode != 1, "Malformed input must not masquerade as a findings exit code.");
+}
+
 void OperatorAcceptanceTest::representativeCorpus_preflight_data()
 {
     QTest::addColumn<QString>("id");
     QTest::addColumn<QString>("pdf");
     QTest::addColumn<bool>("expectPass");
     QTest::addColumn<QString>("expectCheckId");
+    QTest::addColumn<bool>("skipPreflightJson");
 
     for (const OperatorCorpusEntry& entry : OPERATOR_CORPUS)
     {
         QTest::newRow(entry.id) << QString::fromLatin1(entry.id)
                                 << QString::fromLatin1(entry.pdf)
                                 << entry.expectPass
-                                << (entry.expectCheckId ? QString::fromLatin1(entry.expectCheckId) : QString());
+                                << (entry.expectCheckId ? QString::fromLatin1(entry.expectCheckId) : QString())
+                                << entry.skipPreflightJson;
     }
 }
 
@@ -285,20 +413,14 @@ void OperatorAcceptanceTest::representativeCorpus_preflight()
     QFETCH(QString, pdf);
     QFETCH(bool, expectPass);
     QFETCH(QString, expectCheckId);
+    QFETCH(bool, skipPreflightJson);
 
     const QString pdfPath = fixturePath(pdf);
     QVERIFY2(QFile::exists(pdfPath), qPrintable(QStringLiteral("Missing fixture %1").arg(pdfPath)));
 
-    if (pdf == QStringLiteral("malformed-not-pdf.pdf"))
+    if (skipPreflightJson)
     {
-        int exitCode = -1;
-        QByteArray stdErr;
-        QVERIFY(runPdfTool({ QStringLiteral("preflight"), pdfPath, QStringLiteral("--profile"), m_defaultProfilePath },
-                           nullptr,
-                           &stdErr,
-                           &exitCode));
-        QVERIFY(exitCode != 0);
-        QVERIFY(exitCode != 1);
+        assertMalformedPreflightFailure(pdfPath);
         return;
     }
 
@@ -325,14 +447,18 @@ void OperatorAcceptanceTest::operatorLoop_bleedFixupAndRevalidate()
     int initialExitCode = -1;
     QVERIFY(runPreflight(pdfPath, m_defaultProfilePath, &initialReport, &initialExitCode));
     QCOMPARE(initialExitCode, 1);
-    QVERIFY(hasAddBleedFixup(initialReport));
+    QVERIFY(pdfplugin::preflight::validateNormalizedReport(initialReport));
+
+    QString mode;
+    QString bleedMm;
+    QVERIFY(advertisedAddBleedParams(initialReport, &mode, &bleedMm));
 
     QTemporaryDir temporaryDirectory;
     QVERIFY(temporaryDirectory.isValid());
     const QString outputPath = temporaryDirectory.filePath(QStringLiteral("bleed-fixed.pdf"));
 
     int addBleedExitCode = -1;
-    QVERIFY(runAddBleed(pdfPath, outputPath, &addBleedExitCode));
+    QVERIFY(runAddBleed(pdfPath, outputPath, mode, bleedMm, &addBleedExitCode));
     QCOMPARE(addBleedExitCode, 0);
     QVERIFY(QFile::exists(outputPath));
 
@@ -340,14 +466,25 @@ void OperatorAcceptanceTest::operatorLoop_bleedFixupAndRevalidate()
     int postExitCode = -1;
     QVERIFY(runPreflight(outputPath, m_defaultProfilePath, &postReport, &postExitCode));
     QCOMPARE(postExitCode, 0);
-    QVERIFY(postReport.value(QStringLiteral("pass")).toBool());
-    QVERIFY(!checkIdsOf(postReport).contains(QStringLiteral("bleed")));
+
+    const QJsonObject filteredPostReport = pdfplugin::preflight::filterAdvertisedFixups(postReport);
+    QVERIFY(pdfplugin::preflight::validateNormalizedReport(filteredPostReport));
+    QVERIFY(filteredPostReport.value(QStringLiteral("pass")).toBool());
+    QVERIFY(!checkIdsOf(filteredPostReport).contains(QStringLiteral("bleed")));
 }
 
 void OperatorAcceptanceTest::operatorLoop_preservesOriginalBytes()
 {
     const QString pdfPath = fixturePath(QStringLiteral("bleed-missing.pdf"));
     QVERIFY(QFile::exists(pdfPath));
+
+    QJsonObject initialReport;
+    int initialExitCode = -1;
+    QVERIFY(runPreflight(pdfPath, m_defaultProfilePath, &initialReport, &initialExitCode));
+
+    QString mode;
+    QString bleedMm;
+    QVERIFY(advertisedAddBleedParams(initialReport, &mode, &bleedMm));
 
     const QByteArray beforeHash = fileSha256(pdfPath);
     QVERIFY(!beforeHash.isEmpty());
@@ -357,7 +494,7 @@ void OperatorAcceptanceTest::operatorLoop_preservesOriginalBytes()
     const QString outputPath = temporaryDirectory.filePath(QStringLiteral("bleed-fixed.pdf"));
 
     int addBleedExitCode = -1;
-    QVERIFY(runAddBleed(pdfPath, outputPath, &addBleedExitCode));
+    QVERIFY(runAddBleed(pdfPath, outputPath, mode, bleedMm, &addBleedExitCode));
     QCOMPARE(addBleedExitCode, 0);
 
     QCOMPARE(fileSha256(pdfPath), beforeHash);
@@ -365,9 +502,9 @@ void OperatorAcceptanceTest::operatorLoop_preservesOriginalBytes()
     QVERIFY(fileSha256(outputPath) != beforeHash);
 }
 
-void OperatorAcceptanceTest::unicodeAndSpacePaths_preflightSucceeds()
+void OperatorAcceptanceTest::unicodeAndSpacePaths_preflightAndAddBleedSucceed()
 {
-    const QString sourcePdf = fixturePath(QStringLiteral("bleed-adequate.pdf"));
+    const QString sourcePdf = fixturePath(QStringLiteral("bleed-missing.pdf"));
     QVERIFY(QFile::exists(sourcePdf));
 
     QTemporaryDir temporaryDirectory;
@@ -383,23 +520,28 @@ void OperatorAcceptanceTest::unicodeAndSpacePaths_preflightSucceeds()
     QJsonObject report;
     int exitCode = -1;
     QVERIFY(runPreflight(targetPdf, m_defaultProfilePath, &report, &exitCode));
-    QCOMPARE(exitCode, 0);
-    QVERIFY(report.value(QStringLiteral("pass")).toBool());
+    QCOMPARE(exitCode, 1);
+
+    QString mode;
+    QString bleedMm;
+    QVERIFY(advertisedAddBleedParams(report, &mode, &bleedMm));
+
+    const QString outputPdf = nestedDir + QStringLiteral("/café poster_bleed.pdf");
+    int addBleedExitCode = -1;
+    QVERIFY(runAddBleed(targetPdf, outputPdf, mode, bleedMm, &addBleedExitCode));
+    QCOMPARE(addBleedExitCode, 0);
+    QVERIFY(QFile::exists(outputPdf));
+
+    QJsonObject postReport;
+    int postExitCode = -1;
+    QVERIFY(runPreflight(outputPdf, m_defaultProfilePath, &postReport, &postExitCode));
+    QCOMPARE(postExitCode, 0);
+    QVERIFY(postReport.value(QStringLiteral("pass")).toBool());
 }
 
 void OperatorAcceptanceTest::malformedInput_failsWithoutCrash()
 {
-    const QString pdfPath = fixturePath(QStringLiteral("malformed-not-pdf.pdf"));
-    QVERIFY(QFile::exists(pdfPath));
-
-    int exitCode = -1;
-    QByteArray stdErr;
-    QVERIFY(runPdfTool({ QStringLiteral("preflight"), pdfPath, QStringLiteral("--profile"), m_defaultProfilePath },
-                       nullptr,
-                       &stdErr,
-                       &exitCode));
-    QVERIFY2(exitCode != 0, "Malformed input must not report a successful preflight run.");
-    QVERIFY2(exitCode != 1, "Malformed input must not masquerade as a findings exit code.");
+    assertMalformedPreflightFailure(fixturePath(QStringLiteral("malformed-not-pdf.pdf")));
 }
 
 void OperatorAcceptanceTest::invalidProfile_returnsActionableError()
@@ -425,6 +567,42 @@ void OperatorAcceptanceTest::invalidProfile_returnsActionableError()
     QVERIFY(exitCode != 0);
     QVERIFY(exitCode != 1);
     QVERIFY(!stdErr.trimmed().isEmpty());
+}
+
+void OperatorAcceptanceTest::profileSemanticMismatch_returnsProfileFinding()
+{
+    const QString pdfPath = fixturePath(QStringLiteral("bleed-adequate.pdf"));
+    QVERIFY(QFile::exists(pdfPath));
+
+    QTemporaryDir temporaryDirectory;
+    QVERIFY(temporaryDirectory.isValid());
+    const QString profilePath = temporaryDirectory.filePath(QStringLiteral("empty-checks-profile.json"));
+
+    const QJsonObject profile{
+        { QStringLiteral("name"), QStringLiteral("Broken profile") },
+        { QStringLiteral("checks"), QJsonArray() },
+    };
+
+    QFile profileFile(profilePath);
+    QVERIFY(profileFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    profileFile.write(QJsonDocument(profile).toJson(QJsonDocument::Compact));
+    profileFile.close();
+
+    QJsonObject report;
+    int exitCode = -1;
+    QVERIFY(runPreflight(pdfPath, profilePath, &report, &exitCode));
+    QCOMPARE(exitCode, 1);
+    QVERIFY(!report.value(QStringLiteral("pass")).toBool());
+
+    const QJsonArray errors = report.value(QStringLiteral("errors")).toArray();
+    QVERIFY(!errors.isEmpty());
+    const QJsonObject profileFinding = errors.first().toObject();
+    QCOMPARE(profileFinding.value(QStringLiteral("type")).toString(), QStringLiteral("profile"));
+    QCOMPARE(profileFinding.value(QStringLiteral("scope")).toString(), QStringLiteral("document"));
+    QVERIFY(!profileFinding.value(QStringLiteral("message")).toString().isEmpty());
+
+    const QJsonObject filteredReport = pdfplugin::preflight::filterAdvertisedFixups(report);
+    QVERIFY(pdfplugin::preflight::validateNormalizedReport(filteredReport));
 }
 
 void OperatorAcceptanceTest::reportContract_rejectsUnsupportedSchema()
@@ -472,7 +650,8 @@ void OperatorAcceptanceTest::reportContract_classifiesVisualOverlays()
     QVERIFY(runPreflight(bleedPath, m_defaultProfilePath, &bleedReport, &bleedExitCode));
     QCOMPARE(bleedExitCode, 1);
 
-    const QJsonObject bleedFinding = bleedReport.value(QStringLiteral("errors")).toArray().first().toObject();
+    const QJsonObject bleedFinding = findingWithCheckId(bleedReport, QStringLiteral("bleed"));
+    QVERIFY(!bleedFinding.isEmpty());
     QVERIFY(pdfplugin::preflight::findingHasVisualOverlay(bleedFinding, 2));
 
     QJsonObject fontReport;
@@ -480,7 +659,8 @@ void OperatorAcceptanceTest::reportContract_classifiesVisualOverlays()
     QVERIFY(runPreflight(fontPath, m_defaultProfilePath, &fontReport, &fontExitCode));
     QCOMPARE(fontExitCode, 1);
 
-    const QJsonObject fontFinding = fontReport.value(QStringLiteral("errors")).toArray().first().toObject();
+    const QJsonObject fontFinding = findingWithCheckId(fontReport, QStringLiteral("embedded-fonts"));
+    QVERIFY(!fontFinding.isEmpty());
     QVERIFY(!pdfplugin::preflight::findingHasVisualOverlay(fontFinding, 2));
     QCOMPARE(fontFinding.value(QStringLiteral("scope")).toString(), QStringLiteral("object"));
 }
@@ -494,56 +674,63 @@ void OperatorAcceptanceTest::sidecarCancellation_terminatesCleanly()
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     environment.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
     process.setProcessEnvironment(environment);
-    process.start(QStringLiteral(PDFTOOL_EXECUTABLE_PATH),
+    process.start(m_pdfToolPath,
                   { QStringLiteral("preflight"), pdfPath, QStringLiteral("--profile"), m_defaultProfilePath });
     QVERIFY(process.waitForStarted(10000));
+    QVERIFY(process.waitForReadyRead(5000) || process.state() == QProcess::Running);
 
     process.kill();
     QVERIFY(process.waitForFinished(10000));
     QCOMPARE(process.state(), QProcess::NotRunning);
+    QVERIFY(process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0);
 }
 
 void OperatorAcceptanceTest::corpus_performanceBaseline()
 {
     QElapsedTimer timer;
     timer.start();
-    qint64 peakMemoryKb = currentPeakMemoryKb();
+    qint64 peakChildMemoryKb = -1;
 
     int ranCases = 0;
     for (const OperatorCorpusEntry& entry : OPERATOR_CORPUS)
     {
-        if (qstrcmp(entry.id, "malformed-input") == 0)
+        if (entry.skipPreflightJson)
         {
             continue;
         }
 
         const QString pdfPath = fixturePath(QString::fromLatin1(entry.pdf));
-        if (!QFile::exists(pdfPath))
-        {
-            continue;
-        }
+        QVERIFY2(QFile::exists(pdfPath),
+                 qPrintable(QStringLiteral("Missing corpus fixture %1").arg(QString::fromLatin1(entry.pdf))));
 
         QJsonObject report;
         int exitCode = -1;
-        QVERIFY(runPreflight(pdfPath, m_defaultProfilePath, &report, &exitCode));
+        qint64 casePeakMemoryKb = -1;
+        QVERIFY(runPreflight(pdfPath, m_defaultProfilePath, &report, &exitCode, &casePeakMemoryKb));
         QCOMPARE(report.value(QStringLiteral("pass")).toBool(), entry.expectPass);
         QCOMPARE(exitCode, entry.expectPass ? 0 : 1);
         ++ranCases;
 
-        const qint64 samplePeak = currentPeakMemoryKb();
-        if (samplePeak > peakMemoryKb)
+        if (casePeakMemoryKb > peakChildMemoryKb)
         {
-            peakMemoryKb = samplePeak;
+            peakChildMemoryKb = casePeakMemoryKb;
         }
     }
 
     const qint64 elapsedMs = timer.elapsed();
-    QVERIFY2(ranCases >= 4, "Expected at least four corpus cases to run.");
+    QCOMPARE(ranCases, 5);
 
-    qInfo("MIC-300 baseline: %d corpus preflights in %lld ms; peak memory ~%lld KiB (host process, informational only).",
+#ifdef Q_OS_LINUX
+    qInfo("MIC-300 baseline: %d corpus preflights in %lld ms; peak PdfTool VmHWM ~%lld KiB (Linux child process, informational only).",
           ranCases,
           static_cast<long long>(elapsedMs),
-          static_cast<long long>(peakMemoryKb));
+          static_cast<long long>(peakChildMemoryKb));
+#else
+    qInfo("MIC-300 baseline: %d corpus preflights in %lld ms; child peak memory not sampled on this platform (informational wall time only).",
+          ranCases,
+          static_cast<long long>(elapsedMs));
+    Q_UNUSED(peakChildMemoryKb);
+#endif
 }
 
 QTEST_APPLESS_MAIN(OperatorAcceptanceTest)
