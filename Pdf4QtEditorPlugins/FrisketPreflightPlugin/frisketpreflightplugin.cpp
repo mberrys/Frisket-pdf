@@ -26,6 +26,7 @@
 
 #include "pdfbleedfixup.h"
 #include "pdfdocumentwriter.h"
+#include "pdfdrawspacecontroller.h"
 #include "pdfdrawwidget.h"
 #include "pdfwidgetutils.h"
 
