@@ -2,32 +2,17 @@
     "errors": [
     ],
     "fixups_available": [
-        {
-            "description": "Convert all RGB colors to CMYK",
-            "id": "rgb-to-cmyk",
-            "safe": false
-        },
-        {
-            "description": "Downsample images above target DPI",
-            "id": "downsample-images",
-            "safe": false
-        }
     ],
     "pass": true,
     "profile": "Frisket Default",
-    "schema_version": 1,
+    "schema_version": 2,
     "warnings": [
         {
-            "bbox": [
-                0,
-                0,
-                0,
-                0
-            ],
             "check_id": "image-resolution",
             "message": "Image resolution 25 DPI is below minimum 300 DPI on page 1",
             "object_id": "6",
             "page": 1,
+            "scope": "object",
             "severity": "warning",
             "type": "image-resolution"
         }

@@ -58,12 +58,19 @@ private:
     void updateActions();
     bool applyReportJson(const QJsonObject& report, QString* errorMessage = nullptr);
     void finishPreflightRun();
+    void cancelPreflightRun(bool silent = false);
+    void abortPreflightRun(const QString& message);
+    void invalidateReport();
+    void invalidateReportIfStale();
+    bool documentModificationInvalidatesReport(const pdf::PDFModifiedDocument& document) const;
 
     void onRunPreflightTriggered();
     void onShowPanelTriggered(bool checked);
     void onLoadExampleReportTriggered();
     void onPreflightProcessFinished(int exitCode, int exitStatus);
     void onPreflightProcessErrorOccurred();
+    void onPreflightStdoutReady();
+    void onPreflightStderrReady();
 
     QAction* m_actionRunPreflight = nullptr;
     QAction* m_actionShowPanel = nullptr;
@@ -71,6 +78,11 @@ private:
     PreflightReportDockWidget* m_reportDockWidget = nullptr;
     QProcess* m_preflightProcess = nullptr;
     std::unique_ptr<QTemporaryDir> m_preflightTemporaryDirectory;
+    QByteArray m_preflightStdoutBuffer;
+    QByteArray m_preflightStderrBuffer;
+    quint64 m_documentRevision = 0;
+    quint64 m_reportDocumentRevision = 0;
+    quint64 m_preflightRunRevision = 0;
 };
 
 }   // namespace pdfplugin

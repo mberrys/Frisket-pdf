@@ -53,6 +53,32 @@ inline bool isExpectedPreflightExitCode(int exitCode)
     return exitCode == 0 || exitCode == 1;
 }
 
+inline constexpr int PREFLIGHT_SIDECAR_STDOUT_MAX_BYTES = 16 * 1024 * 1024;
+inline constexpr int PREFLIGHT_SIDECAR_STDERR_MAX_BYTES = 256 * 1024;
+
+inline bool isImplementedFixupId(const QString& fixupId)
+{
+    return fixupId == QStringLiteral("add-bleed");
+}
+
+inline QJsonObject filterAdvertisedFixups(const QJsonObject& report)
+{
+    const QJsonArray fixups = report.value(QStringLiteral("fixups_available")).toArray();
+    QJsonArray filteredFixups;
+    for (const QJsonValue& fixupValue : fixups)
+    {
+        const QJsonObject fixupObject = fixupValue.toObject();
+        if (isImplementedFixupId(fixupObject.value(QStringLiteral("id")).toString()))
+        {
+            filteredFixups.append(fixupObject);
+        }
+    }
+
+    QJsonObject filteredReport = report;
+    filteredReport.insert(QStringLiteral("fixups_available"), filteredFixups);
+    return filteredReport;
+}
+
 inline bool setValidationError(QString* errorMessage, const QString& message)
 {
     if (errorMessage)

@@ -2,20 +2,10 @@
     "errors": [
     ],
     "fixups_available": [
-        {
-            "description": "Convert all RGB colors to CMYK",
-            "id": "rgb-to-cmyk",
-            "safe": false
-        },
-        {
-            "description": "Downsample images above target DPI",
-            "id": "downsample-images",
-            "safe": false
-        }
     ],
     "pass": true,
     "profile": "Frisket Default",
-    "schema_version": 1,
+    "schema_version": 2,
     "warnings": [
     ]
 }
