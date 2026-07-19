@@ -71,6 +71,12 @@ QRectF targetBleedRect(const QRectF& reference, const QMarginsF& bleedMM)
                   reference.height() + top + bottom).normalized();
 }
 
+QRect mapPageRectToImage(const QRectF& pageRect, const QTransform& pageToDevice, const QSize& imageSize)
+{
+    const QRectF mapped = pageToDevice.mapRect(pageRect).normalized();
+    return mapped.toAlignedRect().intersected(QRect(QPoint(0, 0), imageSize));
+}
+
 QRectF sideStripRect(const QRectF& reference, PDFBleedFixupSide side, PDFReal depthPt)
 {
     switch (side)
@@ -131,20 +137,40 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probe(const PDFPage* page,
 
     PDFBleedMarginProbeResult rasterResult = probeRaster(page, pageIndex, settings, reference, target);
 
-    // Raster confirmation overrides fast-path results for flagged edges.
-    if (!result.left.hasContent)
+    auto rasterUpgradesEmptyEdge = [](const PDFBleedMarginProbeEdgeResult& rasterEdge) -> bool
+    {
+        if (rasterEdge.totalPixels <= 0)
+        {
+            return false;
+        }
+
+        const qreal inkCoverage = static_cast<qreal>(rasterEdge.inkPixels)
+            / static_cast<qreal>(rasterEdge.totalPixels);
+        // Tier-2 only downgrades Tier-1 false positives when raster sees substantial
+        // margin ink. Trim-edge antialiasing on otherwise empty strips stays below this.
+        constexpr qreal kMinInkCoverageToUpgrade = 0.10;
+        return inkCoverage >= kMinInkCoverageToUpgrade;
+    };
+
+    const bool upgradeLeft = !result.left.hasContent && rasterUpgradesEmptyEdge(rasterResult.left);
+    const bool upgradeRight = !result.right.hasContent && rasterUpgradesEmptyEdge(rasterResult.right);
+    const bool upgradeTop = !result.top.hasContent && rasterUpgradesEmptyEdge(rasterResult.top);
+    const bool upgradeBottom = !result.bottom.hasContent && rasterUpgradesEmptyEdge(rasterResult.bottom);
+
+    // Raster confirmation may upgrade fast-path empty edges when strips have real content.
+    if (upgradeLeft)
     {
         result.left = rasterResult.left;
     }
-    if (!result.right.hasContent)
+    if (upgradeRight)
     {
         result.right = rasterResult.right;
     }
-    if (!result.top.hasContent)
+    if (upgradeTop)
     {
         result.top = rasterResult.top;
     }
-    if (!result.bottom.hasContent)
+    if (upgradeBottom)
     {
         result.bottom = rasterResult.bottom;
     }
@@ -297,17 +323,7 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeRaster(const PDFPage* page,
             continue;
         }
 
-        const int stripW = qMax(1, qCeil(stripRect.width() * pointToPixel));
-        const int stripH = qMax(1, qCeil(stripRect.height() * pointToPixel));
-
-        // Extract the strip region from the pre-rendered full image.
-        const QRect stripPxRect(
-            qMax(0, qFloor(stripRect.left() * pointToPixel)),
-            qMax(0, fullH - qCeil(stripRect.top() * pointToPixel + stripRect.height() * pointToPixel)),
-            qMin(stripW, fullW - qMax(0, qFloor(stripRect.left() * pointToPixel))),
-            qMin(stripH, fullH)
-        );
-
+        const QRect stripPxRect = mapPageRectToImage(stripRect, pageToDevice, fullImage.size());
         if (stripPxRect.isEmpty() || stripPxRect.width() <= 0 || stripPxRect.height() <= 0)
         {
             continue;
@@ -356,14 +372,20 @@ bool PDFBleedMarginProbe::pixelIsInk(const QImage& image, int x, int y, int thre
 
     const QRgb pixel = image.pixel(x, y);
 
-    // Alpha channel: fully transparent means no ink.
     if (qAlpha(pixel) < threshold)
     {
         return false;
     }
 
-    // Any RGBA channel above threshold counts as ink.
-    return qRed(pixel) > threshold || qGreen(pixel) > threshold || qBlue(pixel) > threshold || qAlpha(pixel) > threshold;
+    // Premultiplied white/near-white background is empty margin, not ink.
+    if (qRed(pixel) >= 255 - threshold
+        && qGreen(pixel) >= 255 - threshold
+        && qBlue(pixel) >= 255 - threshold)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace pdf
