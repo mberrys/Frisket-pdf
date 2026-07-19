@@ -4,8 +4,18 @@ on:
   push:
     branches:
       - master
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
       
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build_ubuntu:
@@ -15,31 +25,33 @@ jobs:
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-binary-cache
+      VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           path: pdf4qt
 
       - name: Prepare vcpkg directories
         run: |
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
-          
+
       - name: Install Dependencies
         run: |
           sudo apt update
           sudo apt install -y libcups2 libcups2-dev libfontconfig1-dev
-          
+
       - name: 'VCPKG: Set up VCPKG'
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git
+          git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
+          git checkout 0878b5224d4a4968940ee296a2e7fae2d3b62983
           ./bootstrap-vcpkg.sh
           ./vcpkg integrate install
-        
+
       - name: 'VCPKG: Cache vcpkg dependencies'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ./vcpkg/downloads
@@ -55,7 +67,7 @@ jobs:
         working-directory: vcpkg
         
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730  # v4.3.1
         with:
           version: '6.9.0'
           host: 'linux'
@@ -79,12 +91,13 @@ jobs:
           ctest --output-on-failure
 
       - name: Make DEB package
+        if: github.event_name != 'pull_request'
         working-directory: pdf4qt/build
         run: |
           sh make-package.sh
-          
+
       - name: Upload DEB package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: ubuntu-deb-package
           path: ./pdf4qt/build/*.deb
@@ -97,10 +110,12 @@ jobs:
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg_installed
       VCPKG_ROOT: ${{ github.workspace }}\vcpkg
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg-binary-cache
+      VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
+      QT_QPA_PLATFORM: offscreen
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           path: pdf4qt
 
@@ -112,13 +127,14 @@ jobs:
       - name: 'VCPKG: Set up VCPKG'
         shell: pwsh
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git
+          git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
+          git checkout 0878b5224d4a4968940ee296a2e7fae2d3b62983
           .\bootstrap-vcpkg.bat -disableMetrics
           .\vcpkg integrate install
 
       - name: 'VCPKG: Cache vcpkg dependencies'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ./vcpkg/downloads
@@ -137,7 +153,7 @@ jobs:
         working-directory: vcpkg
         
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730  # v4.3.1
         with:
           version: '6.9.0'
           host: 'windows'
@@ -153,13 +169,14 @@ jobs:
         working-directory: pdf4qt
         shell: pwsh
         run: |
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_VCPKG_BUILD_TYPE=Release -DPDF4QT_INSTALL_QT_DEPENDENCIES=ON -DPDF4QT_INSTALL_DEPENDENCIES=ON -DCMAKE_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DPDF4QT_QT_ROOT="${env:Qt6_DIR}" -DPDF4QT_INSTALL_MSVC_REDISTRIBUTABLE=ON -DPDF4QT_INSTALL_PREPARE_WIX_INSTALLER=ON -DPDF4QT_INSTALL_TO_USR=ON 
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_VCPKG_BUILD_TYPE=Release -DPDF4QT_INSTALL_QT_DEPENDENCIES=ON -DPDF4QT_INSTALL_DEPENDENCIES=ON -DCMAKE_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DPDF4QT_QT_ROOT="${env:Qt6_DIR}" -DPDF4QT_INSTALL_MSVC_REDISTRIBUTABLE=ON -DPDF4QT_INSTALL_PREPARE_WIX_INSTALLER=ON -DPDF4QT_INSTALL_TO_USR=ON
           cmake --build build --target release_translations --config Release -j6
           cmake --build build --config Release -j6
+          ctest --test-dir build -C Release --output-on-failure
           cmake --install build --config Release
- 
+
       - name: Upload Windows package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: 'pdf4qt-${{ runner.os }}.zip'
           path: .\pdf4qt\build\install\usr\bin

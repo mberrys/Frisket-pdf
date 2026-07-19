@@ -66,6 +66,7 @@
 #include <QDialog>
 #include <QMessageBox>
 #include <QDesktopServices>
+#include <QFileInfo>
 #include <QApplication>
 #include <QFileDialog>
 #include <QtConcurrent/QtConcurrent>
@@ -925,15 +926,33 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
             {
                 if (!m_settings->getSettings().m_allowLaunchApplications)
                 {
-                    // Launching of applications is disabled -> continue to next action
                     continue;
                 }
+
+                static const QStringList dangerousExtensions = {
+                    QStringLiteral("exe"), QStringLiteral("bat"), QStringLiteral("cmd"),
+                    QStringLiteral("com"), QStringLiteral("vbs"), QStringLiteral("js"),
+                    QStringLiteral("wsh"), QStringLiteral("ps1"), QStringLiteral("msi"),
+                    QStringLiteral("scr"), QStringLiteral("pif"), QStringLiteral("reg")
+                };
 
                 const pdf::PDFActionLaunch* typedAction = dynamic_cast<const pdf::PDFActionLaunch*>(currentAction);
 #ifdef Q_OS_WIN
                 const pdf::PDFActionLaunch::Win& winSpecification = typedAction->getWinSpecification();
                 if (!winSpecification.file.isEmpty())
                 {
+                    const QString extension = QFileInfo(QString::fromLatin1(winSpecification.file)).suffix().toLower();
+                    if (dangerousExtensions.contains(extension))
+                    {
+                        if (QMessageBox::warning(m_mainWindow, tr("Security Warning"),
+                                tr("The PDF is requesting to launch '%1', which appears to be an executable or script. "
+                                   "This is potentially dangerous. Are you sure you want to proceed?").arg(QString::fromLatin1(winSpecification.file)),
+                                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+                        {
+                            continue;
+                        }
+                    }
+
                     QString message = tr("Would you like to launch application '%1' in working directory '%2' with parameters '%3'?").arg(QString::fromLatin1(winSpecification.file), QString::fromLatin1(winSpecification.directory), QString::fromLatin1(winSpecification.parameters));
                     if (QMessageBox::question(m_mainWindow, tr("Launch application"), message) == QMessageBox::Yes)
                     {
@@ -962,6 +981,18 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
                 QString plaftormFileName = fileSpecification.getPlatformFileName();
                 if (!plaftormFileName.isEmpty())
                 {
+                    const QString extension = QFileInfo(plaftormFileName).suffix().toLower();
+                    if (dangerousExtensions.contains(extension))
+                    {
+                        if (QMessageBox::warning(m_mainWindow, tr("Security Warning"),
+                                tr("The PDF is requesting to launch '%1', which appears to be an executable or script. "
+                                   "This is potentially dangerous. Are you sure you want to proceed?").arg(plaftormFileName),
+                                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+                        {
+                            continue;
+                        }
+                    }
+
                     QString message = tr("Would you like to launch application '%1'?").arg(plaftormFileName);
                     if (QMessageBox::question(m_mainWindow, tr("Launch application"), message) == QMessageBox::Yes)
                     {
@@ -984,19 +1015,33 @@ void PDFProgramController::onActionTriggered(const pdf::PDFAction* action)
             {
                 if (!m_settings->getSettings().m_allowLaunchURI)
                 {
-                    // Launching of URI is disabled -> continue to next action
                     continue;
                 }
 
                 const pdf::PDFActionURI* typedAction = dynamic_cast<const pdf::PDFActionURI*>(currentAction);
                 QByteArray URI = m_pdfDocument->getCatalog()->getBaseURI() + typedAction->getURI();
                 QString urlString = QString::fromUtf8(URI);
+                QUrl url(urlString);
+
+                static const QStringList allowedSchemes = {
+                    QStringLiteral("http"),
+                    QStringLiteral("https"),
+                    QStringLiteral("mailto")
+                };
+
+                const QString scheme = url.scheme().toLower();
+                if (!allowedSchemes.contains(scheme))
+                {
+                    QMessageBox::warning(m_mainWindow, tr("Open URL"),
+                        tr("URL scheme '%1' is not allowed. Only http, https, and mailto links are permitted.").arg(scheme));
+                    break;
+                }
+
                 QString message = tr("Would you like to open URL '%1'?").arg(urlString);
                 if (QMessageBox::question(m_mainWindow, tr("Open URL"), message) == QMessageBox::Yes)
                 {
-                    if (!QDesktopServices::openUrl(QUrl(urlString)))
+                    if (!QDesktopServices::openUrl(url))
                     {
-                        // Error occured
                         QMessageBox::warning(m_mainWindow, tr("Open URL"), tr("Opening url '%1' failed.").arg(urlString));
                     }
                 }
