@@ -1,0 +1,69 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ninja-build libtbb-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@b3ea5275e37b734d027040e2c7fe7a10ea2ef946
+        with:
+          version: "6.9.0"
+          host: "linux"
+          target: "desktop"
+          arch: "gcc_64"
+          install-deps: "true"
+          modules: "qtimageformats"
+
+      - name: Configure fuzz build
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -B build-fuzz -S . -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPDF4QT_BUILD_ONLY_CORE_LIBRARY=OFF \
+            -DPDF4QT_BUILD_TESTS=OFF \
+            -DPDF4QT_ENABLE_SANITIZERS=ON \
+            -DPDF4QT_BUILD_FUZZERS=ON \
+            -DPDF4QT_QT_ROOT="${Qt6_DIR%/lib/cmake/Qt6}"
+
+      - name: Build fuzz harnesses
+        run: cmake --build build-fuzz --target fuzz_pdf_parser fuzz_stream_filters fuzz_content_stream -j$(nproc)
+
+      - name: Run fuzz harnesses
+        run: |
+          SEED_DIR="${GITHUB_WORKSPACE}/frisket-preflight/testdata/fixtures"
+          FUZZ_ARGS=(-max_total_time=600 -print_final_stats=1)
+          if [ -d "$SEED_DIR" ]; then
+            FUZZ_ARGS+=("$SEED_DIR")
+          fi
+          for target in fuzz_pdf_parser fuzz_stream_filters fuzz_content_stream; do
+            echo "Running $target"
+            "./build-fuzz/usr/bin/$target" "${FUZZ_ARGS[@]}"
+          done
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fuzz-crash-artifacts
+          path: |
+            crash-*
+            leak-*
+            timeout-*
+          if-no-files-found: ignore

@@ -24,20 +24,37 @@
 #include "preflightreportdockwidget.h"
 #include "preflightsidecarutils.h"
 
+#include "pdfbleedfixup.h"
 #include "pdfdocumentwriter.h"
 #include "pdfdrawwidget.h"
+#include "pdfwidgetutils.h"
 
 #include <QAction>
+#include <QBrush>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QCoreApplication>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QDir>
+#include <QDoubleSpinBox>
+#include <QFileDialog>
+#include <QFormLayout>
+#include <QHBoxLayout>
 #include <QFile>
 #include <QFileInfo>
 #include <QIcon>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLineEdit>
 #include <QMainWindow>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPen>
 #include <QProcess>
+#include <QPushButton>
 #include <QTemporaryDir>
+#include <QVBoxLayout>
 
 #ifndef FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH
 #define FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH "../share/frisket/profiles"
@@ -45,6 +62,38 @@
 
 namespace pdfplugin
 {
+
+namespace
+{
+
+constexpr qreal POINTS_PER_MM = 72.0 / 25.4;
+
+pdf::PDFBleedFixupMode bleedFixupModeFromString(const QString& text)
+{
+    if (text == QStringLiteral("pixel-repeat"))
+    {
+        return pdf::PDFBleedFixupMode::PixelRepeat;
+    }
+    if (text == QStringLiteral("stretch"))
+    {
+        return pdf::PDFBleedFixupMode::Stretch;
+    }
+    return pdf::PDFBleedFixupMode::Mirror;
+}
+
+QString defaultBleedOutputPath(const QString& sourcePath)
+{
+    const QFileInfo sourceInfo(sourcePath);
+    if (!sourceInfo.isFile())
+    {
+        return QString();
+    }
+
+    return sourceInfo.absolutePath() + QDir::separator()
+        + sourceInfo.completeBaseName() + QStringLiteral("_bleed.") + sourceInfo.suffix();
+}
+
+}   // namespace
 
 FrisketPreflightPlugin::FrisketPreflightPlugin() :
     pdf::PDFPlugin(nullptr)
@@ -77,6 +126,8 @@ void FrisketPreflightPlugin::setWidget(pdf::PDFWidget* widget)
     m_actionLoadExample = new QAction(tr("Load &Example Report"), this);
     m_actionLoadExample->setObjectName("frisketpreflight_LoadExample");
     connect(m_actionLoadExample, &QAction::triggered, this, &FrisketPreflightPlugin::onLoadExampleReportTriggered);
+
+    m_widget->getDrawWidgetProxy()->registerDrawInterface(this);
 
     updateActions();
 }
@@ -138,6 +189,12 @@ void FrisketPreflightPlugin::ensureDockWidget()
             m_actionShowPanel->setChecked(visible);
         }
     });
+
+    connect(m_reportDockWidget, &PreflightReportDockWidget::findingSelectionChanged,
+            this, &FrisketPreflightPlugin::onFindingSelectionChanged);
+
+    connect(m_reportDockWidget, &PreflightReportDockWidget::applyBleedFixupRequested,
+            this, &FrisketPreflightPlugin::onApplyBleedFixupRequested);
 }
 
 void FrisketPreflightPlugin::updateActions()
@@ -160,7 +217,7 @@ void FrisketPreflightPlugin::updateActions()
     }
 }
 
-bool FrisketPreflightPlugin::applyReportJson(const QJsonObject& report, QString* errorMessage)
+bool FrisketPreflightPlugin::applyReportJson(const QJsonObject& report, QString* errorMessage, const QString& sourceLabel)
 {
     const QJsonObject filteredReport = preflight::filterAdvertisedFixups(report);
     if (!preflight::validateNormalizedReport(filteredReport, errorMessage))
@@ -169,11 +226,94 @@ bool FrisketPreflightPlugin::applyReportJson(const QJsonObject& report, QString*
     }
 
     ensureDockWidget();
-    m_reportDockWidget->setReport(filteredReport);
+    m_reportDockWidget->setReport(filteredReport, sourceLabel);
     m_reportDocumentRevision = m_documentRevision;
     m_actionShowPanel->setChecked(true);
     m_reportDockWidget->show();
     return true;
+}
+
+bool FrisketPreflightPlugin::resolvePreflightPaths(QString* pdfToolPath, QString* profilePath) const
+{
+    const QString applicationDirectory = QCoreApplication::applicationDirPath();
+    *pdfToolPath = preflight::resolveBundlePath(applicationDirectory, preflight::getPdfToolFileName());
+    *profilePath = preflight::resolveBundlePath(applicationDirectory, QStringLiteral(FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH "/frisket-default.json"));
+
+    if (!QFileInfo(*pdfToolPath).isExecutable())
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
+                              tr("Could not find the PdfTool preflight sidecar at %1.").arg(QDir::toNativeSeparators(*pdfToolPath)));
+        return false;
+    }
+
+    if (!QFileInfo(*profilePath).isFile())
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
+                              tr("Could not find the bundled Frisket Default profile at %1.").arg(QDir::toNativeSeparators(*profilePath)));
+        return false;
+    }
+
+    return true;
+}
+
+void FrisketPreflightPlugin::startPreflightOnFile(const QString& filePath,
+                                                  const QString& profilePath,
+                                                  quint64 revisionToMatch,
+                                                  bool ignoreRevisionMatch,
+                                                  const QString& reportSourceLabel)
+{
+    if (m_preflightProcess)
+    {
+        return;
+    }
+
+    m_preflightTemporaryDirectory = std::make_unique<QTemporaryDir>();
+    if (!m_preflightTemporaryDirectory->isValid())
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("Could not create a temporary directory for preflight."));
+        return;
+    }
+
+    const QString stagedPath = m_preflightTemporaryDirectory->filePath(QStringLiteral("preflight-input.pdf"));
+    if (!QFile::copy(filePath, stagedPath))
+    {
+        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
+                              tr("Could not stage the preflight input file at %1.").arg(QDir::toNativeSeparators(filePath)));
+        m_preflightTemporaryDirectory.reset();
+        return;
+    }
+
+    QString pdfToolPath;
+    QString bundledProfilePath;
+    if (!resolvePreflightPaths(&pdfToolPath, &bundledProfilePath))
+    {
+        m_preflightTemporaryDirectory.reset();
+        return;
+    }
+
+    Q_UNUSED(bundledProfilePath);
+
+    m_preflightStdoutBuffer.clear();
+    m_preflightStderrBuffer.clear();
+    m_preflightRunRevision = revisionToMatch;
+    m_preflightIgnoreRevision = ignoreRevisionMatch;
+    m_preflightReportSourceLabel = reportSourceLabel;
+    m_preflightProcess = new QProcess(this);
+    m_preflightProcess->setProcessChannelMode(QProcess::SeparateChannels);
+    connect(m_preflightProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this](int exitCode, QProcess::ExitStatus exitStatus) { onPreflightProcessFinished(exitCode, static_cast<int>(exitStatus)); });
+    connect(m_preflightProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error)
+    {
+        if (error == QProcess::FailedToStart)
+        {
+            onPreflightProcessErrorOccurred();
+        }
+    });
+    connect(m_preflightProcess, &QProcess::readyReadStandardOutput, this, &FrisketPreflightPlugin::onPreflightStdoutReady);
+    connect(m_preflightProcess, &QProcess::readyReadStandardError, this, &FrisketPreflightPlugin::onPreflightStderrReady);
+
+    updateActions();
+    m_preflightProcess->start(pdfToolPath, { QStringLiteral("preflight"), stagedPath, QStringLiteral("--profile"), profilePath });
 }
 
 void FrisketPreflightPlugin::onRunPreflightTriggered()
@@ -183,21 +323,10 @@ void FrisketPreflightPlugin::onRunPreflightTriggered()
         return;
     }
 
-    const QString applicationDirectory = QCoreApplication::applicationDirPath();
-    const QString pdfToolPath = preflight::resolveBundlePath(applicationDirectory, preflight::getPdfToolFileName());
-    const QString profilePath = preflight::resolveBundlePath(applicationDirectory, QStringLiteral(FRISKET_PREFLIGHT_PROFILES_RELATIVE_PATH "/frisket-default.json"));
-
-    if (!QFileInfo(pdfToolPath).isExecutable())
+    QString pdfToolPath;
+    QString profilePath;
+    if (!resolvePreflightPaths(&pdfToolPath, &profilePath))
     {
-        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
-                              tr("Could not find the PdfTool preflight sidecar at %1.").arg(QDir::toNativeSeparators(pdfToolPath)));
-        return;
-    }
-
-    if (!QFileInfo(profilePath).isFile())
-    {
-        QMessageBox::critical(m_widget, tr("Frisket Preflight"),
-                              tr("Could not find the bundled Frisket Default profile at %1.").arg(QDir::toNativeSeparators(profilePath)));
         return;
     }
 
@@ -222,6 +351,8 @@ void FrisketPreflightPlugin::onRunPreflightTriggered()
     m_preflightStdoutBuffer.clear();
     m_preflightStderrBuffer.clear();
     m_preflightRunRevision = m_documentRevision;
+    m_preflightIgnoreRevision = false;
+    m_preflightReportSourceLabel.clear();
     m_preflightProcess = new QProcess(this);
     m_preflightProcess->setProcessChannelMode(QProcess::SeparateChannels);
     connect(m_preflightProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
@@ -251,11 +382,13 @@ void FrisketPreflightPlugin::onPreflightProcessFinished(int exitCode, int exitSt
     onPreflightStderrReady();
 
     const quint64 runRevision = m_preflightRunRevision;
+    const bool ignoreRevision = m_preflightIgnoreRevision;
+    const QString reportSourceLabel = m_preflightReportSourceLabel;
     const QByteArray standardOutput = m_preflightStdoutBuffer;
     const QString standardError = QString::fromLocal8Bit(m_preflightStderrBuffer).trimmed();
     finishPreflightRun();
 
-    if (runRevision != m_documentRevision)
+    if (!ignoreRevision && runRevision != m_documentRevision)
     {
         return;
     }
@@ -283,7 +416,7 @@ void FrisketPreflightPlugin::onPreflightProcessFinished(int exitCode, int exitSt
 
     const QJsonObject report = reportDocument.object();
     QString validationError;
-    if (!applyReportJson(report, &validationError))
+    if (!applyReportJson(report, &validationError, reportSourceLabel))
     {
         QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("PdfTool returned an invalid preflight report: %1").arg(validationError));
     }
@@ -353,6 +486,8 @@ void FrisketPreflightPlugin::cancelPreflightRun(bool silent)
     m_preflightStdoutBuffer.clear();
     m_preflightStderrBuffer.clear();
     m_preflightRunRevision = 0;
+    m_preflightIgnoreRevision = false;
+    m_preflightReportSourceLabel.clear();
 
     if (!silent)
     {
@@ -368,12 +503,15 @@ void FrisketPreflightPlugin::abortPreflightRun(const QString& message)
 
 void FrisketPreflightPlugin::invalidateReport()
 {
+    m_selectedFindingIndex = -1;
+
     if (m_reportDockWidget)
     {
         m_reportDockWidget->clearReport();
     }
 
     m_reportDocumentRevision = 0;
+    updateOverlayGraphics();
 }
 
 void FrisketPreflightPlugin::invalidateReportIfStale()
@@ -436,6 +574,255 @@ void FrisketPreflightPlugin::onLoadExampleReportTriggered()
         QMessageBox::warning(m_widget, tr("Frisket Preflight"),
                              tr("Example report does not match the Frisket report contract: %1").arg(validationError));
     }
+}
+
+void FrisketPreflightPlugin::drawPage(QPainter* painter,
+                                      pdf::PDFInteger pageIndex,
+                                      const pdf::PDFPrecompiledPage* compiledPage,
+                                      pdf::PDFTextLayoutGetter& layoutGetter,
+                                      const QTransform& pagePointToDevicePointMatrix,
+                                      const pdf::PDFColorConvertor& convertor,
+                                      QList<pdf::PDFRenderError>& errors) const
+{
+    Q_UNUSED(compiledPage);
+    Q_UNUSED(layoutGetter);
+    Q_UNUSED(convertor);
+    Q_UNUSED(errors);
+
+    if (!m_reportDockWidget || !m_reportDockWidget->hasReport())
+    {
+        return;
+    }
+
+    const QVector<PreflightFindingEntry>& findings = m_reportDockWidget->findings();
+    if (findings.isEmpty())
+    {
+        return;
+    }
+
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
+    const qreal lineWidth = pdf::PDFWidgetUtils::scaleDPI_x(painter->device(), 1.0);
+    const qreal selectedLineWidth = pdf::PDFWidgetUtils::scaleDPI_x(painter->device(), 2.5);
+
+    for (int findingIndex = 0; findingIndex < findings.size(); ++findingIndex)
+    {
+        const PreflightFindingEntry& finding = findings.at(findingIndex);
+        if (!finding.hasVisualOverlay || finding.page <= 0 || finding.page - 1 != pageIndex)
+        {
+            continue;
+        }
+
+        const QRectF deviceRect = pagePointToDevicePointMatrix.mapRect(finding.bbox).normalized();
+        if (deviceRect.isEmpty())
+        {
+            continue;
+        }
+
+        const bool isSelected = findingIndex == m_selectedFindingIndex;
+        QColor borderColor;
+        QColor fillColor;
+
+        if (finding.severity == QStringLiteral("error"))
+        {
+            borderColor = QColor(220, 38, 38);
+            fillColor = QColor(220, 38, 38, isSelected ? 90 : 55);
+        }
+        else if (finding.severity == QStringLiteral("warning"))
+        {
+            borderColor = QColor(234, 88, 12);
+            fillColor = QColor(234, 88, 12, isSelected ? 85 : 50);
+        }
+        else
+        {
+            borderColor = QColor(37, 99, 235);
+            fillColor = QColor(37, 99, 235, isSelected ? 80 : 45);
+        }
+
+        painter->setPen(QPen(borderColor, isSelected ? selectedLineWidth : lineWidth));
+        painter->setBrush(fillColor);
+        painter->drawRect(deviceRect);
+
+        if (finding.severity == QStringLiteral("error"))
+        {
+            QPen hatchPen(borderColor, lineWidth * 0.75, Qt::SolidLine);
+            painter->setPen(hatchPen);
+            painter->setBrush(Qt::NoBrush);
+
+            const qreal spacing = pdf::PDFWidgetUtils::scaleDPI_x(painter->device(), 6.0);
+            for (qreal offset = deviceRect.left() - deviceRect.height(); offset < deviceRect.right(); offset += spacing)
+            {
+                painter->drawLine(QPointF(offset, deviceRect.bottom()),
+                                    QPointF(offset + deviceRect.height(), deviceRect.top()));
+            }
+        }
+    }
+}
+
+void FrisketPreflightPlugin::updateOverlayGraphics()
+{
+    if (m_widget)
+    {
+        m_widget->getDrawWidget()->getWidget()->update();
+    }
+}
+
+void FrisketPreflightPlugin::onFindingSelectionChanged(int row)
+{
+    m_selectedFindingIndex = row;
+
+    if (!m_reportDockWidget || !m_widget || row < 0)
+    {
+        updateOverlayGraphics();
+        return;
+    }
+
+    const QVector<PreflightFindingEntry>& findings = m_reportDockWidget->findings();
+    if (row >= findings.size())
+    {
+        updateOverlayGraphics();
+        return;
+    }
+
+    const PreflightFindingEntry& finding = findings.at(row);
+    if ((finding.scope == QStringLiteral("page") || finding.scope == QStringLiteral("object"))
+        && finding.page > 0)
+    {
+        m_widget->getDrawWidgetProxy()->goToPage(finding.page - 1);
+    }
+
+    updateOverlayGraphics();
+}
+
+void FrisketPreflightPlugin::onApplyBleedFixupRequested()
+{
+    if (!m_document || !m_reportDockWidget)
+    {
+        return;
+    }
+
+    const PreflightFixupEntry* addBleedFixup = m_reportDockWidget->addBleedFixup();
+    if (!addBleedFixup)
+    {
+        return;
+    }
+
+    const QString originalPath = m_dataExchangeInterface->getOriginalFileName();
+    const double defaultAmountPt = addBleedFixup->amountPt > 0.0 ? addBleedFixup->amountPt : 9.0;
+    const qreal defaultBleedMm = defaultAmountPt / POINTS_PER_MM;
+    const QString defaultMode = addBleedFixup->params.value(QStringLiteral("mode")).toString(QStringLiteral("mirror"));
+
+    QDialog dialog(m_widget);
+    dialog.setWindowTitle(tr("Apply Bleed Fix"));
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+    QFormLayout* form = new QFormLayout();
+
+    QComboBox* modeCombo = new QComboBox(&dialog);
+    modeCombo->addItem(tr("Mirror"), int(pdf::PDFBleedFixupMode::Mirror));
+    modeCombo->addItem(tr("Pixel repeat"), int(pdf::PDFBleedFixupMode::PixelRepeat));
+    modeCombo->addItem(tr("Stretch"), int(pdf::PDFBleedFixupMode::Stretch));
+    const int defaultModeIndex = modeCombo->findData(int(bleedFixupModeFromString(defaultMode)));
+    if (defaultModeIndex >= 0)
+    {
+        modeCombo->setCurrentIndex(defaultModeIndex);
+    }
+    form->addRow(tr("Mode"), modeCombo);
+
+    QDoubleSpinBox* bleedSpin = new QDoubleSpinBox(&dialog);
+    bleedSpin->setRange(0.1, 50.0);
+    bleedSpin->setDecimals(2);
+    bleedSpin->setSuffix(tr(" mm"));
+    bleedSpin->setValue(defaultBleedMm);
+    form->addRow(tr("Bleed amount"), bleedSpin);
+
+    QLineEdit* outputPathEdit = new QLineEdit(defaultBleedOutputPath(originalPath), &dialog);
+    QPushButton* browseButton = new QPushButton(tr("Browse..."), &dialog);
+    QHBoxLayout* outputLayout = new QHBoxLayout();
+    outputLayout->addWidget(outputPathEdit, 1);
+    outputLayout->addWidget(browseButton);
+    form->addRow(tr("Output file"), outputLayout);
+
+    QCheckBox* rerunCheckBox = new QCheckBox(tr("Re-run preflight after fixing"), &dialog);
+    rerunCheckBox->setChecked(true);
+    layout->addLayout(form);
+    layout->addWidget(rerunCheckBox);
+
+    QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(browseButton, &QPushButton::clicked, &dialog, [&dialog, outputPathEdit, originalPath]()
+    {
+        const QString selectedPath = QFileDialog::getSaveFileName(&dialog,
+                                                                  tr("Save bleed-fixed PDF"),
+                                                                  outputPathEdit->text().isEmpty() ? defaultBleedOutputPath(originalPath) : outputPathEdit->text(),
+                                                                  tr("PDF files (*.pdf)"));
+        if (!selectedPath.isEmpty())
+        {
+            outputPathEdit->setText(selectedPath);
+        }
+    });
+
+    if (dialog.exec() != QDialog::Accepted)
+    {
+        return;
+    }
+
+    const QString outputPath = outputPathEdit->text().trimmed();
+    if (outputPath.isEmpty())
+    {
+        QMessageBox::warning(m_widget, tr("Apply Bleed Fix"), tr("Choose an output file path."));
+        return;
+    }
+
+    pdf::PDFDocument fixedDocument = *m_document;
+    pdf::PDFBleedFixupSettings settings;
+    settings.mode = pdf::PDFBleedFixupMode(modeCombo->currentData().toInt());
+    const qreal bleedMm = bleedSpin->value();
+    settings.bleedMM = QMarginsF(bleedMm, bleedMm, bleedMm, bleedMm);
+    settings.force = true;
+
+    const pdf::PDFOperationResult fixupResult = pdf::PDFBleedFixup::apply(&fixedDocument, settings);
+    if (!fixupResult)
+    {
+        QMessageBox::critical(m_widget, tr("Apply Bleed Fix"), fixupResult.getErrorMessage());
+        return;
+    }
+
+    if (QFile::exists(outputPath))
+    {
+        QFile::remove(outputPath);
+    }
+
+    pdf::PDFDocumentWriter writer(nullptr);
+    const pdf::PDFOperationResult writeResult = writer.write(outputPath, &fixedDocument, true);
+    if (!writeResult)
+    {
+        QMessageBox::critical(m_widget, tr("Apply Bleed Fix"), writeResult.getErrorMessage());
+        return;
+    }
+
+    QMessageBox::information(m_widget, tr("Apply Bleed Fix"),
+                             tr("Bleed fixup saved to %1. The open document was not modified.")
+                                 .arg(QDir::toNativeSeparators(outputPath)));
+
+    if (!rerunCheckBox->isChecked() || m_preflightProcess)
+    {
+        return;
+    }
+
+    QString pdfToolPath;
+    QString profilePath;
+    if (!resolvePreflightPaths(&pdfToolPath, &profilePath))
+    {
+        return;
+    }
+
+    startPreflightOnFile(outputPath,
+                         profilePath,
+                         m_documentRevision,
+                         true,
+                         tr("Post-fix results for: %1").arg(QDir::toNativeSeparators(outputPath)));
 }
 
 }   // namespace pdfplugin

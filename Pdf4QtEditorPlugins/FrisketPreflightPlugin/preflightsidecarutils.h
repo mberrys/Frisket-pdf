@@ -31,6 +31,10 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#ifndef FRISKET_PREFLIGHT_SCHEMA_VERSION
+#define FRISKET_PREFLIGHT_SCHEMA_VERSION 2
+#endif
+
 namespace pdfplugin::preflight
 {
 
@@ -117,7 +121,7 @@ inline bool isContractIdentifier(const QString& value)
 
 inline bool isSupportedSchemaVersion(int schemaVersion)
 {
-    return schemaVersion == 1 || schemaVersion == 2;
+    return schemaVersion >= 1 && schemaVersion <= FRISKET_PREFLIGHT_SCHEMA_VERSION;
 }
 
 inline bool validateBboxValue(const QJsonValue& bboxValue, const QString& context, QString* errorMessage)
@@ -371,7 +375,7 @@ inline bool validateNormalizedReport(const QJsonObject& report, QString* errorMe
     const QJsonValue schemaVersion = report.value(QStringLiteral("schema_version"));
     if (!isInteger(schemaVersion) || !isSupportedSchemaVersion(schemaVersion.toInt()))
     {
-        return setValidationError(errorMessage, QStringLiteral("schema_version must be 1 or 2."));
+        return setValidationError(errorMessage, QStringLiteral("schema_version must be between 1 and %1.").arg(FRISKET_PREFLIGHT_SCHEMA_VERSION));
     }
 
     const int schemaVersionValue = schemaVersion.toInt();

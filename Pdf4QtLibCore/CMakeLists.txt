@@ -107,6 +107,8 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfprogress.h
     sources/pdfredact.cpp
     sources/pdfredact.h
+    sources/pdfredactverifier.cpp
+    sources/pdfredactverifier.h
     sources/pdfsecurityhandler.cpp
     sources/pdfsecurityhandler.h
     sources/pdfsignaturehandler.cpp

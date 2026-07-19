@@ -145,6 +145,8 @@ void PreflightReportModel::setReport(const QJsonObject& report)
         fixup.id = fixupObject.value(QStringLiteral("id")).toString();
         fixup.description = fixupObject.value(QStringLiteral("description")).toString();
         fixup.safe = fixupObject.value(QStringLiteral("safe")).toBool(false);
+        fixup.amountPt = fixupObject.value(QStringLiteral("amount_pt")).toDouble(0.0);
+        fixup.params = fixupObject.value(QStringLiteral("params")).toObject();
         m_fixups.push_back(fixup);
     }
 
@@ -163,6 +165,24 @@ void PreflightReportModel::clear()
     m_errorCount = 0;
     m_warningCount = 0;
     endResetModel();
+}
+
+bool PreflightReportModel::hasAddBleedFixup() const
+{
+    return addBleedFixup() != nullptr;
+}
+
+const PreflightFixupEntry* PreflightReportModel::addBleedFixup() const
+{
+    for (const PreflightFixupEntry& fixup : m_fixups)
+    {
+        if (fixup.id == QStringLiteral("add-bleed"))
+        {
+            return &fixup;
+        }
+    }
+
+    return nullptr;
 }
 
 void PreflightReportModel::appendFindings(const QJsonArray& findings)

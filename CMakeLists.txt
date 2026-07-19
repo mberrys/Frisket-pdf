@@ -48,6 +48,13 @@ endif()
 
 option(PDF4QT_BUILD_ONLY_CORE_LIBRARY "Build only core library" OFF)
 option(PDF4QT_BUILD_TESTS "Build UnitTests" ON)
+option(PDF4QT_ENABLE_SANITIZERS "Build with ASan+UBSan" OFF)
+option(PDF4QT_BUILD_FUZZERS "Build libFuzzer harnesses" OFF)
+
+if(PDF4QT_ENABLE_SANITIZERS OR PDF4QT_BUILD_FUZZERS)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
 
 set(PDF4QT_QT_ROOT "" CACHE PATH "Qt root directory")
 
@@ -196,6 +203,10 @@ endif()
 if(PDF4QT_BUILD_TESTS)
     enable_testing()
     add_subdirectory(UnitTests)
+endif()
+
+if(PDF4QT_BUILD_FUZZERS)
+    add_subdirectory(Fuzz)
 endif()
 
 qt_collect_translation_source_targets(i18n_targets)

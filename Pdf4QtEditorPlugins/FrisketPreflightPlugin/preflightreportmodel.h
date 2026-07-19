@@ -38,6 +38,8 @@ struct PreflightFixupEntry
     QString id;
     QString description;
     bool safe = false;
+    double amountPt = 0.0;
+    QJsonObject params;
 };
 
 struct PreflightFindingEntry
@@ -85,6 +87,8 @@ public:
     int schemaVersion() const { return m_schemaVersion; }
     const QVector<PreflightFixupEntry>& fixups() const { return m_fixups; }
     const QVector<PreflightFindingEntry>& findings() const { return m_findings; }
+    bool hasAddBleedFixup() const;
+    const PreflightFixupEntry* addBleedFixup() const;
 
 private:
     void appendFindings(const QJsonArray& findings);

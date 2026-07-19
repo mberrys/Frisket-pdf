@@ -25,6 +25,8 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QListWidget>
+#include <QItemSelectionModel>
+#include <QPushButton>
 #include <QStackedWidget>
 #include <QTableView>
 #include <QVBoxLayout>
@@ -66,9 +68,21 @@ PreflightReportDockWidget::PreflightReportDockWidget(QWidget* parent) :
     m_findingsView->verticalHeader()->setVisible(false);
     reportLayout->addWidget(m_findingsView, 1);
 
+    connect(m_findingsView->selectionModel(), &QItemSelectionModel::currentChanged, this,
+            [this](const QModelIndex& current, const QModelIndex& previous)
+    {
+        Q_UNUSED(previous);
+        Q_EMIT findingSelectionChanged(current.isValid() ? current.row() : -1);
+    });
+
     m_fixupsList = new QListWidget(reportPage);
     m_fixupsList->setMaximumHeight(120);
     reportLayout->addWidget(m_fixupsList);
+
+    m_applyFixupButton = new QPushButton(tr("Apply Bleed Fix..."), reportPage);
+    m_applyFixupButton->setEnabled(false);
+    connect(m_applyFixupButton, &QPushButton::clicked, this, &PreflightReportDockWidget::applyBleedFixupRequested);
+    reportLayout->addWidget(m_applyFixupButton);
 
     m_contentStack->addWidget(reportPage);
     layout->addWidget(m_contentStack, 1);
@@ -77,20 +91,35 @@ PreflightReportDockWidget::PreflightReportDockWidget(QWidget* parent) :
     refreshEmptyState();
 }
 
-void PreflightReportDockWidget::setReport(const QJsonObject& report)
+void PreflightReportDockWidget::setReport(const QJsonObject& report, const QString& sourceLabel)
 {
+    clearFindingSelection();
+    m_reportSourceLabel = sourceLabel;
     m_model.setReport(report);
     refreshHeader();
     refreshFixups();
+    refreshApplyFixupButton();
     m_contentStack->setCurrentIndex(1);
 }
 
 void PreflightReportDockWidget::clearReport()
 {
+    clearFindingSelection();
+    m_reportSourceLabel.clear();
     m_model.clear();
     refreshHeader();
     refreshFixups();
+    refreshApplyFixupButton();
     refreshEmptyState();
+}
+
+void PreflightReportDockWidget::clearFindingSelection()
+{
+    if (m_findingsView && m_findingsView->selectionModel())
+    {
+        m_findingsView->selectionModel()->clearSelection();
+    }
+    Q_EMIT findingSelectionChanged(-1);
 }
 
 void PreflightReportDockWidget::refreshHeader()
@@ -103,7 +132,14 @@ void PreflightReportDockWidget::refreshHeader()
     }
 
     const QString statusText = m_model.pass() ? tr("Pass") : tr("Fail");
-    m_headerLabel->setText(tr("%1 — profile: %2").arg(statusText, m_model.profileName()));
+    if (m_reportSourceLabel.isEmpty())
+    {
+        m_headerLabel->setText(tr("%1 — profile: %2").arg(statusText, m_model.profileName()));
+    }
+    else
+    {
+        m_headerLabel->setText(tr("%1 — profile: %2 — %3").arg(statusText, m_model.profileName(), m_reportSourceLabel));
+    }
     m_summaryLabel->setText(tr("%1 error(s), %2 warning(s).")
                                 .arg(m_model.errorCount())
                                 .arg(m_model.warningCount()));
@@ -130,6 +166,16 @@ void PreflightReportDockWidget::refreshFixups()
     {
         m_fixupsList->addItem(tr("No fixups available."));
     }
+}
+
+void PreflightReportDockWidget::refreshApplyFixupButton()
+{
+    if (!m_applyFixupButton)
+    {
+        return;
+    }
+
+    m_applyFixupButton->setEnabled(m_model.hasReport() && m_model.hasAddBleedFixup());
 }
 
 void PreflightReportDockWidget::refreshEmptyState()

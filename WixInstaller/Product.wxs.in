@@ -19,6 +19,7 @@
         
         <Feature Id="feature_PDF4QT_Editor_Plugins" Absent="allow" AllowAdvertise="no" Title="Plugin Pack" Level="1" Description="Plugin pack for editor. Contains additional editing features, such as audio book conversion, signatures, soft-proofing, dimensions, object inspector, redaction etc.">
           <ComponentGroupRef Id="PDF4QT_Editor_Plugins"/>
+          <ComponentGroupRef Id="PDF4QT_Frisket_Data"/>
         </Feature>
       </Feature>
       
@@ -42,6 +43,13 @@
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
         <Directory Id="INSTALLFOLDER" Name="PDF4QT" />
+        <Directory Id="dir_share_root" Name="share">
+          <Directory Id="dir_frisket" Name="frisket">
+            <Directory Id="dir_frisket_profiles" Name="profiles">
+              <Directory Id="dir_frisket_schemas" Name="schemas" />
+            </Directory>
+          </Directory>
+        </Directory>
       </Directory>
       <Directory Id="DesktopFolder" Name="Desktop"/>
       <Directory Id="ProgramMenuFolder" Name="Programs">
@@ -341,6 +349,23 @@
       </Component>
       <Component Id="cmpEditorPlugin" Directory="dir_pdfplugins" Guid="{FE5DC1D1-3320-43A7-BD4F-DCFB2A9DE039}">
         <File Id="filEditorPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\EditorPlugin.dll" />
+      </Component>
+      <Component Id="cmpFrisketPreflightPlugin" Directory="dir_pdfplugins" Guid="{A4E8C2F1-9B3D-4E71-A5C6-8F2D1E0B7A94}">
+        <File Id="filFrisketPreflightPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\FrisketPreflightPlugin.dll" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="PDF4QT_Frisket_Data">
+      <Component Id="cmpFrisketDefaultProfile" Directory="dir_frisket_profiles" Guid="{C1D9E8A2-5F4B-4A6C-9D3E-7B1F0C8A2D45}">
+        <File Id="filFrisketDefaultProfile" KeyPath="yes" Source="$(var.MyInstallDir)\..\share\frisket\profiles\frisket-default.json" />
+      </Component>
+      <Component Id="cmpFrisketProfileSchema" Directory="dir_frisket_schemas" Guid="{D2E0F9B3-6A5C-4B7D-8E4F-9C2A1D3B4E56}">
+        <File Id="filFrisketProfileSchema" KeyPath="yes" Source="$(var.MyInstallDir)\..\share\frisket\profiles\schemas\profile.schema.json" />
+      </Component>
+      <Component Id="cmpFrisketReportSchema" Directory="dir_frisket_schemas" Guid="{E3F1A0C4-7B6D-4C8E-9F5A-0D3B2E4C5F67}">
+        <File Id="filFrisketReportSchema" KeyPath="yes" Source="$(var.MyInstallDir)\..\share\frisket\profiles\schemas\report.schema.json" />
       </Component>
     </ComponentGroup>
   </Fragment>

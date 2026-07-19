@@ -214,6 +214,16 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("profile", "Frisket preflight profile (JSON).", "profile"));
     }
 
+    if (optionFlags.testFlag(VerifyRedaction))
+    {
+        parser->addPositionalArgument("original", "Original document containing redact annotations.");
+        parser->addPositionalArgument("redacted", "Redacted output document to verify.");
+        parser->addOption(QCommandLineOption("verify-redact-copy-title", "Original redaction copied the title."));
+        parser->addOption(QCommandLineOption("verify-redact-copy-metadata", "Original redaction copied metadata."));
+        parser->addOption(QCommandLineOption("verify-redact-copy-outline", "Original redaction copied outline."));
+        parser->addOption(QCommandLineOption("verify-redact-allow-incremental", "Do not fail when the output trailer contains /Prev."));
+    }
+
     if (optionFlags.testFlag(SignatureVerification))
     {
         parser->addOption(QCommandLineOption("ver-no-user-cert", "Disable user certificate store."));
@@ -595,6 +605,25 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
     if (optionFlags.testFlag(PreflightProfile))
     {
         options.preflightProfilePath = parser->value("profile");
+    }
+
+    if (optionFlags.testFlag(VerifyRedaction))
+    {
+        options.verifyRedactionFiles = positionalArguments;
+        options.verifyRedactionOptions = pdf::PDFRedact::None;
+        if (parser->isSet("verify-redact-copy-title"))
+        {
+            options.verifyRedactionOptions |= pdf::PDFRedact::CopyTitle;
+        }
+        if (parser->isSet("verify-redact-copy-metadata"))
+        {
+            options.verifyRedactionOptions |= pdf::PDFRedact::CopyMetadata;
+        }
+        if (parser->isSet("verify-redact-copy-outline"))
+        {
+            options.verifyRedactionOptions |= pdf::PDFRedact::CopyOutline;
+        }
+        options.verifyRedactionCheckIncremental = !parser->isSet("verify-redact-allow-incremental");
     }
 
     if (optionFlags.testFlag(Separate))

@@ -110,5 +110,37 @@
     "expect": { "pass": true, "check_ids": ["content-bleed"] },
     "source": "generated",
     "notes": "Artwork into left/right/top bleed strips only; Tier-1 emits exactly one content-bleed on the bottom edge."
+  },
+  {
+    "id": "ai-art-missing-bleed",
+    "pdf": "ai-art-missing-bleed.pdf",
+    "profile": "examples/profile-tiered-bleed-raster.json",
+    "expect": { "pass": false, "check_ids": ["bleed"] },
+    "source": "hand-built",
+    "notes": "CMYK raster flush to trim with geometric edge lines; zero box bleed margin."
+  },
+  {
+    "id": "ai-art-partial-bleed",
+    "pdf": "ai-art-partial-bleed.pdf",
+    "profile": "examples/profile-tiered-bleed-raster.json",
+    "expect": { "pass": false, "check_ids": ["bleed"] },
+    "source": "hand-built",
+    "notes": "Uneven bleed boxes: adequate left/bottom, short right/top."
+  },
+  {
+    "id": "ai-art-hard-corners",
+    "pdf": "ai-art-hard-corners.pdf",
+    "profile": "examples/profile-tiered-bleed-raster.json",
+    "expect": { "pass": false, "check_ids": ["bleed"] },
+    "source": "hand-built",
+    "notes": "High-contrast checker corners at trim for mirror seam visibility."
+  },
+  {
+    "id": "ai-art-raster-trim-edge",
+    "pdf": "ai-art-raster-trim-edge.pdf",
+    "profile": "examples/profile-tiered-bleed-raster.json",
+    "expect": { "pass": false, "check_ids": ["bleed"] },
+    "source": "hand-built",
+    "notes": "Photo-like RGB gradient raster touching trim boundary."
   }
 ]
