@@ -30,7 +30,7 @@ endif()
 
 function(pdf4qt_add_fuzzer target source)
     add_executable(${target} ${source})
-    target_link_libraries(${target} PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui)
+    target_link_libraries(${target} PRIVATE Pdf4QtLibCore TBB::tbb Qt6::Core Qt6::Gui)
     target_compile_options(${target} PRIVATE -fsanitize=fuzzer)
     target_link_options(${target} PRIVATE -fsanitize=fuzzer)
     set_target_properties(${target} PROPERTIES

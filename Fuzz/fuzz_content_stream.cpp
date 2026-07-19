@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfcms.h"
+#include "pdfconstants.h"
 #include "pdfdocumentbuilder.h"
 #include "pdffont.h"
 #include "pdfoptionalcontent.h"
@@ -37,9 +38,9 @@ struct FuzzPageContext
     const pdf::PDFPage* page = nullptr;
 };
 
-const FuzzPageContext& getFuzzContext()
+FuzzPageContext& getFuzzContext()
 {
-    static const FuzzPageContext context = []
+    static FuzzPageContext context = []
     {
         FuzzPageContext result;
         pdf::PDFDocumentBuilder builder;
@@ -62,14 +63,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         return 0;
     }
 
-    const FuzzPageContext& context = getFuzzContext();
+    FuzzPageContext& context = getFuzzContext();
     const pdf::PDFPage* page = context.page;
     if (!page)
     {
         return 0;
     }
 
-    const pdf::PDFDocument* document = &context.document;
+    pdf::PDFDocument* document = &context.document;
     pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
     pdf::PDFOptionalContentActivity optionalContentActivity(document, pdf::OCUsage::Export, nullptr);
     pdf::PDFCMSManager cmsManager(nullptr);
