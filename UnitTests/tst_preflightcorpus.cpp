@@ -302,7 +302,15 @@ void PreflightCorpusTest::preflightMatchesSnapshot()
              qPrintable(QStringLiteral("Missing snapshot '%1'. Run with FRISKET_UPDATE_SNAPSHOTS=1 to create it.").arg(snapshotPath)));
     const QByteArray expectedJson = snapshotFile.readAll();
 
-    QCOMPARE(QString::fromUtf8(actualJson), QString::fromUtf8(expectedJson));
+    // Normalize EOLs so Windows checkouts (eol=crlf) match QJsonDocument LF output.
+    auto normalizeNewlines = [](QByteArray data) {
+        data.replace("\r\n", "\n");
+        data.replace('\r', '\n');
+        return data;
+    };
+
+    QCOMPARE(QString::fromUtf8(normalizeNewlines(actualJson)),
+             QString::fromUtf8(normalizeNewlines(expectedJson)));
 }
 
 QTEST_APPLESS_MAIN(PreflightCorpusTest)
