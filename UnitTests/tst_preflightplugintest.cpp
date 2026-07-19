@@ -38,6 +38,8 @@ private slots:
     void isNormalizedReport_acceptsSchemaV2ScopeFixtures();
     void isNormalizedReport_rejectsInvalidScopeCombinations();
     void findingHasVisualOverlay_respectsScopeAndBbox();
+    void filterAdvertisedFixups_removesUnimplementedFixups();
+    void isImplementedFixupId_onlyAdvertisesAddBleed();
 };
 
 namespace
@@ -182,6 +184,41 @@ void PreflightPluginTest::findingHasVisualOverlay_respectsScopeAndBbox()
     QVERIFY(!pdfplugin::preflight::findingHasVisualOverlay(documentScopeFinding(), 2));
     QVERIFY(!pdfplugin::preflight::findingHasVisualOverlay(pageScopeFinding(), 2));
     QVERIFY(pdfplugin::preflight::findingHasVisualOverlay(objectScopeFinding(), 2));
+}
+
+void PreflightPluginTest::filterAdvertisedFixups_removesUnimplementedFixups()
+{
+    QJsonArray fixups;
+    fixups.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("rgb-to-cmyk") },
+        { QStringLiteral("safe"), false },
+        { QStringLiteral("description"), QStringLiteral("Convert all RGB colors to CMYK") }
+    });
+    fixups.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("add-bleed") },
+        { QStringLiteral("safe"), false },
+        { QStringLiteral("description"), QStringLiteral("Extend page boxes / artwork to provide bleed") }
+    });
+    fixups.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("downsample-images") },
+        { QStringLiteral("safe"), false },
+        { QStringLiteral("description"), QStringLiteral("Downsample images above target DPI") }
+    });
+
+    QJsonObject report = scopeFixtureReport(pageScopeFinding(), false);
+    report.insert(QStringLiteral("fixups_available"), fixups);
+
+    const QJsonObject filtered = pdfplugin::preflight::filterAdvertisedFixups(report);
+    const QJsonArray filteredFixups = filtered.value(QStringLiteral("fixups_available")).toArray();
+    QCOMPARE(filteredFixups.size(), 1);
+    QCOMPARE(filteredFixups.first().toObject().value(QStringLiteral("id")).toString(), QStringLiteral("add-bleed"));
+}
+
+void PreflightPluginTest::isImplementedFixupId_onlyAdvertisesAddBleed()
+{
+    QVERIFY(pdfplugin::preflight::isImplementedFixupId(QStringLiteral("add-bleed")));
+    QVERIFY(!pdfplugin::preflight::isImplementedFixupId(QStringLiteral("rgb-to-cmyk")));
+    QVERIFY(!pdfplugin::preflight::isImplementedFixupId(QStringLiteral("downsample-images")));
 }
 
 QTEST_APPLESS_MAIN(PreflightPluginTest)

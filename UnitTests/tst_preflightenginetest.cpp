@@ -41,6 +41,7 @@ private slots:
     void run_includesProfileFixups();
     void run_synthesizesAddBleedWhenGapAndNoProfileFixup();
     void run_removesAddBleedWhenNoGap();
+    void run_doesNotAdvertiseUnimplementedFixups();
     void run_invalidProfileEmitsDocumentScopeFinding();
 };
 
@@ -245,6 +246,39 @@ void PreflightEngineTest::run_removesAddBleedWhenNoGap()
     {
         QVERIFY(fixup.id != QStringLiteral("add-bleed"));
     }
+}
+
+void PreflightEngineTest::run_doesNotAdvertiseUnimplementedFixups()
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 200));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("bleed") },
+        { QStringLiteral("amount_pt"), 9 },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+    QJsonArray fixups;
+    fixups.append(QJsonObject{ { QStringLiteral("id"), QStringLiteral("rgb-to-cmyk") } });
+    fixups.append(QJsonObject{ { QStringLiteral("id"), QStringLiteral("add-bleed") }, { QStringLiteral("amount_pt"), 9 } });
+    fixups.append(QJsonObject{ { QStringLiteral("id"), QStringLiteral("downsample-images") }, { QStringLiteral("target_dpi"), 300 } });
+    profile.insert(QStringLiteral("fixups"), fixups);
+
+    pdf::PreflightResult result = engine.run(profile);
+    QCOMPARE(result.fixupsAvailable.size(), 1);
+    QCOMPARE(result.fixupsAvailable.first().id, QStringLiteral("add-bleed"));
+
+    const QJsonArray reportFixups = result.toJson().value(QStringLiteral("fixups_available")).toArray();
+    QCOMPARE(reportFixups.size(), 1);
+    QCOMPARE(reportFixups.first().toObject().value(QStringLiteral("id")).toString(), QStringLiteral("add-bleed"));
 }
 
 void PreflightEngineTest::run_invalidProfileEmitsDocumentScopeFinding()
