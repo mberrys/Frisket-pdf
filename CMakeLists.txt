@@ -168,7 +168,7 @@ endif()
 
 # Parallel STL (libstdc++/libc++) on Linux needs TBB for both GCC and Clang.
 if(PDF4QT_LINUX)
-    find_package(TBB REQUIRED)
+    find_package(TBB CONFIG REQUIRED)
     set(PDF4QT_USE_TBB ON)
 endif()
 
