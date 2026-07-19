@@ -108,7 +108,7 @@ QString extractTextInRegion(const PDFDocument* document, PDFInteger pageIndex, c
     PDFCMSManager cmsManager(nullptr);
     cmsManager.setDocument(document);
     PDFCMSPointer cms = cmsManager.getCurrentCMS();
-    PDFModifiedDocument modifiedDocument(document, &optionalContentActivity);
+    PDFModifiedDocument modifiedDocument(const_cast<PDFDocument*>(document), &optionalContentActivity);
     fontCache.setDocument(modifiedDocument);
     fontCache.setCacheShrinkEnabled(nullptr, false);
     PDFMeshQualitySettings meshQualitySettings;
