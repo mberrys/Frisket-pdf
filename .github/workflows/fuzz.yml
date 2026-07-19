@@ -4,6 +4,13 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "Fuzz/**"
+      - ".github/workflows/fuzz.yml"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - "Pdf4QtLibCore/**"
 
 jobs:
   fuzz:
@@ -80,6 +87,7 @@ jobs:
             -DPDF4QT_INSTALL_QT_DEPENDENCIES=0 \
             -DPDF4QT_BUILD_ONLY_CORE_LIBRARY=ON \
             -DPDF4QT_BUILD_TESTS=OFF \
+            -DPDF4QT_ENABLE_SENTRY=OFF \
             -DPDF4QT_ENABLE_SANITIZERS=ON \
             -DPDF4QT_BUILD_FUZZERS=ON \
             -DPDF4QT_QT_ROOT="${Qt6_DIR%/lib/cmake/Qt6}"
@@ -93,12 +101,17 @@ jobs:
       - name: Run fuzz harnesses
         run: |
           SEED_DIR="${GITHUB_WORKSPACE}/frisket-preflight/testdata/fixtures"
-          FUZZ_ARGS=(-max_total_time=600 -print_final_stats=1)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FUZZ_SECONDS=120
+          else
+            FUZZ_SECONDS=600
+          fi
+          FUZZ_ARGS=(-max_total_time=${FUZZ_SECONDS} -print_final_stats=1)
           if [ -d "$SEED_DIR" ]; then
             FUZZ_ARGS+=("$SEED_DIR")
           fi
           for target in fuzz_pdf_parser fuzz_stream_filters fuzz_content_stream fuzz_images; do
-            echo "Running $target"
+            echo "Running $target (${FUZZ_SECONDS}s)"
             "./build-fuzz/usr/bin/$target" "${FUZZ_ARGS[@]}"
           done
 
