@@ -6,10 +6,12 @@ on:
 jobs:
   build_windows:
     runs-on: windows-2022
+    env:
+      VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           path: pdf4qt
       
@@ -90,15 +92,17 @@ jobs:
           
       - name: 'VCPKG: Set up VCPKG'
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          .\bootstrap-vcpkg.bat -disableMetrics
-          .\vcpkg integrate install
+          git init vcpkg
+          git -C vcpkg remote add origin https://github.com/microsoft/vcpkg.git
+          git -C vcpkg fetch --depth=1 origin $env:VCPKG_COMMIT
+          git -C vcpkg checkout --detach FETCH_HEAD
+          .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          .\vcpkg\vcpkg integrate install
           set VCPKG_ROOT=${env:GITHUB_WORKSPACE}\vcpkg\
           set "VCPKG_BINARY_SOURCES=clear;files,${env:GITHUB_WORKSPACE}\vcpkg\archives,readwrite"
 
       - name: 'VCPKG: Cache vcpkg dependencies'
-        uses: actions/cache@v4
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: |
             ./vcpkg/downloads
@@ -114,7 +118,7 @@ jobs:
         working-directory: vcpkg
         
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@b7840a6733f49e2a39c4355260d2375063d39b61 # v3
         with:
           version: '6.9.0'
           host: 'windows'
@@ -208,14 +212,14 @@ jobs:
           MakeAppx pack /d ".\pdf4qt\build\install\usr\bin" /p ".\pdf4qt\build\install\mberrys.Frisket-pdf_${{ env.pdf4qt_version }}.msix"
           
       - name: Upload ZIP directory
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: 'Frisket-pdf-Windows-${{ env.pdf4qt_version }}.zip'
           path: .\pdf4qt\build\install\usr\bin
           retention-days: 30
 
       - name: Upload MSIX package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: 'mberrys.Frisket-pdf_${{ env.pdf4qt_version }}.msix'
           path: .\pdf4qt\build\install\mberrys.Frisket-pdf_${{ env.pdf4qt_version }}.msix
@@ -223,7 +227,7 @@ jobs:
           compression-level: 0
           
       - name: Upload MSI package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: '${{ env.msipackagefilename }}'
           path: .\pdf4qt\build\install\${{ env.msipackagefilename }}

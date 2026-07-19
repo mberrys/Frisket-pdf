@@ -31,10 +31,10 @@ jobs:
           flatpak list
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Cache Flatpak builder artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: |
             ~/.cache/flatpak-builder
@@ -58,7 +58,7 @@ jobs:
           flatpak build-bundle repo io.github.mberrys.Frisket-pdf.flatpak io.github.mberrys.Frisket-pdf
 
       - name: Upload Flatpak Package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: io.github.mberrys.Frisket-pdf.flatpak
           path: ./io.github.mberrys.Frisket-pdf.flatpak
