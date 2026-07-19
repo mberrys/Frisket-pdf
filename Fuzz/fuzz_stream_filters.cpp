@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfstreamfilters.h"
+#include "pdfexception.h"
 
 #include <QByteArray>
 
@@ -46,7 +47,19 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         return 0;
     }
 
-    const QByteArray payload(reinterpret_cast<const char*>(data + 1), int(size - 1));
-    (void)filter->apply(payload, pdf::PDFObject(), nullptr);
+    try
+    {
+        const QByteArray payload(reinterpret_cast<const char*>(data + 1), int(size - 1));
+        (void)filter->apply(payload, pdf::PDFObject(), nullptr);
+    }
+    catch (const pdf::PDFException&)
+    {
+    }
+    catch (const std::exception&)
+    {
+    }
+    catch (...)
+    {
+    }
     return 0;
 }
