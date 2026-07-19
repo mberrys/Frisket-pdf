@@ -23,6 +23,7 @@
 #include <QtTest>
 
 #include "pdfcms.h"
+#include "pdfconstants.h"
 #include "pdfdocumentbuilder.h"
 #include "pdfdocumentwriter.h"
 #include "pdffont.h"
@@ -55,7 +56,11 @@ pdf::PDFDocument createRedactableDocument()
 
     pdf::PDFPageContentStreamBuilder streamBuilder(&builder);
     QPainter* painter = streamBuilder.begin(page);
-    QVERIFY(painter);
+    if (!painter)
+    {
+        return pdf::PDFDocument();
+    }
+
     painter->setPen(Qt::black);
     painter->drawText(QPointF(50, 100), QStringLiteral("Secret Text"));
     streamBuilder.end(painter);
@@ -64,7 +69,7 @@ pdf::PDFDocument createRedactableDocument()
     return builder.build();
 }
 
-pdf::PDFDocument performRedaction(const pdf::PDFDocument& original)
+pdf::PDFDocument performRedaction(pdf::PDFDocument& original)
 {
     pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
     pdf::PDFOptionalContentActivity optionalContentActivity(&original, pdf::OCUsage::Export, nullptr);
@@ -88,7 +93,8 @@ pdf::PDFDocument performRedaction(const pdf::PDFDocument& original)
 
 void RedactVerifierTest::test_redacted_document_passes_verification()
 {
-    const pdf::PDFDocument originalDocument = createRedactableDocument();
+    pdf::PDFDocument originalDocument = createRedactableDocument();
+    QVERIFY(originalDocument.getCatalog());
     const pdf::PDFDocument redactedDocument = performRedaction(originalDocument);
 
     QTemporaryFile redactedFile;
@@ -112,6 +118,7 @@ void RedactVerifierTest::test_redacted_document_passes_verification()
 void RedactVerifierTest::test_redact_annotations_remaining_fail()
 {
     const pdf::PDFDocument originalDocument = createRedactableDocument();
+    QVERIFY(originalDocument.getCatalog());
 
     pdf::PDFRedactVerificationSettings settings;
     const pdf::PDFRedactVerification verification = pdf::PDFRedactVerifier::verify(&originalDocument,
