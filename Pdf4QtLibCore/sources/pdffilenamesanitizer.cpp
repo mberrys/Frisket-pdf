@@ -31,8 +31,12 @@ namespace pdf
 
 QString PDFFilenameSanitizer::sanitize(const QString& rawFilename, const QString& fallbackName)
 {
+    // Normalize Windows separators so absolute paths and traversal work on all hosts.
+    QString normalized = rawFilename;
+    normalized.replace(QLatin1Char('\\'), QLatin1Char('/'));
+
     // Extract basename only — strips all directory components including traversal
-    QString name = QFileInfo(rawFilename).fileName();
+    QString name = QFileInfo(normalized).fileName();
 
     // Remove null bytes and control characters (U+0000–U+001F)
     QString cleaned;

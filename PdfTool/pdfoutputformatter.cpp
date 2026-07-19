@@ -837,7 +837,7 @@ void PDFConsole::writeError(QString text, QStringConverter::Encoding encoding)
         WriteFile(outputHandle, encodedData.constData(), encodedData.size(), nullptr, nullptr);
     }
 #else
-    QTextStream stream(stdout);
+    QTextStream stream(stderr);
     stream << text;
     stream << Qt::endl;
 #endif

@@ -26,6 +26,7 @@ jobs:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-binary-cache
       VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
+      QT_QPA_PLATFORM: offscreen
 
     steps:
       - name: Checkout repository
