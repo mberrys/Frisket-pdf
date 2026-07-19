@@ -98,10 +98,10 @@
   {
     "id": "content-bleed-raster-confirm",
     "pdf": "content-bleed-raster-confirm.pdf",
-    "profile": "examples/profile-tiered-bleed.json",
+    "profile": "examples/profile-tiered-bleed-raster.json",
     "expect": { "pass": true, "check_ids": ["content-bleed"] },
-    "source": "hand-built",
-    "notes": "Fast bounds flags gap; strip raster confirms missing content. Content-bleed check implemented in MIC-151."
+    "source": "generated",
+    "notes": "Fast bounds flags gap; strip raster confirms empty bleed margins and emits bleed-margin-empty per edge."
   },
   {
     "id": "content-bleed-three-of-four",

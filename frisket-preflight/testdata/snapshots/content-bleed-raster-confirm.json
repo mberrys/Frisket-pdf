@@ -13,22 +13,64 @@
         }
     ],
     "pass": true,
-    "profile": "Sinalite Tiered Bleed",
+    "profile": "Sinalite Tiered Bleed (Raster Confirm)",
     "schema_version": 2,
     "warnings": [
         {
             "bbox": [
                 1,
-                1,
-                219,
-                219
+                10,
+                10,
+                210
             ],
             "check_id": "content-bleed",
-            "message": "Artwork does not extend into bleed margin on left, right, top, bottom",
+            "message": "Bleed margin empty on left edge",
             "page": 1,
             "scope": "object",
             "severity": "warning",
-            "type": "content-bleed"
+            "type": "bleed-margin-empty"
+        },
+        {
+            "bbox": [
+                210,
+                10,
+                219,
+                210
+            ],
+            "check_id": "content-bleed",
+            "message": "Bleed margin empty on right edge",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "bleed-margin-empty"
+        },
+        {
+            "bbox": [
+                10,
+                210,
+                210,
+                219
+            ],
+            "check_id": "content-bleed",
+            "message": "Bleed margin empty on top edge",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "bleed-margin-empty"
+        },
+        {
+            "bbox": [
+                10,
+                1,
+                210,
+                10
+            ],
+            "check_id": "content-bleed",
+            "message": "Bleed margin empty on bottom edge",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "bleed-margin-empty"
         },
         {
             "bbox": [
