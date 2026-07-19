@@ -166,8 +166,10 @@ if (UNIX AND NOT APPLE)
     set(PDF4QT_LINUX ON)
 endif()
 
-if (LINUX_GCC)
+# Parallel STL (libstdc++/libc++) on Linux needs TBB for both GCC and Clang.
+if(PDF4QT_LINUX)
     find_package(TBB REQUIRED)
+    set(PDF4QT_USE_TBB ON)
 endif()
 
 option(PDF4QT_INSTALL_TO_USR "Install to usr directory" ${VCPKG_TOOLCHAIN})

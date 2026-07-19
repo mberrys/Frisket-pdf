@@ -203,7 +203,7 @@ target_link_libraries(Pdf4QtLibCore PRIVATE Freetype::Freetype)
 target_link_libraries(Pdf4QtLibCore PRIVATE openjp2)
 target_link_libraries(Pdf4QtLibCore PRIVATE JPEG::JPEG)
 
-if(LINUX_GCC)
+if(PDF4QT_USE_TBB)
     target_link_libraries(Pdf4QtLibCore PUBLIC TBB::tbb)
 endif()
 
