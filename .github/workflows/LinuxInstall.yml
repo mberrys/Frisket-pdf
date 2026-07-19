@@ -10,13 +10,15 @@ jobs:
       VCPKG_OVERLAY_PORTS: ${{ github.workspace }}/pdf4qt/vcpkg/overlays/linux:${{ github.workspace }}/pdf4qt/vcpkg/overlays/general
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
       GNUPGHOME: ${{ github.workspace }}/gnupg
+      VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
 
     steps:
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libxcb-cursor0 libspeechd2 gnupg2 wget appstream libcups2 libcups2-dev
-          wget -c "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          wget -O appimagetool-x86_64.AppImage "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage"
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool-x86_64.AppImage" | sha256sum --check --status
           chmod +x appimagetool-x86_64.AppImage
           sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
@@ -62,19 +64,21 @@ jobs:
           GNUPGHOME: ${{ env.GNUPGHOME }}
           
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           path: pdf4qt
           
       - name: 'VCPKG: Set up VCPKG'
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          ./bootstrap-vcpkg.sh
-          ./vcpkg integrate install
+          git init vcpkg
+          git -C vcpkg remote add origin https://github.com/microsoft/vcpkg.git
+          git -C vcpkg fetch --depth=1 origin "$VCPKG_COMMIT"
+          git -C vcpkg checkout --detach FETCH_HEAD
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg integrate install
         
       - name: 'VCPKG: Cache vcpkg dependencies'
-        uses: actions/cache@v4
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: |
             ./vcpkg/downloads
@@ -90,7 +94,7 @@ jobs:
         working-directory: vcpkg
         
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.9.0'
           host: 'linux'
@@ -124,6 +128,7 @@ jobs:
         run: |
           cp install/usr/share/icons/hicolor/scalable/apps/io.github.mberrys.Frisket-pdf.svg install/io.github.mberrys.Frisket-pdf.svg
           wget -O deploy.AppImage https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          echo "974a87457ed26241b793bed7841978fcdf84158d13220e53833a06515f173b0b  deploy.AppImage" | sha256sum --check --status
           chmod +x deploy.AppImage
           ./deploy.AppImage install/usr/share/applications/io.github.mberrys.Frisket-pdf.desktop -executable-dir=install/usr/bin -extra-plugins=iconengines,imageformats,texttospeech
           
@@ -148,7 +153,7 @@ jobs:
           GNUPGHOME: ${{ env.GNUPGHOME }}
 
       - name: Upload AppImage Package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ env.appimagefilename }}
           path: ./pdf4qt/build/${{ env.appimagefilename }}
@@ -156,7 +161,7 @@ jobs:
           compression-level: 0
           
       - name: Upload AppImage Signature File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ env.appimagefilename }}.sig
           path: ./pdf4qt/build/${{ env.appimagefilename }}.sig
@@ -165,7 +170,7 @@ jobs:
           compression-level: 0
           
       - name: Upload AppImage zsync File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ env.appimagefilename }}.zsync
           path: ./pdf4qt/build/${{ env.appimagefilename }}.zsync
