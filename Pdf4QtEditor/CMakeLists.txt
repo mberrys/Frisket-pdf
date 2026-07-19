@@ -36,3 +36,7 @@ set_target_properties(Pdf4QtEditor PROPERTIES
 )
 
 install(TARGETS Pdf4QtEditor RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR} LIBRARY DESTINATION ${PDF4QT_INSTALL_LIB_DIR})
+
+if(PDF4QT_ENABLE_SENTRY)
+    pdf4qt_deploy_sentry_crashpad(Pdf4QtEditor)
+endif()
