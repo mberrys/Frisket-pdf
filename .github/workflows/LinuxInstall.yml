@@ -16,7 +16,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxcb-cursor0 libspeechd2 gnupg2 wget appstream libcups2 libcups2-dev
+
+      - name: Install appimagetool
+        run: |
           wget -c "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          echo "${{ vars.APPIMAGETOOL_SHA256 }}  appimagetool-x86_64.AppImage" | sha256sum -c -
           chmod +x appimagetool-x86_64.AppImage
           sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
@@ -62,19 +66,20 @@ jobs:
           GNUPGHOME: ${{ env.GNUPGHOME }}
           
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           path: pdf4qt
-          
+
       - name: 'VCPKG: Set up VCPKG'
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git
+          git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
+          git checkout 0878b5224d4a4968940ee296a2e7fae2d3b62983
           ./bootstrap-vcpkg.sh
           ./vcpkg integrate install
-        
+
       - name: 'VCPKG: Cache vcpkg dependencies'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: |
             ./vcpkg/downloads
@@ -90,7 +95,7 @@ jobs:
         working-directory: vcpkg
         
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730  # v4.3.1
         with:
           version: '6.9.0'
           host: 'linux'
@@ -124,6 +129,7 @@ jobs:
         run: |
           cp install/usr/share/icons/hicolor/scalable/apps/io.github.mberrys.Frisket-pdf.svg install/io.github.mberrys.Frisket-pdf.svg
           wget -O deploy.AppImage https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          echo "${{ vars.LINUXDEPLOYQT_SHA256 }}  deploy.AppImage" | sha256sum -c -
           chmod +x deploy.AppImage
           ./deploy.AppImage install/usr/share/applications/io.github.mberrys.Frisket-pdf.desktop -executable-dir=install/usr/bin -extra-plugins=iconengines,imageformats,texttospeech
           
@@ -148,7 +154,7 @@ jobs:
           GNUPGHOME: ${{ env.GNUPGHOME }}
 
       - name: Upload AppImage Package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: ${{ env.appimagefilename }}
           path: ./pdf4qt/build/${{ env.appimagefilename }}
@@ -156,7 +162,7 @@ jobs:
           compression-level: 0
           
       - name: Upload AppImage Signature File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: ${{ env.appimagefilename }}.sig
           path: ./pdf4qt/build/${{ env.appimagefilename }}.sig
@@ -165,7 +171,7 @@ jobs:
           compression-level: 0
           
       - name: Upload AppImage zsync File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: ${{ env.appimagefilename }}.zsync
           path: ./pdf4qt/build/${{ env.appimagefilename }}.zsync
