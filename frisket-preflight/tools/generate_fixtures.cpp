@@ -32,9 +32,14 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QGuiApplication>
+#include <QPainter>
 
 namespace
 {
+
+constexpr qreal MEDIA_SIZE_PT = 220.0;
+constexpr qreal TRIM_INSET_PT = 10.0;
+constexpr qreal TRIM_SIZE_PT = 200.0;
 
 void writeFixture(const QDir& outputDir, const QString& fileName, const pdf::PDFDocument& document)
 {
@@ -44,6 +49,25 @@ void writeFixture(const QDir& outputDir, const QString& fileName, const pdf::PDF
     {
         qFatal("Failed to write fixture '%s': %s", qPrintable(fileName), qPrintable(result.getErrorMessage()));
     }
+}
+
+pdf::PDFObjectReference appendTieredBleedPage(pdf::PDFDocumentBuilder& builder, const QRectF& contentRect)
+{
+  // MediaBox 220x220, TrimBox 200x200 inset 10pt on every side. BleedBox is left
+  // unset; per PDFPage::parse it falls back to CropBox -> MediaBox, giving a
+  // 10pt margin over TrimBox (>= the 9pt amount_pt used by tiered-bleed profiles).
+    const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, MEDIA_SIZE_PT, MEDIA_SIZE_PT));
+    builder.setPageTrimBox(page, QRectF(TRIM_INSET_PT, TRIM_INSET_PT, TRIM_SIZE_PT, TRIM_SIZE_PT));
+
+    pdf::PDFPageContentStreamBuilder pageContentStreamBuilder(&builder,
+                                                              pdf::PDFContentStreamBuilder::CoordinateSystem::PDF);
+    if (QPainter* painter = pageContentStreamBuilder.begin(page))
+    {
+        painter->fillRect(contentRect, Qt::black);
+        pageContentStreamBuilder.end(painter);
+    }
+
+    return page;
 }
 
 void generateBleedAdequateFixture(const QDir& outputDir)
@@ -57,8 +81,8 @@ void generateBleedAdequateFixture(const QDir& outputDir)
     builder.setDocumentCreator(QCoreApplication::applicationName());
     builder.setDocumentSubject("frisket-preflight golden corpus: adequate bleed");
 
-    const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, 220, 220));
-    builder.setPageTrimBox(page, QRectF(10, 10, 200, 200));
+    const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, MEDIA_SIZE_PT, MEDIA_SIZE_PT));
+    builder.setPageTrimBox(page, QRectF(TRIM_INSET_PT, TRIM_INSET_PT, TRIM_SIZE_PT, TRIM_SIZE_PT));
 
     writeFixture(outputDir, "bleed-adequate.pdf", builder.build());
 }
@@ -79,6 +103,51 @@ void generateBleedMissingFixture(const QDir& outputDir)
     writeFixture(outputDir, "bleed-missing.pdf", builder.build());
 }
 
+void generateContentBleedAdequateFixture(const QDir& outputDir)
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.setDocumentTitle("Frisket fixture - content bleed adequate");
+    builder.setDocumentCreator(QCoreApplication::applicationName());
+    builder.setDocumentSubject("frisket-preflight golden corpus: artwork extends into bleed");
+
+    appendTieredBleedPage(builder, QRectF(0, 0, MEDIA_SIZE_PT, MEDIA_SIZE_PT));
+    writeFixture(outputDir, "content-bleed-adequate.pdf", builder.build());
+}
+
+void generateContentBleedMissingFixture(const QDir& outputDir)
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.setDocumentTitle("Frisket fixture - content bleed missing");
+    builder.setDocumentCreator(QCoreApplication::applicationName());
+    builder.setDocumentSubject("frisket-preflight golden corpus: artwork stops at trim");
+
+    appendTieredBleedPage(builder, QRectF(TRIM_INSET_PT, TRIM_INSET_PT, TRIM_SIZE_PT, TRIM_SIZE_PT));
+    writeFixture(outputDir, "content-bleed-missing.pdf", builder.build());
+}
+
+void generateContentBleedRasterConfirmFixture(const QDir& outputDir)
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.setDocumentTitle("Frisket fixture - content bleed raster confirm");
+    builder.setDocumentCreator(QCoreApplication::applicationName());
+    builder.setDocumentSubject("frisket-preflight golden corpus: fast bounds flags bleed gap");
+
+    appendTieredBleedPage(builder, QRectF(TRIM_INSET_PT, TRIM_INSET_PT, TRIM_SIZE_PT, TRIM_SIZE_PT));
+    writeFixture(outputDir, "content-bleed-raster-confirm.pdf", builder.build());
+}
+
+void generateContentBleedThreeOfFourFixture(const QDir& outputDir)
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.setDocumentTitle("Frisket fixture - content bleed three of four");
+    builder.setDocumentCreator(QCoreApplication::applicationName());
+    builder.setDocumentSubject("frisket-preflight golden corpus: bleed on three edges only");
+
+    // Artwork covers left, right, and top bleed strips but stops above the bottom strip.
+    appendTieredBleedPage(builder, QRectF(0, TRIM_INSET_PT + 1.0, MEDIA_SIZE_PT, MEDIA_SIZE_PT - TRIM_INSET_PT - 1.0));
+    writeFixture(outputDir, "content-bleed-three-of-four.pdf", builder.build());
+}
+
 }   // namespace
 
 int main(int argc, char* argv[])
@@ -92,6 +161,10 @@ int main(int argc, char* argv[])
 
     generateBleedAdequateFixture(outputDir);
     generateBleedMissingFixture(outputDir);
+    generateContentBleedAdequateFixture(outputDir);
+    generateContentBleedMissingFixture(outputDir);
+    generateContentBleedRasterConfirmFixture(outputDir);
+    generateContentBleedThreeOfFourFixture(outputDir);
 
     return 0;
 }

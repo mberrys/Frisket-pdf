@@ -39,6 +39,7 @@ Check params used by Phase 1 plans (open-ended via `additionalProperties`):
 | `raster_confirm` | `content-bleed` |
 | `probe_dpi` | `content-bleed` |
 | `probe_threshold` | `content-bleed` |
+| `raster_white_threshold` | `content-bleed` |
 
 ## Report JSON
 
@@ -79,7 +80,11 @@ The default `frisket-default` profile does **not** enable Tier-2. Use a separate
 profile to opt in (see `examples/profile-tiered-bleed.json`).
 
 When a document fails either bleed tier, the engine dynamically surfaces the
-`add-bleed` fixup in `fixups_available`.
+`add-bleed` fixup in `fixups_available` and emits a `needs-auto-bleed` advisory
+finding per affected page.
+
+With `raster_confirm: true`, Tier-2 emits `bleed-margin-empty` (one finding per
+empty edge) instead of a single aggregate `content-bleed` finding.
 
 ## Intended CLI (MIC-133)
 
@@ -87,14 +92,17 @@ When a document fails either bleed tier, the engine dynamically surfaces the
 # Default profile (Tier-1 bleed only)
 PdfTool preflight document.pdf --profile frisket-preflight/profiles/frisket-default.json
 
-# Tiered bleed profile (Tier-1 + Tier-2 content-bleed)
+# Tiered bleed profile (Tier-1 + Tier-2 content-bleed, fast bounds only)
 PdfTool preflight document.pdf --profile frisket-preflight/examples/profile-tiered-bleed.json
+
+# Tiered bleed with strip raster confirmation (bleed-margin-empty findings)
+PdfTool preflight document.pdf --profile frisket-preflight/examples/profile-tiered-bleed-raster.json
 ```
 
 - Exit `0` when `pass` is true; exit `1` when `errors[]` is non-empty.
 - stdout: single JSON document validating against `schemas/report.schema.json`.
 - Profiles: **JSON** at runtime today (`frisket-default.json` mirrors the YAML). YAML authoring is fine; convert or add a loader later.
-- Implemented checks: **bleed**, **trim**, and **page-size**, all from page boxes (MIC-134). `trim` and `page-size` are **job-spec dependent** — each is skipped unless its profile check entry supplies both `expected_width_pt` and `expected_height_pt` (compared strictly, orientation-sensitive, within `tolerance_pt`). The generic `frisket-default.json` leaves them unset, so those two checks are no-ops there until a job-specific profile sets a size. Remaining checks (fonts, color mode, image DPI) land in later issues.
+- Implemented checks in `PreflightEngine`: **bleed**, **trim**, **page-size** (page boxes), **content-bleed** (tiered artwork bleed, optional `raster_confirm`), **color-mode**, **image-resolution**, and **embedded-fonts**. `trim` and `page-size` are **job-spec dependent** — each is skipped unless its profile check entry supplies both `expected_width_pt` and `expected_height_pt` (compared strictly, orientation-sensitive, within `tolerance_pt`). The generic `frisket-default.json` leaves them unset, so those two checks are no-ops there until a job-specific profile sets a size.
 
 Other PdfTool commands accept `--console-format json` via `PDFOutputFormatter` (tree JSON, not the preflight report schema).
 
@@ -192,8 +200,9 @@ passes, and only the target check is exercised.
 | `trim-pagesize-mismatch.pdf` | test-trim-pagesize | fail | `trim`, `page-size` (540×720 vs 612×792) |
 | `trim-pagesize-ok.pdf` | test-trim-pagesize | pass | `trim`, `page-size` (612×792) |
 | `content-bleed-adequate.pdf` | tiered-bleed | pass | `content-bleed` (artwork extends into bleed) |
-| `content-bleed-missing.pdf` | tiered-bleed | fail | `content-bleed` (artwork stops at trim) |
-| `content-bleed-raster-confirm.pdf` | tiered-bleed | fail | `content-bleed` (fast bounds + raster confirm) |
+| `content-bleed-missing.pdf` | tiered-bleed | fail (warnings) | `content-bleed`, `needs-auto-bleed` (artwork stops at trim) |
+| `content-bleed-raster-confirm.pdf` | tiered-bleed-raster | fail (warnings) | `bleed-margin-empty`, `needs-auto-bleed` (raster-confirmed empty margins) |
+| `content-bleed-three-of-four.pdf` | tiered-bleed | fail (warnings) | `content-bleed` (one empty edge only) |
 
 The `bleed-*` pair above covers the `bleed` check, so every Frisket Default custom check has
 at least one known-pass and one known-fail (or warning) case.
@@ -208,18 +217,12 @@ test-only profile, `testdata/profiles/test-trim-pagesize.json`, that pins an exp
 Letter size at error severity (the shipped `frisket-default` profile intentionally leaves the
 expected size unset).
 
-**`pending` and CI.** MIC-134 shipped `bleed`, `trim`, and `page-size` only (PR #10); the
-`trim-pagesize-*` pair above is promoted and snapshotted (PR #13). `color-mode`,
-`image-resolution`, and `embedded-fonts` are not yet implemented in `PdfTool/pdftoolpreflight.cpp`
-and are tracked as separate follow-ups: MIC-148 (color-mode), MIC-149 (image-resolution), and
-MIC-150 (embedded-fonts). Their fixtures' manifest entries carry `"pending": true`, and
-`UnitTestsPreflightCorpus` **skips** pending rows (both the manifest and snapshot checks).
-Their `expect{}` records the *intended* outcome once the check lands, not today's behavior —
-this keeps CI green while committing the fixtures now. When one of those checks ships:
-
-1. Remove `"pending": true` from that fixture's manifest entry.
-2. `FRISKET_UPDATE_SNAPSHOTS=1 ctest --test-dir build -R UnitTestsPreflightCorpus`, then review
-   and commit the new `testdata/snapshots/<id>.json`.
+**`pending` and CI.** MIC-134 shipped `bleed`, `trim`, and `page-size` (PR #10); the
+`trim-pagesize-*` pair above is promoted and snapshotted (PR #13). Custom checks
+`color-mode`, `image-resolution`, and `embedded-fonts` are implemented in
+`PreflightEngine` and covered by the fixtures above. Tier-2 bleed findings
+(`content-bleed`, `bleed-margin-empty`, `needs-auto-bleed`) are covered by the
+`content-bleed-*` fixtures and `examples/profile-tiered-bleed*.json` profiles.
 
 **To regenerate the PDFs** (only when a fixture's geometry/content must change):
 

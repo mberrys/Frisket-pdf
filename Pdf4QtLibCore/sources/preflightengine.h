@@ -63,6 +63,7 @@ struct PDF4QTLIBCORESHARED_EXPORT PreflightCheckConfig
     bool rasterConfirm = false;
     int probeDpi = 150;
     int probeThreshold = 16;
+    qreal rasterWhiteThreshold = 0.9975;
 
     // image-resolution parameters.
     int minDpi = 0;

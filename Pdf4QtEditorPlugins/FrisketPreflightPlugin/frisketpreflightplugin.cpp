@@ -54,17 +54,7 @@ FrisketPreflightPlugin::FrisketPreflightPlugin() :
 
 FrisketPreflightPlugin::~FrisketPreflightPlugin()
 {
-    if (m_preflightProcess)
-    {
-        disconnect(m_preflightProcess, nullptr, this, nullptr);
-        if (m_preflightProcess->state() != QProcess::NotRunning)
-        {
-            m_preflightProcess->kill();
-            m_preflightProcess->waitForFinished();
-        }
-    }
-
-    m_preflightTemporaryDirectory.reset();
+    cancelPreflightRun(true);
 }
 
 void FrisketPreflightPlugin::setWidget(pdf::PDFWidget* widget)
@@ -95,15 +85,27 @@ void FrisketPreflightPlugin::setDocument(const pdf::PDFModifiedDocument& documen
 {
     BaseClass::setDocument(document);
 
+    const bool documentChanged = documentModificationInvalidatesReport(document);
+    if (documentChanged)
+    {
+        ++m_documentRevision;
+    }
+
     if (document.hasReset())
     {
-        if (m_reportDockWidget)
-        {
-            m_reportDockWidget->clearReport();
-        }
-
-        updateActions();
+        cancelPreflightRun(true);
+        invalidateReport();
     }
+    else if (documentChanged)
+    {
+        if (m_preflightProcess)
+        {
+            cancelPreflightRun(true);
+        }
+        invalidateReportIfStale();
+    }
+
+    updateActions();
 }
 
 std::vector<QAction*> FrisketPreflightPlugin::getActions() const
@@ -160,13 +162,15 @@ void FrisketPreflightPlugin::updateActions()
 
 bool FrisketPreflightPlugin::applyReportJson(const QJsonObject& report, QString* errorMessage)
 {
-    if (!preflight::validateNormalizedReport(report, errorMessage))
+    const QJsonObject filteredReport = preflight::filterAdvertisedFixups(report);
+    if (!preflight::validateNormalizedReport(filteredReport, errorMessage))
     {
         return false;
     }
 
     ensureDockWidget();
-    m_reportDockWidget->setReport(report);
+    m_reportDockWidget->setReport(filteredReport);
+    m_reportDocumentRevision = m_documentRevision;
     m_actionShowPanel->setChecked(true);
     m_reportDockWidget->show();
     return true;
@@ -215,6 +219,9 @@ void FrisketPreflightPlugin::onRunPreflightTriggered()
     }
 
     m_preflightTemporaryDirectory = std::move(temporaryDirectory);
+    m_preflightStdoutBuffer.clear();
+    m_preflightStderrBuffer.clear();
+    m_preflightRunRevision = m_documentRevision;
     m_preflightProcess = new QProcess(this);
     m_preflightProcess->setProcessChannelMode(QProcess::SeparateChannels);
     connect(m_preflightProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
@@ -226,6 +233,8 @@ void FrisketPreflightPlugin::onRunPreflightTriggered()
             onPreflightProcessErrorOccurred();
         }
     });
+    connect(m_preflightProcess, &QProcess::readyReadStandardOutput, this, &FrisketPreflightPlugin::onPreflightStdoutReady);
+    connect(m_preflightProcess, &QProcess::readyReadStandardError, this, &FrisketPreflightPlugin::onPreflightStderrReady);
 
     updateActions();
     m_preflightProcess->start(pdfToolPath, { QStringLiteral("preflight"), snapshotPath, QStringLiteral("--profile"), profilePath });
@@ -238,8 +247,19 @@ void FrisketPreflightPlugin::onPreflightProcessFinished(int exitCode, int exitSt
         return;
     }
 
-    const QByteArray standardOutput = m_preflightProcess->readAllStandardOutput();
-    const QString standardError = QString::fromLocal8Bit(m_preflightProcess->readAllStandardError()).trimmed();
+    onPreflightStdoutReady();
+    onPreflightStderrReady();
+
+    const quint64 runRevision = m_preflightRunRevision;
+    const QByteArray standardOutput = m_preflightStdoutBuffer;
+    const QString standardError = QString::fromLocal8Bit(m_preflightStderrBuffer).trimmed();
+    finishPreflightRun();
+
+    if (runRevision != m_documentRevision)
+    {
+        return;
+    }
+
     if (exitStatus != QProcess::NormalExit || !preflight::isExpectedPreflightExitCode(exitCode))
     {
         QString detail = standardError;
@@ -248,7 +268,6 @@ void FrisketPreflightPlugin::onPreflightProcessFinished(int exitCode, int exitSt
             detail = tr("PdfTool exited with code %1.").arg(exitCode);
         }
 
-        finishPreflightRun();
         QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("Preflight did not complete successfully: %1").arg(detail));
         return;
     }
@@ -258,13 +277,11 @@ void FrisketPreflightPlugin::onPreflightProcessFinished(int exitCode, int exitSt
     if (parseError.error != QJsonParseError::NoError || !reportDocument.isObject())
     {
         QString detail = parseError.error != QJsonParseError::NoError ? parseError.errorString() : tr("The output is not a JSON object.");
-        finishPreflightRun();
         QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("PdfTool returned an invalid preflight report: %1").arg(detail));
         return;
     }
 
     const QJsonObject report = reportDocument.object();
-    finishPreflightRun();
     QString validationError;
     if (!applyReportJson(report, &validationError))
     {
@@ -284,16 +301,95 @@ void FrisketPreflightPlugin::onPreflightProcessErrorOccurred()
     QMessageBox::critical(m_widget, tr("Frisket Preflight"), tr("Could not start PdfTool: %1").arg(error));
 }
 
+void FrisketPreflightPlugin::onPreflightStdoutReady()
+{
+    if (!m_preflightProcess)
+    {
+        return;
+    }
+
+    m_preflightStdoutBuffer.append(m_preflightProcess->readAllStandardOutput());
+    if (m_preflightStdoutBuffer.size() > preflight::PREFLIGHT_SIDECAR_STDOUT_MAX_BYTES)
+    {
+        abortPreflightRun(tr("Preflight output exceeded the maximum allowed size."));
+    }
+}
+
+void FrisketPreflightPlugin::onPreflightStderrReady()
+{
+    if (!m_preflightProcess)
+    {
+        return;
+    }
+
+    m_preflightStderrBuffer.append(m_preflightProcess->readAllStandardError());
+    if (m_preflightStderrBuffer.size() > preflight::PREFLIGHT_SIDECAR_STDERR_MAX_BYTES)
+    {
+        abortPreflightRun(tr("Preflight diagnostic output exceeded the maximum allowed size."));
+    }
+}
+
 void FrisketPreflightPlugin::finishPreflightRun()
+{
+    cancelPreflightRun(true);
+    updateActions();
+}
+
+void FrisketPreflightPlugin::cancelPreflightRun(bool silent)
 {
     if (m_preflightProcess)
     {
+        disconnect(m_preflightProcess, nullptr, this, nullptr);
+        if (m_preflightProcess->state() != QProcess::NotRunning)
+        {
+            m_preflightProcess->kill();
+            m_preflightProcess->waitForFinished(3000);
+        }
         m_preflightProcess->deleteLater();
         m_preflightProcess = nullptr;
     }
 
     m_preflightTemporaryDirectory.reset();
-    updateActions();
+    m_preflightStdoutBuffer.clear();
+    m_preflightStderrBuffer.clear();
+    m_preflightRunRevision = 0;
+
+    if (!silent)
+    {
+        updateActions();
+    }
+}
+
+void FrisketPreflightPlugin::abortPreflightRun(const QString& message)
+{
+    finishPreflightRun();
+    QMessageBox::critical(m_widget, tr("Frisket Preflight"), message);
+}
+
+void FrisketPreflightPlugin::invalidateReport()
+{
+    if (m_reportDockWidget)
+    {
+        m_reportDockWidget->clearReport();
+    }
+
+    m_reportDocumentRevision = 0;
+}
+
+void FrisketPreflightPlugin::invalidateReportIfStale()
+{
+    if (m_reportDocumentRevision != 0 && m_reportDocumentRevision != m_documentRevision)
+    {
+        invalidateReport();
+    }
+}
+
+bool FrisketPreflightPlugin::documentModificationInvalidatesReport(const pdf::PDFModifiedDocument& document) const
+{
+    return document.hasReset()
+        || document.hasPageContentsChanged()
+        || document.hasFlag(pdf::PDFModifiedDocument::Annotation)
+        || document.hasFlag(pdf::PDFModifiedDocument::FormField);
 }
 
 void FrisketPreflightPlugin::onShowPanelTriggered(bool checked)

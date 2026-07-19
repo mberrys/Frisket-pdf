@@ -1,0 +1,90 @@
+{
+    "errors": [
+    ],
+    "fixups_available": [
+        {
+            "description": "Extend page boxes / artwork to provide bleed",
+            "id": "add-bleed",
+            "params": {
+                "amount_pt": 9,
+                "mode": "mirror"
+            },
+            "safe": false
+        }
+    ],
+    "pass": true,
+    "profile": "Sinalite Tiered Bleed (Raster Confirm)",
+    "schema_version": 2,
+    "warnings": [
+        {
+            "bbox": [
+                1,
+                10,
+                10,
+                210
+            ],
+            "check_id": "content-bleed",
+            "message": "Bleed margin empty on left edge",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "bleed-margin-empty"
+        },
+        {
+            "bbox": [
+                210,
+                10,
+                219,
+                210
+            ],
+            "check_id": "content-bleed",
+            "message": "Bleed margin empty on right edge",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "bleed-margin-empty"
+        },
+        {
+            "bbox": [
+                10,
+                210,
+                210,
+                219
+            ],
+            "check_id": "content-bleed",
+            "message": "Bleed margin empty on top edge",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "bleed-margin-empty"
+        },
+        {
+            "bbox": [
+                10,
+                1,
+                210,
+                10
+            ],
+            "check_id": "content-bleed",
+            "message": "Bleed margin empty on bottom edge",
+            "page": 1,
+            "scope": "object",
+            "severity": "warning",
+            "type": "bleed-margin-empty"
+        },
+        {
+            "bbox": [
+                10,
+                10,
+                210,
+                210
+            ],
+            "check_id": "content-bleed",
+            "message": "Page is a candidate for the add-bleed fixup",
+            "page": 1,
+            "scope": "page",
+            "severity": "info",
+            "type": "needs-auto-bleed"
+        }
+    ]
+}

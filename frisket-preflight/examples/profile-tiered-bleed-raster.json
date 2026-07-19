@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "Sinalite Tiered Bleed (Raster Confirm)",
+  "description": "Tiered bleed profile with Tier-2 strip raster confirmation enabled.",
+  "checks": [
+    { "id": "bleed", "required": true, "amount_pt": 9, "severity": "error" },
+    { "id": "content-bleed", "amount_pt": 9, "severity": "warning", "raster_confirm": true, "probe_dpi": 150, "probe_threshold": 16, "raster_white_threshold": 0.9975 }
+  ],
+  "fixups": [
+    { "id": "add-bleed", "amount_pt": 9, "confirm": true }
+  ]
+}

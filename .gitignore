@@ -2,3 +2,11 @@
 *.qbs.user
 *.txt.user
 build/*
+
+# Local configure, build, and test diagnostics. Curated fixtures remain tracked.
+/aqtinstall.log
+/build.log
+/test-output.txt
+/test-verify.txt
+/build/*.log
+/build/test-*.txt

@@ -10,6 +10,7 @@ jobs:
       VCPKG_OVERLAY_PORTS: ${{ github.workspace }}/pdf4qt/vcpkg/overlays/linux:${{ github.workspace }}/pdf4qt/vcpkg/overlays/general
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
       GNUPGHOME: ${{ github.workspace }}/gnupg
+      VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
 
     steps:
       - name: Install dependencies
