@@ -15,7 +15,21 @@
     ],
     "pass": true,
     "profile": "Frisket Default",
-    "schema_version": 2,
+    "schema_version": 1,
     "warnings": [
+        {
+            "bbox": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "check_id": "image-resolution",
+            "message": "Image resolution 25 DPI is below minimum 300 DPI on page 1",
+            "object_id": "6",
+            "page": 1,
+            "severity": "warning",
+            "type": "image-resolution"
+        }
     ]
 }

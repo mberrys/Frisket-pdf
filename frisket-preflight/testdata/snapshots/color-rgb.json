@@ -4,16 +4,15 @@
             "bbox": [
                 0,
                 0,
-                200,
-                200
+                0,
+                0
             ],
-            "check_id": "bleed",
-            "message": "BleedBox is missing or less than 9 pt on one or more edges",
+            "check_id": "color-mode",
+            "message": "Disallowed color space(s) found on page 1: DeviceRGB (allowed: CMYK, Grayscale)",
             "object_id": null,
             "page": 1,
-            "scope": "page",
             "severity": "error",
-            "type": "bleed"
+            "type": "color-mode"
         }
     ],
     "fixups_available": [
@@ -26,20 +25,11 @@
             "description": "Downsample images above target DPI",
             "id": "downsample-images",
             "safe": false
-        },
-        {
-            "description": "Extend page boxes / artwork to provide bleed",
-            "id": "add-bleed",
-            "params": {
-                "amount_pt": 9,
-                "mode": "mirror"
-            },
-            "safe": false
         }
     ],
     "pass": false,
     "profile": "Frisket Default",
-    "schema_version": 2,
+    "schema_version": 1,
     "warnings": [
     ]
 }
