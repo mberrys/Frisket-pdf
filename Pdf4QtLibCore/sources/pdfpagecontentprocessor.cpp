@@ -4007,7 +4007,17 @@ PDFPageContentProcessor::PDFPageContentProcessorStateGuard::~PDFPageContentProce
     m_processor->m_patternDictionary = m_patternDictionary;
     m_processor->m_procedureSets = m_procedureSets;
 
-    m_processor->operatorRestoreGraphicState();
+    try
+    {
+        m_processor->operatorRestoreGraphicState();
+    }
+    catch (const PDFRendererException& exception)
+    {
+        // A broken content stream can contain more restore operators than save
+        // operators, popping the state saved by this guard's constructor. The
+        // destructor must not throw, so report the error instead.
+        m_processor->m_errorList.append(exception.getError());
+    }
 }
 
 PDFPageContentProcessor::PDFTransparencyGroupGuard::PDFTransparencyGroupGuard(PDFPageContentProcessor* processor, PDFTransparencyGroup&& group) :
