@@ -27,6 +27,7 @@
 #include "pdfadvancedtools.h"
 #include "pdfdocumentbuilder.h"
 #include "pdfredact.h"
+#include "pdfredactverifier.h"
 #include "pdfdocumentwriter.h"
 #include "pdfselectpagesdialog.h"
 #include "pdfcompiler.h"
@@ -204,6 +205,27 @@ void RedactPlugin::onCreateRedactedDocumentTriggered()
         if (!result)
         {
             QMessageBox::critical(m_widget, tr("Error"), result.getErrorMessage());
+            return;
+        }
+
+        pdf::PDFRedactVerificationSettings verificationSettings;
+        verificationSettings.redactOptions = options;
+        const pdf::PDFRedactVerification verification = pdf::PDFRedactVerifier::verify(m_document,
+                                                                                       &redactedDocument,
+                                                                                       verificationSettings,
+                                                                                       dialog.getFileName());
+        if (!verification.passed())
+        {
+            QStringList details;
+            for (const pdf::PDFRedactVerificationIssue& issue : verification.issues)
+            {
+                details << QStringLiteral("%1: %2").arg(issue.checkId, issue.message);
+            }
+
+            QMessageBox::warning(m_widget,
+                                 tr("Redaction Verification"),
+                                 tr("The redacted document was saved, but verification reported issues:\n\n%1")
+                                     .arg(details.join(QStringLiteral("\n"))));
         }
     }
 }

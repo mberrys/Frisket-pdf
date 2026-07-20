@@ -22,6 +22,7 @@
 
 #include "pdftoolabstractapplication.h"
 #include "pdfconstants.h"
+#include "pdfsentry.h"
 
 #include <QGuiApplication>
 #include <QCommandLineParser>
@@ -32,6 +33,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("MelkaJ");
     QCoreApplication::setApplicationName("PdfTool");
     QCoreApplication::setApplicationVersion(pdf::PDF_LIBRARY_VERSION);
+
+    const pdf::PDFSentrySession sentrySession(QStringLiteral("pdftool"));
 
     QStringList arguments = QCoreApplication::arguments();
 
@@ -59,6 +62,9 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addVersionOption();
     parser.process(arguments);
+
+    const QString sentryCommand = command.isEmpty() ? QStringLiteral("help") : command;
+    const pdf::PDFSentryTransaction sentryTransaction(sentryCommand, "pdftool.command");
 
     return application->execute(application->getOptions(&parser));
 }

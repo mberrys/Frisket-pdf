@@ -30,6 +30,7 @@
 
 class QLabel;
 class QListWidget;
+class QPushButton;
 class QStackedWidget;
 class QTableView;
 
@@ -43,10 +44,21 @@ class PreflightReportDockWidget : public QDockWidget
 public:
     explicit PreflightReportDockWidget(QWidget* parent = nullptr);
 
-    void setReport(const QJsonObject& report);
+    void setReport(const QJsonObject& report, const QString& sourceLabel = QString());
     void clearReport();
 
+    bool hasReport() const { return m_model.hasReport(); }
+    const QVector<PreflightFindingEntry>& findings() const { return m_model.findings(); }
+    bool hasAddBleedFixup() const { return m_model.hasAddBleedFixup(); }
+    const PreflightFixupEntry* addBleedFixup() const { return m_model.addBleedFixup(); }
+
+Q_SIGNALS:
+    void findingSelectionChanged(int row);
+    void applyBleedFixupRequested();
+
 private:
+    void clearFindingSelection();
+    void refreshApplyFixupButton();
     void refreshHeader();
     void refreshFixups();
     void refreshEmptyState();
@@ -57,7 +69,9 @@ private:
     QLabel* m_summaryLabel = nullptr;
     QTableView* m_findingsView = nullptr;
     QListWidget* m_fixupsList = nullptr;
+    QPushButton* m_applyFixupButton = nullptr;
     QLabel* m_emptyLabel = nullptr;
+    QString m_reportSourceLabel;
 };
 
 }   // namespace pdfplugin

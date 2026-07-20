@@ -252,9 +252,24 @@ QByteArray PDFLzwStreamDecoder::decompress()
         {
             m_currentSequenceEnd = m_sequence.begin();
 
-            for (uint32_t currentCode = code; currentCode != TABLE_SIZE; currentCode = m_table[currentCode].previous)
+            // Chain length is bounded by the number of table entries. A malformed
+            // stream (or a corrupted 'previous' chain) must not be able to loop
+            // (or write into m_sequence) without bound, so cap the traversal and
+            // fail closed instead of hanging or overrunning the sequence buffer.
+            uint32_t currentCode = code;
+            for (uint32_t i = 0; i < TABLE_SIZE && currentCode != TABLE_SIZE; ++i, currentCode = m_table[currentCode].previous)
             {
+                if (m_currentSequenceEnd == m_sequence.end())
+                {
+                    throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
+                }
+
                 *m_currentSequenceEnd++ = m_table[currentCode].character;
+            }
+
+            if (currentCode != TABLE_SIZE)
+            {
+                throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
             }
 
             // We must reverse the sequence, because we stored it in the
@@ -265,6 +280,11 @@ QByteArray PDFLzwStreamDecoder::decompress()
         {
             // We use the buffer from previous run, just add a new
             // character to the end.
+            if (m_currentSequenceEnd == m_sequence.end())
+            {
+                throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
+            }
+
             *m_currentSequenceEnd++ = m_newCharacter;
         }
         else
@@ -561,7 +581,7 @@ QByteArray PDFRunLengthDecodeFilter::apply(const QByteArray& data,
     auto itEnd = data.cend();
     for (auto it = data.cbegin(); it != itEnd;)
     {
-        const unsigned char current = *it++;
+        const unsigned char current = static_cast<unsigned char>(*it++);
         if (current == 128)
         {
             // End of stream marker
@@ -571,12 +591,20 @@ QByteArray PDFRunLengthDecodeFilter::apply(const QByteArray& data,
         {
             // Copy n + 1 characters from the input array literally (and advance iterators)
             const int count = static_cast<int>(current) + 1;
+            if (std::distance(it, itEnd) < count)
+            {
+                throw PDFException(PDFTranslationContext::tr("Truncated RunLengthDecode stream."));
+            }
             std::copy(it, std::next(it, count), std::back_inserter(result));
             std::advance(it, count);
         }
         else if (current > 128)
         {
             // Copy 257 - n copies of single character
+            if (it == itEnd)
+            {
+                throw PDFException(PDFTranslationContext::tr("Truncated RunLengthDecode stream."));
+            }
             const int count = 257 - current;
             const char toBeCopied = *it++;
             std::fill_n(std::back_inserter(result), count, toBeCopied);

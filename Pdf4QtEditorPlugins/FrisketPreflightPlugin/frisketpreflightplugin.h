@@ -24,6 +24,7 @@
 #define FRISKETPREFLIGHTPLUGIN_H
 
 #include "pdfplugin.h"
+#include "pdfdocumentdrawinterface.h"
 
 #include <memory>
 
@@ -36,7 +37,7 @@ namespace pdfplugin
 
 class PreflightReportDockWidget;
 
-class FrisketPreflightPlugin : public pdf::PDFPlugin
+class FrisketPreflightPlugin : public pdf::PDFPlugin, public pdf::IDocumentDrawInterface
 {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID "PDF4QT.FrisketPreflightPlugin" FILE "FrisketPreflightPlugin.json")
@@ -53,10 +54,27 @@ public:
     virtual std::vector<QAction*> getActions() const override;
     virtual QString getPluginMenuName() const override;
 
+    virtual void drawPage(QPainter* painter,
+                          pdf::PDFInteger pageIndex,
+                          const pdf::PDFPrecompiledPage* compiledPage,
+                          pdf::PDFTextLayoutGetter& layoutGetter,
+                          const QTransform& pagePointToDevicePointMatrix,
+                          const pdf::PDFColorConvertor& convertor,
+                          QList<pdf::PDFRenderError>& errors) const override;
+
 private:
+    void updateOverlayGraphics();
+    void onFindingSelectionChanged(int row);
     void ensureDockWidget();
     void updateActions();
-    bool applyReportJson(const QJsonObject& report, QString* errorMessage = nullptr);
+    bool applyReportJson(const QJsonObject& report, QString* errorMessage = nullptr, const QString& sourceLabel = QString());
+    bool resolvePreflightPaths(QString* pdfToolPath, QString* profilePath) const;
+    void startPreflightOnFile(const QString& filePath,
+                              const QString& profilePath,
+                              quint64 revisionToMatch,
+                              bool ignoreRevisionMatch,
+                              const QString& reportSourceLabel);
+    void onApplyBleedFixupRequested();
     void finishPreflightRun();
     void cancelPreflightRun(bool silent = false);
     void abortPreflightRun(const QString& message);
@@ -83,6 +101,9 @@ private:
     quint64 m_documentRevision = 0;
     quint64 m_reportDocumentRevision = 0;
     quint64 m_preflightRunRevision = 0;
+    bool m_preflightIgnoreRevision = false;
+    QString m_preflightReportSourceLabel;
+    mutable int m_selectedFindingIndex = -1;
 };
 
 }   // namespace pdfplugin

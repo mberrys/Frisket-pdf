@@ -1016,7 +1016,7 @@ void PDFSidebarWidget::openAttachment(const pdf::PDFFileSpecification* fileSpeci
         return;
     }
 
-    QString fileName = QFileInfo(fileSpecification->getPlatformFileName()).fileName();
+    QString fileName = pdf::PDFFilenameSanitizer::sanitize(fileSpecification->getPlatformFileName());
     if (fileName.isEmpty())
     {
         fileName = tr("attachment");
@@ -1044,6 +1044,12 @@ void PDFSidebarWidget::openAttachment(const pdf::PDFFileSpecification* fileSpeci
 
     attachmentDirectory.setPath(attachmentDirectoryName);
     const QString attachmentFileName = attachmentDirectory.filePath(fileName);
+    if (!pdf::PDFFilenameSanitizer::isPathContained(attachmentFileName, attachmentDirectoryName))
+    {
+        QMessageBox::critical(this, tr("Open Attachment"), tr("Attachment filename is not allowed."));
+        return;
+    }
+
     if (!saveAttachmentToFile(fileSpecification, attachmentFileName))
     {
         return;

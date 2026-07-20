@@ -58,6 +58,10 @@ add_executable(PdfTool
     pdftoolpreflight.cpp
     pdftoolpreflight.h
     pdftoolpreflightchecks.h
+    pdftoolverifyredaction.cpp
+    pdftoolverifyredaction.h
+    pdftoolsentryverify.cpp
+    pdftoolsentryverify.h
 )
 
 target_link_libraries(PdfTool PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Xml)
@@ -74,3 +78,7 @@ set_target_properties(PdfTool PROPERTIES
 )
 
 install(TARGETS PdfTool RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR} LIBRARY DESTINATION ${PDF4QT_INSTALL_LIB_DIR})
+
+if(PDF4QT_ENABLE_SENTRY)
+    pdf4qt_deploy_sentry_crashpad(PdfTool)
+endif()

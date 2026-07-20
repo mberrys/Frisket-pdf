@@ -17,22 +17,14 @@
       <Feature Id="feature_PDF4QT_Editor" Absent="allow" AllowAdvertise="no" Title="Editor"  Display="expand" Level="1" Description="Advanced PDF viewer/editor with many functions, such as annotation editing, form filling, signature verification, and many optional plugins.">
         <ComponentGroupRef Id="PDF4QT_Editor"/>
         
-        <Feature Id="feature_PDF4QT_Editor_Plugins" Absent="allow" AllowAdvertise="no" Title="Plugin Pack" Level="1" Description="Plugin pack for editor. Contains additional editing features, such as audio book conversion, signatures, soft-proofing, dimensions, object inspector, redaction etc.">
+        <Feature Id="feature_PDF4QT_Editor_Plugins" Absent="allow" AllowAdvertise="no" Title="Plugin Pack" Level="1" Description="${PDF4QT_WIX_PLUGIN_PACK_DESCRIPTION}">
           <ComponentGroupRef Id="PDF4QT_Editor_Plugins"/>
+          <ComponentGroupRef Id="PDF4QT_Frisket_Data"/>
         </Feature>
       </Feature>
-      
-      <Feature Id="feature_PDF4QT_Viewer" Absent="allow" AllowAdvertise="no" Title="Viewer" Level="1" Description="Simple PDF viewer with basic functions.">
-        <ComponentGroupRef Id="PDF4QT_Viewer"/>
-      </Feature>
-
-      <Feature Id="feature_PDF4QT_PageMaster" Absent="allow" AllowAdvertise="no" Title="PageMaster" Level="1" Description="Document page organizer (split/merge documents, insert/remove/move/clone pages, insert blank pages and images to create a new document).">
-        <ComponentGroupRef Id="PDF4QT_PageMaster"/>
-      </Feature>
-
-      <Feature Id="feature_PDF4QT_Diff" Absent="allow" AllowAdvertise="no" Title="Diff" Level="1" Description="Compare content of two documents.">
-        <ComponentGroupRef Id="PDF4QT_Diff"/>
-      </Feature>
+${PDF4QT_WIX_FEATURE_VIEWER}
+${PDF4QT_WIX_FEATURE_PAGEMASTER}
+${PDF4QT_WIX_FEATURE_DIFF}
     </Feature>
 
     <UIRef Id="WixUI_FeatureTree" />
@@ -42,6 +34,13 @@
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">
         <Directory Id="INSTALLFOLDER" Name="PDF4QT" />
+        <Directory Id="dir_share_root" Name="share">
+          <Directory Id="dir_frisket" Name="frisket">
+            <Directory Id="dir_frisket_profiles" Name="profiles">
+              <Directory Id="dir_frisket_schemas" Name="schemas" />
+            </Directory>
+          </Directory>
+        </Directory>
       </Directory>
       <Directory Id="DesktopFolder" Name="Desktop"/>
       <Directory Id="ProgramMenuFolder" Name="Programs">
@@ -75,6 +74,7 @@
       <Component Id="cmpPdfTool" Directory="INSTALLFOLDER" Guid="{E5C28C55-AC18-4E71-B84E-82745BC0360B}">
         <File Id="filPdfTool" KeyPath="yes" Source="$(var.MyInstallDir)\PdfTool.exe" />
       </Component>
+${PDF4QT_WIX_SENTRY_CRASHPAD}
       <Component Id="cmpQt6Core" Directory="INSTALLFOLDER" Guid="{D8024726-7864-42BE-9E38-DFF782AC5C97}">
         <File Id="filQt6Core" KeyPath="yes" Source="$(var.MyInstallDir)\Qt6Core.dll" />
       </Component>
@@ -269,58 +269,13 @@
     <Icon Id="PDF4QT_VP_Icon.exe" SourceFile="$(var.MyInstallDir)\Pdf4QtEditor.exe"/>
   </Fragment>
 
-  <Fragment>
-    <ComponentGroup Id="PDF4QT_Viewer">
-      <Component Id="cmpPdf4QtViewer" Directory="INSTALLFOLDER" Guid="{2D222775-6DA7-43E6-B212-3A142622190C}">
-        <File Id="filPdf4QtViewer" KeyPath="yes" Source="$(var.MyInstallDir)\Pdf4QtViewer.exe">
-          <Shortcut Id="PDF4QT_Viewer_Shortcut" Directory="ProgramMenuDir" Name="PDF4QT Viewer" Description="Simple PDF viewer" WorkingDirectory="INSTALLFOLDER" Icon="PDF4QT_VL_Icon.exe" IconIndex="0" Advertise="yes"/>
-        </File>
-        <ProgId Id='pdf4qt_default_viewer.pdf' Description='PDF Document'>
-          <Extension Id='pdf' ContentType='application/pdf'>
-            <Verb Id='open' Command='Open' TargetFile='filPdf4QtViewer' Argument='"%1"' />
-          </Extension>
-        </ProgId>
-      </Component>
-    </ComponentGroup>
-  </Fragment>
-
-  <Fragment>
-    <Icon Id="PDF4QT_VL_Icon.exe" SourceFile="$(var.MyInstallDir)\Pdf4QtViewer.exe"/>
-  </Fragment>
-
-  <Fragment>
-    <ComponentGroup Id="PDF4QT_PageMaster">
-      <Component Id="cmpPdf4QtPageMaster" Directory="INSTALLFOLDER" Guid="{9D248BEE-BA78-4050-B362-0694B11AA326}">
-        <File Id="filPdf4QtPageMaster" KeyPath="yes" Source="$(var.MyInstallDir)\Pdf4QtPageMaster.exe">
-          <Shortcut Id="PDF4QT_DPO_Shortcut" Directory="ProgramMenuDir" Name="PDF4QT PageMaster" Description="PDF Document page organizer" WorkingDirectory="INSTALLFOLDER" Icon="PDF4QT_DPO_Icon.exe" IconIndex="0" Advertise="yes"/>
-        </File>
-      </Component>
-    </ComponentGroup>
-  </Fragment>
-
-  <Fragment>
-    <Icon Id="PDF4QT_DPO_Icon.exe" SourceFile="$(var.MyInstallDir)\Pdf4QtPageMaster.exe"/>
-  </Fragment>
-
-  <Fragment>
-    <ComponentGroup Id="PDF4QT_Diff">
-      <Component Id="cmpPdf4QtDiff" Directory="INSTALLFOLDER" Guid="{067D40E9-4FAE-472D-BCC3-B92A23CA0028}">
-        <File Id="filPdf4QtDiff" KeyPath="yes" Source="$(var.MyInstallDir)\Pdf4QtDiff.exe">
-          <Shortcut Id="PDF4QT_DD_Shortcut" Directory="ProgramMenuDir" Name="PDF4QT Diff" Description="Compare two similar PDF documents" WorkingDirectory="INSTALLFOLDER" Icon="PDF4QT_DD_Icon.exe" IconIndex="0" Advertise="yes"/>
-        </File>
-      </Component>
-    </ComponentGroup>
-  </Fragment>
-
-  <Fragment>
-    <Icon Id="PDF4QT_DD_Icon.exe" SourceFile="$(var.MyInstallDir)\Pdf4QtDiff.exe"/>
-  </Fragment>
+${PDF4QT_WIX_FRAGMENT_VIEWER}
+${PDF4QT_WIX_FRAGMENT_PAGEMASTER}
+${PDF4QT_WIX_FRAGMENT_DIFF}
 
   <Fragment>
     <ComponentGroup Id="PDF4QT_Editor_Plugins">
-      <Component Id="cmpAudioBookPlugin" Directory="dir_pdfplugins" Guid="{06D159D2-0F34-417E-9134-7E9195E697A0}">
-        <File Id="filAudioBookPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\AudioBookPlugin.dll" />
-      </Component>
+${PDF4QT_WIX_PLUGIN_AUDIOBOOK}
       <Component Id="cmpDimensionsPlugin" Directory="dir_pdfplugins" Guid="{0D422903-CBDD-47CF-B7A9-6C829BD64717}">
         <File Id="filDimensionsPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\DimensionsPlugin.dll" />
       </Component>
@@ -341,6 +296,24 @@
       </Component>
       <Component Id="cmpEditorPlugin" Directory="dir_pdfplugins" Guid="{FE5DC1D1-3320-43A7-BD4F-DCFB2A9DE039}">
         <File Id="filEditorPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\EditorPlugin.dll" />
+      </Component>
+      <Component Id="cmpFrisketPreflightPlugin" Directory="dir_pdfplugins" Guid="{A4E8C2F1-9B3D-4E71-A5C6-8F2D1E0B7A94}">
+        <File Id="filFrisketPreflightPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\FrisketPreflightPlugin.dll" />
+      </Component>
+${PDF4QT_WIX_PLUGIN_SCANNER}
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="PDF4QT_Frisket_Data">
+      <Component Id="cmpFrisketDefaultProfile" Directory="dir_frisket_profiles" Guid="{C1D9E8A2-5F4B-4A6C-9D3E-7B1F0C8A2D45}">
+        <File Id="filFrisketDefaultProfile" KeyPath="yes" Source="$(var.MyInstallDir)\..\share\frisket\profiles\frisket-default.json" />
+      </Component>
+      <Component Id="cmpFrisketProfileSchema" Directory="dir_frisket_schemas" Guid="{D2E0F9B3-6A5C-4B7D-8E4F-9C2A1D3B4E56}">
+        <File Id="filFrisketProfileSchema" KeyPath="yes" Source="$(var.MyInstallDir)\..\share\frisket\profiles\schemas\profile.schema.json" />
+      </Component>
+      <Component Id="cmpFrisketReportSchema" Directory="dir_frisket_schemas" Guid="{E3F1A0C4-7B6D-4C8E-9F5A-0D3B2E4C5F67}">
+        <File Id="filFrisketReportSchema" KeyPath="yes" Source="$(var.MyInstallDir)\..\share\frisket\profiles\schemas\report.schema.json" />
       </Component>
     </ComponentGroup>
   </Fragment>

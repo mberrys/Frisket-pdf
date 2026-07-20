@@ -181,6 +181,11 @@ struct PDFToolOptions
     // For option 'PreflightProfile'
     QString preflightProfilePath;
 
+    // For option 'VerifyRedaction'
+    QStringList verifyRedactionFiles;
+    pdf::PDFRedact::Options verifyRedactionOptions = {};
+    bool verifyRedactionCheckIncremental = true;
+
     // For option 'Encrypt'
     pdf::PDFSecurityHandlerFactory::Algorithm encryptionAlgorithm = pdf::PDFSecurityHandlerFactory::Algorithm::AES_256;
     pdf::PDFSecurityHandlerFactory::EncryptContents encryptionContents = pdf::PDFSecurityHandlerFactory::EncryptContents::All;
@@ -277,6 +282,7 @@ public:
         Redact                          = 0x02000000,       ///< Settings for Redact tool
         AddBleed                        = 0x04000000,       ///< Settings for add-bleed tool
         PreflightProfile                = 0x08000000,       ///< Frisket preflight profile path
+        VerifyRedaction                 = 0x10000000,       ///< Settings for verify-redaction tool
     };
     Q_DECLARE_FLAGS(Options, Option)
 

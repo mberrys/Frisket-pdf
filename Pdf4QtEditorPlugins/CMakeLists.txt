@@ -20,7 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-add_subdirectory(AudioBookPlugin)
+if(PDF4QT_PLUGIN_AUDIOBOOK)
+    add_subdirectory(AudioBookPlugin)
+endif()
 add_subdirectory(DimensionsPlugin)
 add_subdirectory(ObjectInspectorPlugin)
 add_subdirectory(OutputPreviewPlugin)
@@ -29,4 +31,6 @@ add_subdirectory(SignaturePlugin)
 add_subdirectory(SoftProofingPlugin)
 add_subdirectory(EditorPlugin)
 add_subdirectory(FrisketPreflightPlugin)
-add_subdirectory(ScannerPlugin)
+if(PDF4QT_PLUGIN_SCANNER)
+    add_subdirectory(ScannerPlugin)
+endif()

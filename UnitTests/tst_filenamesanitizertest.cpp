@@ -46,6 +46,7 @@ private slots:
     void test_leading_trailing_dots();
     void test_isPathContained_safe();
     void test_isPathContained_traversal();
+    void test_attachmentOpenPath_contained();
 };
 
 void FilenameSanitizerTest::test_normal_filename()
@@ -160,6 +161,21 @@ void FilenameSanitizerTest::test_isPathContained_traversal()
 
     QVERIFY(!pdf::PDFFilenameSanitizer::isPathContained(escaped, target));
     QVERIFY(!pdf::PDFFilenameSanitizer::isPathContained(target, target));
+}
+
+void FilenameSanitizerTest::test_attachmentOpenPath_contained()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString attachmentDirectoryName = tempDir.filePath(QStringLiteral("PDF4QT/Attachments/test-id"));
+    QVERIFY(QDir().mkpath(attachmentDirectoryName));
+
+    const QString sanitizedFileName = pdf::PDFFilenameSanitizer::sanitize(QStringLiteral("../../secret.txt"));
+    const QString attachmentFileName = QDir(attachmentDirectoryName).filePath(sanitizedFileName);
+
+    QCOMPARE(sanitizedFileName, QStringLiteral("secret.txt"));
+    QVERIFY(pdf::PDFFilenameSanitizer::isPathContained(attachmentFileName, attachmentDirectoryName));
 }
 
 QTEST_GUILESS_MAIN(FilenameSanitizerTest)

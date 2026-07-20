@@ -134,6 +134,20 @@ set_target_properties(UnitTestsFilenameSanitizer PROPERTIES
 )
 add_test(UnitTestsFilenameSanitizer "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsFilenameSanitizer")
 
+add_executable(UnitTestsRedactVerifier
+    tst_redactverifiertest.cpp
+)
+
+target_link_libraries(UnitTestsRedactVerifier PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+set_target_properties(UnitTestsRedactVerifier PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsRedactVerifier "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsRedactVerifier")
+
 # Pure geometry math for the preflight custom checks (bleed / trim / page-size).
 # Header-only, so it only needs the PdfTool include dir - no Core or PdfTool link.
 add_executable(UnitTestsPreflightChecks
@@ -190,4 +204,43 @@ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
     )
     add_test(UnitTestsPreflightCorpus  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsPreflightCorpus")
+
+    add_executable(UnitTestsBleedStress
+        tst_bleedstresstest.cpp
+    )
+
+    target_link_libraries(UnitTestsBleedStress PRIVATE Qt6::Core Qt6::Test)
+    add_dependencies(UnitTestsBleedStress PdfTool)
+    target_compile_definitions(UnitTestsBleedStress PRIVATE
+        PDFTOOL_EXECUTABLE_PATH="$<TARGET_FILE:PdfTool>"
+        FRISKET_PREFLIGHT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-preflight"
+    )
+
+    set_target_properties(UnitTestsBleedStress PROPERTIES
+        WIN32_EXECUTABLE OFF
+        MACOSX_BUNDLE OFF
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+    )
+    add_test(UnitTestsBleedStress  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsBleedStress")
+
+    add_executable(UnitTestsOperatorAcceptance
+        tst_operatoracceptance.cpp
+    )
+
+    target_link_libraries(UnitTestsOperatorAcceptance PRIVATE Qt6::Core Qt6::Test)
+    add_dependencies(UnitTestsOperatorAcceptance PdfTool)
+    target_compile_definitions(UnitTestsOperatorAcceptance PRIVATE
+        PDFTOOL_EXECUTABLE_PATH="$<TARGET_FILE:PdfTool>"
+        FRISKET_PREFLIGHT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-preflight"
+    )
+    target_include_directories(UnitTestsOperatorAcceptance PRIVATE ${CMAKE_SOURCE_DIR}/Pdf4QtEditorPlugins/FrisketPreflightPlugin)
+
+    set_target_properties(UnitTestsOperatorAcceptance PROPERTIES
+        WIN32_EXECUTABLE OFF
+        MACOSX_BUNDLE OFF
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+    )
+    add_test(UnitTestsOperatorAcceptance  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsOperatorAcceptance")
 endif()

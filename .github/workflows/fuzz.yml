@@ -1,0 +1,133 @@
+name: Fuzz
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Fuzz/**"
+      - ".github/workflows/fuzz.yml"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - "Pdf4QtLibCore/**"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      VCPKG_OVERLAY_PORTS: ${{ github.workspace }}/vcpkg/overlays/linux:${{ github.workspace }}/vcpkg/overlays/general
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
+      VCPKG_ROOT: ${{ github.workspace }}/.vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-binary-cache
+      VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Prepare vcpkg directories
+        run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ninja-build libtbb-dev libcups2 libcups2-dev libfontconfig1-dev
+
+      - name: Set up vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          cd "$VCPKG_ROOT"
+          git checkout "$VCPKG_COMMIT"
+          ./bootstrap-vcpkg.sh
+          ./vcpkg integrate install
+
+      - name: Cache vcpkg dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ${{ env.VCPKG_ROOT }}/downloads
+            ${{ env.VCPKG_ROOT }}/packages
+            ${{ env.VCPKG_INSTALLED_DIR }}
+          key: ${{ runner.os }}-fuzz-vcpkg-v1-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          restore-keys: |
+            ${{ runner.os }}-fuzz-vcpkg-v1-
+
+      - name: Install project dependencies
+        run: |
+          "$VCPKG_ROOT/vcpkg" install \
+            --x-manifest-root="$GITHUB_WORKSPACE" \
+            --x-install-root="$VCPKG_INSTALLED_DIR" \
+            --clean-buildtrees-after-build \
+            --clean-packages-after-build
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
+        with:
+          version: "6.9.0"
+          host: "linux"
+          target: "desktop"
+          dir: "${{ github.workspace }}/qt/"
+          install-deps: "true"
+          modules: "qtimageformats"
+          cache: "true"
+          cache-key-prefix: ${{ runner.os }}-qt-690-fuzz
+
+      - name: Configure fuzz build
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -B build-fuzz -S . -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_VCPKG_BUILD_TYPE=Release \
+            -DVCPKG_INSTALLED_DIR="$VCPKG_INSTALLED_DIR" \
+            -DPDF4QT_INSTALL_QT_DEPENDENCIES=0 \
+            -DPDF4QT_BUILD_ONLY_CORE_LIBRARY=ON \
+            -DPDF4QT_BUILD_TESTS=OFF \
+            -DPDF4QT_ENABLE_SENTRY=OFF \
+            -DPDF4QT_ENABLE_SANITIZERS=ON \
+            -DPDF4QT_BUILD_FUZZERS=ON \
+            -DPDF4QT_QT_ROOT="${{ github.workspace }}/qt/Qt/6.9.0/gcc_64"
+
+      - name: Build fuzz harnesses
+        run: |
+          cmake --build build-fuzz \
+            --target fuzz_pdf_parser fuzz_stream_filters fuzz_content_stream fuzz_images \
+            -j"$(nproc)"
+
+      - name: Run fuzz harnesses
+        run: |
+          SEED_DIR="${GITHUB_WORKSPACE}/frisket-preflight/testdata/fixtures"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FUZZ_SECONDS=120
+          else
+            FUZZ_SECONDS=600
+          fi
+          FUZZ_ARGS=(-max_total_time=${FUZZ_SECONDS} -print_final_stats=1)
+          if [ -d "$SEED_DIR" ]; then
+            FUZZ_ARGS+=("$SEED_DIR")
+          fi
+          for target in fuzz_pdf_parser fuzz_stream_filters fuzz_content_stream fuzz_images; do
+            echo "Running $target (${FUZZ_SECONDS}s)"
+            "./build-fuzz/usr/bin/$target" "${FUZZ_ARGS[@]}"
+          done
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fuzz-crash-artifacts
+          path: |
+            crash-*
+            leak-*
+            timeout-*
+          if-no-files-found: ignore

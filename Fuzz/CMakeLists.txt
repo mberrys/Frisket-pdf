@@ -20,23 +20,28 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-add_executable(Pdf4QtEditor
-    main.cpp
-    icon.rc
-    app.qrc
-)
-
-target_link_libraries(Pdf4QtEditor PRIVATE Pdf4QtLibCore Pdf4QtLibWidgets Pdf4QtLibGui Qt6::Core Qt6::Gui Qt6::Widgets)
-
-set_target_properties(Pdf4QtEditor PROPERTIES
-    WIN32_EXECUTABLE ON
-    MACOSX_BUNDLE ON
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
-)
-
-install(TARGETS Pdf4QtEditor RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR} LIBRARY DESTINATION ${PDF4QT_INSTALL_LIB_DIR})
-
-if(PDF4QT_ENABLE_SENTRY)
-    pdf4qt_deploy_sentry_crashpad(Pdf4QtEditor)
+if(NOT PDF4QT_BUILD_FUZZERS)
+    return()
 endif()
+
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "PDF4QT_BUILD_FUZZERS requires Clang with libFuzzer support.")
+endif()
+
+function(pdf4qt_add_fuzzer target source)
+    add_executable(${target} ${source})
+    target_link_libraries(${target} PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui)
+    if(PDF4QT_USE_TBB)
+        target_link_libraries(${target} PRIVATE TBB::tbb)
+    endif()
+    target_compile_options(${target} PRIVATE -fsanitize=fuzzer)
+    target_link_options(${target} PRIVATE -fsanitize=fuzzer)
+    set_target_properties(${target} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+    )
+endfunction()
+
+pdf4qt_add_fuzzer(fuzz_pdf_parser fuzz_pdf_parser.cpp)
+pdf4qt_add_fuzzer(fuzz_stream_filters fuzz_stream_filters.cpp)
+pdf4qt_add_fuzzer(fuzz_content_stream fuzz_content_stream.cpp)
+pdf4qt_add_fuzzer(fuzz_images fuzz_images.cpp)

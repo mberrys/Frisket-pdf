@@ -53,7 +53,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 import pikepdf
 
@@ -283,6 +283,120 @@ def trim_pagesize_mismatch(out_dir, tmp):
     _finalize(path, media=(0, 0, 540, 720), trim=(0, 0, 540, 720))
 
 
+# ---------------------------------------------------------------------------
+# AI-artwork bleed stress fixtures (MIC-316)
+# ---------------------------------------------------------------------------
+
+def _edge_line_cmyk_image(px, path):
+    """CMYK raster with high-contrast geometric lines on all four edges."""
+    im = Image.new("CMYK", (px, px), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(im)
+    ink = (0, 255, 255, 0)
+    line = max(4, px // 80)
+    draw.rectangle((0, 0, px - 1, line - 1), fill=ink)
+    draw.rectangle((0, px - line, px - 1, px - 1), fill=ink)
+    draw.rectangle((0, 0, line - 1, px - 1), fill=ink)
+    draw.rectangle((px - line, 0, px - 1, px - 1), fill=ink)
+    im.save(path, "JPEG", quality=92)
+
+
+def _corner_checker_cmyk_image(px, path):
+    """High-contrast corner blocks where mirror seams are most visible."""
+    im = Image.new("CMYK", (px, px), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(im)
+    block = px // 5
+    black = (0, 0, 0, 255)
+    white = (0, 0, 0, 0)
+    for y in range(0, block, 12):
+        for x in range(0, block, 12):
+            color = black if ((x // 12) + (y // 12)) % 2 == 0 else white
+            draw.rectangle((x, y, x + 11, y + 11), fill=color)
+            draw.rectangle((px - block + x, y, px - block + x + 11, y + 11), fill=color)
+            draw.rectangle((x, px - block + y, x + 11, px - block + y + 11), fill=color)
+            draw.rectangle((px - block + x, px - block + y, px - block + x + 11, px - block + y + 11), fill=color)
+    draw.rectangle((0, 0, px - 1, 3), fill=(0, 255, 255, 0))
+    draw.rectangle((0, px - 4, px - 1, px - 1), fill=(0, 255, 255, 0))
+    draw.rectangle((0, 0, 3, px - 1), fill=(0, 255, 255, 0))
+    draw.rectangle((px - 4, 0, px - 1, px - 1), fill=(0, 255, 255, 0))
+    im.save(path, "JPEG", quality=92)
+
+
+def _photo_gradient_rgb_image(px, path):
+    """Photo-like smooth RGB gradient flush to the trim boundary."""
+    im = Image.new("RGB", (px, px))
+    draw = ImageDraw.Draw(im)
+    for y in range(px):
+        r = int(40 + (215 * y) / max(px - 1, 1))
+        g = int(90 + (120 * (px - y)) / max(px - 1, 1))
+        b = int(160 + (80 * y) / max(px - 1, 1))
+        draw.line((0, y, px - 1, y), fill=(r, g, b))
+    draw.rectangle((0, 0, px - 1, 2), fill=(255, 220, 40))
+    draw.rectangle((0, px - 3, px - 1, px - 1), fill=(255, 220, 40))
+    draw.rectangle((0, 0, 2, px - 1), fill=(255, 220, 40))
+    draw.rectangle((px - 3, 0, px - 1, px - 1), fill=(255, 220, 40))
+    im.save(path, "PNG")
+
+
+def ai_art_missing_bleed(out_dir, tmp):
+    """FAIL bleed: raster artwork flush to trim, zero box bleed margin."""
+    path = os.path.join(out_dir, "ai-art-missing-bleed.pdf")
+    img = os.path.join(tmp, "ai_missing.jpg")
+    _edge_line_cmyk_image(900, img)
+    buf = io.BytesIO()
+    c = _new_canvas(buf, (400, 400))
+    c.drawImage(img, 0, 0, width=400, height=400)
+    c.showPage()
+    c.save()
+    with open(path, "wb") as f:
+        f.write(buf.getvalue())
+    _finalize(path, media=(0, 0, 400, 400), trim=(0, 0, 400, 400))
+
+
+def ai_art_partial_bleed(out_dir, tmp):
+    """FAIL bleed: adequate left/bottom bleed boxes, short on right/top."""
+    path = os.path.join(out_dir, "ai-art-partial-bleed.pdf")
+    img = os.path.join(tmp, "ai_partial.jpg")
+    _edge_line_cmyk_image(900, img)
+    buf = io.BytesIO()
+    c = _new_canvas(buf, (400, 400))
+    c.drawImage(img, 20, 20, width=360, height=360)
+    c.showPage()
+    c.save()
+    with open(path, "wb") as f:
+        f.write(buf.getvalue())
+    _finalize(path, media=(0, 0, 400, 400), trim=(20, 20, 380, 380), bleed=(0, 0, 380, 380))
+
+
+def ai_art_hard_corners(out_dir, tmp):
+    """FAIL bleed: checker corners at trim for mirror seam stress."""
+    path = os.path.join(out_dir, "ai-art-hard-corners.pdf")
+    img = os.path.join(tmp, "ai_corners.jpg")
+    _corner_checker_cmyk_image(900, img)
+    buf = io.BytesIO()
+    c = _new_canvas(buf, (400, 400))
+    c.drawImage(img, 0, 0, width=400, height=400)
+    c.showPage()
+    c.save()
+    with open(path, "wb") as f:
+        f.write(buf.getvalue())
+    _finalize(path, media=(0, 0, 400, 400), trim=(0, 0, 400, 400))
+
+
+def ai_art_raster_trim_edge(out_dir, tmp):
+    """FAIL bleed: photo-like RGB raster touching trim edges."""
+    path = os.path.join(out_dir, "ai-art-raster-trim-edge.pdf")
+    img = os.path.join(tmp, "ai_photo.png")
+    _photo_gradient_rgb_image(900, img)
+    buf = io.BytesIO()
+    c = _new_canvas(buf, (400, 400))
+    c.drawImage(img, 0, 0, width=400, height=400)
+    c.showPage()
+    c.save()
+    with open(path, "wb") as f:
+        f.write(buf.getvalue())
+    _finalize(path, media=(0, 0, 400, 400), trim=(0, 0, 400, 400))
+
+
 FIXTURES = [
     color_rgb,
     color_cmyk,
@@ -292,6 +406,10 @@ FIXTURES = [
     font_embedded,
     trim_pagesize_ok,
     trim_pagesize_mismatch,
+    ai_art_missing_bleed,
+    ai_art_partial_bleed,
+    ai_art_hard_corners,
+    ai_art_raster_trim_edge,
 ]
 
 
