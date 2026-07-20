@@ -1353,6 +1353,17 @@ void PDFJBIG2Decoder::processSymbolDictionary(const PDFJBIG2SegmentHeader& heade
 
     /* sanity checks */
 
+    // SDNUMEXSYMS/SDNUMNEWSYMS come directly from the segment data and are used
+    // to reserve/resize symbol bitmap vectors below. A well-formed segment can't
+    // encode more symbols than it has bytes to describe them, so bound both by
+    // the remaining stream size to reject a bogus huge count instead of
+    // attempting a multi-gigabyte allocation.
+    const uint32_t maximalSymbolCount = static_cast<uint32_t>(m_reader.getStream()->size());
+    if (parameters.SDNUMEXSYMS > maximalSymbolCount || parameters.SDNUMNEWSYMS > maximalSymbolCount)
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 invalid number of symbols in symbol dictionary segment."));
+    }
+
     if ((symbolDictionaryFlags >> 13) != 0)
     {
         throw PDFException(PDFTranslationContext::tr("JBIG2 invalid flags for symbol dictionary segment."));
