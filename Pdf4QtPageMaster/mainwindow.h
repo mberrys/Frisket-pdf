@@ -26,6 +26,7 @@
 #include "pdficontheme.h"
 #include "pdfpagegeometry.h"
 #include "pdfbleedfixup.h"
+#include "pdfpagemasterexport.h"
 #include "pdfprogress.h"
 
 #include "pageitemmodel.h"
@@ -63,13 +64,6 @@ class PDFProgress;
 
 namespace pdfpagemaster
 {
-
-struct ExportResult
-{
-    bool success = false;
-    QString errorMessage;
-    QStringList writtenFiles;
-};
 
 class PageItemPreviewRenderer;
 class WorkspaceFilterProxyModel;
@@ -255,7 +249,7 @@ private:
     pdf::PDFProgress* m_exportProgress;
     QProgressBar* m_exportProgressBar;
     QLabel* m_exportProgressLabel;
-    QFutureWatcher<ExportResult>* m_exportWatcher;
+    QFutureWatcher<pdf::PDFPageMasterExportResult>* m_exportWatcher;
     QLabel* m_dropFeedbackLabel;
     QFrame* m_dropInsertionMarker;
     QWidget* m_dropFeedbackViewport;
