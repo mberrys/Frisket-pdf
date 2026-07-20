@@ -28,6 +28,15 @@
 namespace pdf
 {
 
+// Many JBIG2 counts and dimensions (symbol counts, bitmap width/height, pattern
+// counts, ...) are decoded directly from attacker-controlled stream data with
+// no inherent bound. 16384 in each bitmap dimension (256M pixels/bytes total)
+// comfortably covers any real scanned page while staying far below a
+// DoS-sized allocation; it also serves as a general sanity cap for counts
+// that end up sizing containers of similar or smaller per-element size.
+constexpr int64_t JBIG2_MAX_BITMAP_DIMENSION = 16384;
+constexpr int64_t JBIG2_MAX_BITMAP_PIXELS = JBIG2_MAX_BITMAP_DIMENSION * JBIG2_MAX_BITMAP_DIMENSION;
+
 class PDFJBIG2HuffmanCodeTable : public PDFJBIG2Segment
 {
 public:
@@ -1353,6 +1362,17 @@ void PDFJBIG2Decoder::processSymbolDictionary(const PDFJBIG2SegmentHeader& heade
 
     /* sanity checks */
 
+    // SDNUMEXSYMS/SDNUMNEWSYMS come directly from the segment data and are used
+    // to reserve/resize symbol bitmap vectors below. A well-formed segment can't
+    // encode more symbols than it has bytes to describe them, so bound both by
+    // the remaining stream size to reject a bogus huge count instead of
+    // attempting a multi-gigabyte allocation.
+    const uint32_t maximalSymbolCount = static_cast<uint32_t>(m_reader.getStream()->size());
+    if (parameters.SDNUMEXSYMS > maximalSymbolCount || parameters.SDNUMNEWSYMS > maximalSymbolCount)
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 invalid number of symbols in symbol dictionary segment."));
+    }
+
     if ((symbolDictionaryFlags >> 13) != 0)
     {
         throw PDFException(PDFTranslationContext::tr("JBIG2 invalid flags for symbol dictionary segment."));
@@ -2176,6 +2196,27 @@ void PDFJBIG2Decoder::processPatternDictionary(const PDFJBIG2SegmentHeader& head
     if ((flags & 0b11111000) != 0)
     {
         throw PDFException(PDFTranslationContext::tr("JBIG2 invalid pattern dictionary flags."));
+    }
+
+    if (HDPW == 0 || HDPH == 0)
+    {
+        // GRAYMAX is otherwise unbounded and is used below both to size the
+        // collective bitmap (GBW = (GRAYMAX + 1) * HDPW) and to reserve/fill
+        // the pattern vector directly (bitmaps.reserve(GRAYMAX + 1)). With
+        // HDPW == 0, GBW is always 0 regardless of GRAYMAX, so a malicious
+        // GRAYMAX would bypass the bitmap dimension cap and still drive an
+        // unbounded vector allocation. A pattern dictionary can't have zero
+        // pattern width/height anyway, so reject it outright.
+        throw PDFException(PDFTranslationContext::tr("JBIG2 invalid pattern dictionary pattern size."));
+    }
+
+    if (int64_t(GRAYMAX) + 1 > JBIG2_MAX_BITMAP_PIXELS / HDPW)
+    {
+        // Defense in depth: even with HDPW > 0, (GRAYMAX + 1) * HDPW below can
+        // wrap around as a uint32_t and slip a small GBW past the collective
+        // bitmap's dimension check while bitmaps.reserve(GRAYMAX + 1) further
+        // down still attempts to allocate GRAYMAX + 1 elements directly.
+        throw PDFException(PDFTranslationContext::tr("JBIG2 invalid pattern dictionary pattern count."));
     }
 
     QByteArray mmrData;
@@ -3646,10 +3687,24 @@ PDFJBIG2Bitmap::PDFJBIG2Bitmap() :
 
 }
 
+namespace
+{
+
+void checkJBIG2BitmapDimensions(int width, int height)
+{
+    if (width < 0 || height < 0 || int64_t(width) * int64_t(height) > JBIG2_MAX_BITMAP_PIXELS)
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid JBIG2 bitmap dimensions %1x%2.").arg(width).arg(height));
+    }
+}
+
+}   // namespace
+
 PDFJBIG2Bitmap::PDFJBIG2Bitmap(int width, int height) :
     m_width(width),
     m_height(height)
 {
+    checkJBIG2BitmapDimensions(width, height);
     m_data.resize(width * height, 0);
 }
 
@@ -3657,6 +3712,7 @@ PDFJBIG2Bitmap::PDFJBIG2Bitmap(int width, int height, uint8_t fill) :
     m_width(width),
     m_height(height)
 {
+    checkJBIG2BitmapDimensions(width, height);
     m_data.resize(width * height, fill);
 }
 

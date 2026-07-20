@@ -252,9 +252,24 @@ QByteArray PDFLzwStreamDecoder::decompress()
         {
             m_currentSequenceEnd = m_sequence.begin();
 
-            for (uint32_t currentCode = code; currentCode != TABLE_SIZE; currentCode = m_table[currentCode].previous)
+            // Chain length is bounded by the number of table entries. A malformed
+            // stream (or a corrupted 'previous' chain) must not be able to loop
+            // (or write into m_sequence) without bound, so cap the traversal and
+            // fail closed instead of hanging or overrunning the sequence buffer.
+            uint32_t currentCode = code;
+            for (uint32_t i = 0; i < TABLE_SIZE && currentCode != TABLE_SIZE; ++i, currentCode = m_table[currentCode].previous)
             {
+                if (m_currentSequenceEnd == m_sequence.end())
+                {
+                    throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
+                }
+
                 *m_currentSequenceEnd++ = m_table[currentCode].character;
+            }
+
+            if (currentCode != TABLE_SIZE)
+            {
+                throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
             }
 
             // We must reverse the sequence, because we stored it in the
@@ -265,6 +280,11 @@ QByteArray PDFLzwStreamDecoder::decompress()
         {
             // We use the buffer from previous run, just add a new
             // character to the end.
+            if (m_currentSequenceEnd == m_sequence.end())
+            {
+                throw PDFException(PDFTranslationContext::tr("Invalid code in the LZW stream."));
+            }
+
             *m_currentSequenceEnd++ = m_newCharacter;
         }
         else

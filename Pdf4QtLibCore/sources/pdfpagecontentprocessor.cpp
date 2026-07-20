@@ -269,6 +269,16 @@ PDFPageContentProcessor::PDFPageContentProcessor(const PDFPage* page,
     m_pageBoundingRectDeviceSpace = pagePointToDevicePointMatrix.map(pageRectPath).boundingRect();
 
     initDictionaries(m_page->getResources());
+
+    // Create generic device color spaces, so the processor has a consistent
+    // graphic state even before initializeProcessor() replaces them with
+    // resource-aware color spaces - content can be processed via processForm()
+    // on a processor which did not run full content processing.
+    m_deviceGrayColorSpace.reset(new PDFDeviceGrayColorSpace);
+    m_deviceRGBColorSpace.reset(new PDFDeviceRGBColorSpace);
+    m_deviceCMYKColorSpace.reset(new PDFDeviceCMYKColorSpace);
+    m_graphicState.setStrokeColorSpace(m_deviceGrayColorSpace);
+    m_graphicState.setFillColorSpace(m_deviceGrayColorSpace);
 }
 
 PDFPageContentProcessor::~PDFPageContentProcessor()
@@ -4007,7 +4017,17 @@ PDFPageContentProcessor::PDFPageContentProcessorStateGuard::~PDFPageContentProce
     m_processor->m_patternDictionary = m_patternDictionary;
     m_processor->m_procedureSets = m_procedureSets;
 
-    m_processor->operatorRestoreGraphicState();
+    try
+    {
+        m_processor->operatorRestoreGraphicState();
+    }
+    catch (const PDFRendererException& exception)
+    {
+        // A broken content stream can contain more restore operators than save
+        // operators, popping the state saved by this guard's constructor. The
+        // destructor must not throw, so report the error instead.
+        m_processor->m_errorList.append(exception.getError());
+    }
 }
 
 PDFPageContentProcessor::PDFTransparencyGroupGuard::PDFTransparencyGroupGuard(PDFPageContentProcessor* processor, PDFTransparencyGroup&& group) :

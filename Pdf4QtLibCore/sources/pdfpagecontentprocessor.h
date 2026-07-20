@@ -943,6 +943,11 @@ private:
     template<typename... Operands>
     inline QColor getColorFromColorSpace(const PDFAbstractColorSpace* colorSpace, Operands... operands)
     {
+        if (!colorSpace)
+        {
+            throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid color space."));
+        }
+
         constexpr const size_t operandCount = sizeof...(Operands);
         const size_t colorSpaceComponentCount = colorSpace->getColorComponentCount();
         if (operandCount == colorSpaceComponentCount)
