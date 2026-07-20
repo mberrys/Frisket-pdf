@@ -42,6 +42,10 @@ void PDFXRefTable::readXRefTable(PDFParsingContext* context, const QByteArray& b
 
     m_entries.clear();
 
+    // Entry count is bounded by the document size - each object described
+    // by the cross-reference table occupies at least one byte in the document.
+    const PDFInteger maximalEntryCount = static_cast<PDFInteger>(byteArray.size());
+
     std::set<PDFInteger> processedOffsets;
     std::stack<PDFInteger> workSet;
     workSet.push(startTableOffset);
@@ -80,6 +84,12 @@ void PDFXRefTable::readXRefTable(PDFParsingContext* context, const QByteArray& b
 
                 PDFInteger firstObjectNumber = firstObject.getInteger();
                 PDFInteger count = countObject.getInteger();
+
+                if (firstObjectNumber < 0 || count < 0 || firstObjectNumber > maximalEntryCount ||
+                    count > maximalEntryCount || firstObjectNumber + count > maximalEntryCount)
+                {
+                    throw PDFException(tr("Invalid format of reference table."));
+                }
 
                 const PDFInteger lastObjectIndex = firstObjectNumber + count - 1;
                 const PDFInteger desiredSize = lastObjectIndex + 1;
@@ -191,7 +201,7 @@ void PDFXRefTable::readXRefTable(PDFParsingContext* context, const QByteArray& b
                 if (typeObject.isName() && typeObject.getString() == "XRef")
                 {
                     PDFObject sizeObject = crossReferenceStreamDictionary->get("Size");
-                    if (!sizeObject.isInt() || sizeObject.getInteger() < 0)
+                    if (!sizeObject.isInt() || sizeObject.getInteger() < 0 || sizeObject.getInteger() > maximalEntryCount)
                     {
                         throw PDFException(tr("Invalid format of cross-reference stream."));
                     }
@@ -291,6 +301,12 @@ void PDFXRefTable::readXRefTable(PDFParsingContext* context, const QByteArray& b
                     {
                         PDFInteger firstObjectNumber = indexArray[2 * i];
                         PDFInteger count = indexArray[2 * i + 1];
+
+                        if (firstObjectNumber < 0 || count < 0 || firstObjectNumber > maximalEntryCount ||
+                            count > maximalEntryCount || firstObjectNumber + count > maximalEntryCount)
+                        {
+                            throw PDFException(tr("Invalid format of cross-reference stream."));
+                        }
 
                         const PDFInteger lastObjectIndex = firstObjectNumber + count - 1;
                         const PDFInteger currentDesiredSize = lastObjectIndex + 1;
