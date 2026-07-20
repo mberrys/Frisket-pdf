@@ -15,6 +15,9 @@ on:
       - "vcpkg.json"
       - "Pdf4QtLibCore/**"
 
+permissions:
+  contents: read
+
 jobs:
   fuzz:
     runs-on: ubuntu-24.04
