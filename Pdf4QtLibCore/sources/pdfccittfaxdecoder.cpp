@@ -297,6 +297,14 @@ PDFCCITTFaxDecoder::PDFCCITTFaxDecoder(const QByteArray* stream, const PDFCCITTF
 
 PDFImageData PDFCCITTFaxDecoder::decode()
 {
+    if (m_parameters.decode.size() != 2)
+    {
+        // /Decode array comes directly from the PDF and is not validated by the
+        // caller beyond being non-empty; Q_ASSERT below is compiled out in
+        // release builds, so this must be an enforced runtime check.
+        throw PDFException(PDFTranslationContext::tr("Invalid decode array for CCITT fax decoder."));
+    }
+
     PDFBitWriter writer(1);
     std::vector<int> codingLine;
     std::vector<int> referenceLine;
