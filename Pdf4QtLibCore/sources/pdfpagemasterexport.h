@@ -70,7 +70,8 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportResult
 };
 
 /// Headless PageMaster export orchestrator (ADR-003).
-/// Locked stage order: assemble → page geometry → bleed fixup → image optimize → write.
+/// Locked stage order per output: assemble → page geometry → bleed fixup → image optimize → write.
+/// Retains at most one assembled PDFDocument at a time (MIC-307).
 /// Synchronous and not thread-safe; callers may invoke run() from a worker thread.
 class PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExport
 {
