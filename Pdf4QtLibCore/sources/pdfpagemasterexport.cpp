@@ -25,7 +25,14 @@
 #include "pdfprogress.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSaveFile>
+#include <QUuid>
 
 #include <utility>
 
@@ -34,6 +41,12 @@ namespace pdf
 
 namespace
 {
+
+constexpr int MANIFEST_SCHEMA_VERSION = 1;
+constexpr QLatin1String MANIFEST_FILE_NAME(".frisket-batch.json");
+constexpr QLatin1String OUTPUT_STATUS_PENDING("pending");
+constexpr QLatin1String OUTPUT_STATUS_WRITTEN("written");
+constexpr QLatin1String OUTPUT_STATUS_FAILED("failed");
 
 bool isCancelRequested(const PDFPageMasterExportJob& job)
 {
@@ -49,21 +62,25 @@ PDFProgress* activeProgress(const PDFPageMasterExportJob& job)
     return job.progress;
 }
 
-PDFPageMasterExportResult createExportError(QString message, QStringList writtenFiles = {})
+PDFPageMasterExportResult createExportError(QString message, QStringList writtenFiles = {}, QString manifestPath = {}, QJsonObject manifest = {})
 {
     PDFPageMasterExportResult result;
     result.success = false;
     result.errorMessage = std::move(message);
     result.writtenFiles = std::move(writtenFiles);
+    result.manifestPath = std::move(manifestPath);
+    result.manifest = std::move(manifest);
     return result;
 }
 
-PDFPageMasterExportResult createExportCancelled(QStringList writtenFiles = {})
+PDFPageMasterExportResult createExportCancelled(QStringList writtenFiles = {}, QString manifestPath = {}, QJsonObject manifest = {})
 {
     PDFPageMasterExportResult result;
     result.success = false;
     result.cancelled = true;
     result.writtenFiles = std::move(writtenFiles);
+    result.manifestPath = std::move(manifestPath);
+    result.manifest = std::move(manifest);
     return result;
 }
 
@@ -73,6 +90,198 @@ void finishProgressIfActive(PDFProgress* progress)
     {
         progress->finish();
     }
+}
+
+QString resolveManifestPath(const PDFPageMasterExportJob& job)
+{
+    if (!job.manifestPath.isEmpty())
+    {
+        return job.manifestPath;
+    }
+
+    if (job.outputFileNames.empty())
+    {
+        return {};
+    }
+
+    const QFileInfo firstOutput(job.outputFileNames.front());
+    return QDir(firstOutput.absolutePath()).filePath(QString(MANIFEST_FILE_NAME));
+}
+
+bool writeFileAtomically(const QString& finalPath, const QByteArray& payload)
+{
+    QSaveFile saveFile(finalPath);
+    if (!saveFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+        return false;
+    }
+
+    if (saveFile.write(payload) != payload.size())
+    {
+        saveFile.cancelWriting();
+        return false;
+    }
+
+    return saveFile.commit();
+}
+
+QJsonObject createManifestObject(const QString& batchId, const QStringList& outputFileNames)
+{
+    QJsonArray outputs;
+    for (const QString& path : outputFileNames)
+    {
+        outputs.append(QJsonObject{
+            { QStringLiteral("path"), path },
+            { QStringLiteral("status"), QString(OUTPUT_STATUS_PENDING) }
+        });
+    }
+
+    return QJsonObject{
+        { QStringLiteral("schema_version"), MANIFEST_SCHEMA_VERSION },
+        { QStringLiteral("batch_id"), batchId },
+        { QStringLiteral("outputs"), outputs }
+    };
+}
+
+bool persistManifest(const QString& manifestPath, const QJsonObject& manifest)
+{
+    const QByteArray payload = QJsonDocument(manifest).toJson(QJsonDocument::Compact);
+    return writeFileAtomically(manifestPath, payload);
+}
+
+QString outputStatusAt(const QJsonObject& manifest, int index)
+{
+    const QJsonArray outputs = manifest.value(QStringLiteral("outputs")).toArray();
+    if (index < 0 || index >= outputs.size())
+    {
+        return {};
+    }
+
+    return outputs.at(index).toObject().value(QStringLiteral("status")).toString();
+}
+
+void setOutputStatus(QJsonObject& manifest, int index, const QString& status, const QString& error = {})
+{
+    QJsonArray outputs = manifest.value(QStringLiteral("outputs")).toArray();
+    if (index < 0 || index >= outputs.size())
+    {
+        return;
+    }
+
+    QJsonObject entry = outputs.at(index).toObject();
+    entry.insert(QStringLiteral("status"), status);
+    if (error.isEmpty())
+    {
+        entry.remove(QStringLiteral("error"));
+    }
+    else
+    {
+        entry.insert(QStringLiteral("error"), error);
+    }
+    outputs.replace(index, entry);
+    manifest.insert(QStringLiteral("outputs"), outputs);
+}
+
+bool loadExistingManifest(const QString& manifestPath, QJsonObject* manifest, QString* errorMessage)
+{
+    QFile manifestFile(manifestPath);
+    if (!manifestFile.open(QIODevice::ReadOnly))
+    {
+        if (errorMessage)
+        {
+            *errorMessage = QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                          "Could not read batch manifest at %1.").arg(manifestPath);
+        }
+        return false;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(manifestFile.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject())
+    {
+        if (errorMessage)
+        {
+            *errorMessage = QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                      "Batch manifest at %1 is not valid JSON.").arg(manifestPath);
+        }
+        return false;
+    }
+
+    *manifest = document.object();
+    return true;
+}
+
+bool manifestCompatibleWithJob(const QJsonObject& manifest, const PDFPageMasterExportJob& job)
+{
+    const QJsonArray outputs = manifest.value(QStringLiteral("outputs")).toArray();
+    if (outputs.size() != int(job.outputFileNames.size()))
+    {
+        return false;
+    }
+
+    for (int index = 0; index < outputs.size(); ++index)
+    {
+        const QString manifestPath = outputs.at(index).toObject().value(QStringLiteral("path")).toString();
+        if (QFileInfo(manifestPath).absoluteFilePath() != QFileInfo(job.outputFileNames[size_t(index)]).absoluteFilePath())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+int findOutputIndexByPath(const QJsonObject& manifest, const QString& fileName)
+{
+    const QJsonArray outputs = manifest.value(QStringLiteral("outputs")).toArray();
+    const QString absolutePath = QFileInfo(fileName).absoluteFilePath();
+    for (int index = 0; index < outputs.size(); ++index)
+    {
+        const QString entryPath = outputs.at(index).toObject().value(QStringLiteral("path")).toString();
+        if (QFileInfo(entryPath).absoluteFilePath() == absolutePath)
+        {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+bool shouldSkipResumedOutput(const PDFPageMasterExportJob& job, const QJsonObject& manifest, const QString& fileName)
+{
+    if (!job.resume)
+    {
+        return false;
+    }
+
+    const int index = findOutputIndexByPath(manifest, fileName);
+    if (index < 0)
+    {
+        return false;
+    }
+
+    const QString status = outputStatusAt(manifest, index);
+    return status == OUTPUT_STATUS_WRITTEN && QFile::exists(fileName);
+}
+
+bool writeDocumentAtomically(const QString& fileName, PDFDocument* document, bool allowOverwrite)
+{
+    const bool isDocumentFileAlreadyExisting = QFile::exists(fileName);
+    if (!allowOverwrite && isDocumentFileAlreadyExisting)
+    {
+        return false;
+    }
+
+    // PDFDocumentWriter(safeWrite=true) uses QSaveFile: temp write then commit/rename
+    // without deleting the previous final until the new bytes are durable.
+    PDFDocumentWriter writer(nullptr);
+    const PDFOperationResult writeResult = writer.write(fileName, document, true);
+    if (!writeResult)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace
@@ -104,7 +313,48 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
                                      .arg(job.outputFileNames.size()));
     }
 
+    const QString manifestPath = resolveManifestPath(job);
+    QJsonObject manifest;
+    QString batchId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+    if (job.resume && !manifestPath.isEmpty() && QFile::exists(manifestPath))
+    {
+        QString manifestError;
+        if (!loadExistingManifest(manifestPath, &manifest, &manifestError))
+        {
+            return createExportError(std::move(manifestError));
+        }
+
+        if (!manifestCompatibleWithJob(manifest, job))
+        {
+            // Stale or mismatched batch — start a fresh manifest for this job.
+            job.resume = false;
+            manifest = createManifestObject(batchId, QStringList(job.outputFileNames.begin(), job.outputFileNames.end()));
+            if (!persistManifest(manifestPath, manifest))
+            {
+                return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                                     "Could not write batch manifest at %1.").arg(manifestPath));
+            }
+        }
+        else
+        {
+            batchId = manifest.value(QStringLiteral("batch_id")).toString(batchId);
+        }
+    }
+    else
+    {
+        job.resume = false;
+        manifest = createManifestObject(batchId, QStringList(job.outputFileNames.begin(), job.outputFileNames.end()));
+        if (!manifestPath.isEmpty() && !persistManifest(manifestPath, manifest))
+        {
+            return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                                 "Could not write batch manifest at %1.").arg(manifestPath));
+        }
+    }
+
     PDFPageMasterExportResult result;
+    result.manifestPath = manifestPath;
+    result.manifest = manifest;
     result.success = true;
     result.writtenFiles.reserve(int(job.assembledDocuments.size()));
 
@@ -123,14 +373,30 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled(std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportCancelled(std::move(result.writtenFiles), manifestPath, manifest);
+        }
+
+        const QString& fileName = job.outputFileNames[index];
+
+        if (shouldSkipResumedOutput(job, manifest, fileName))
+        {
+            result.writtenFiles << fileName;
+            if (PDFProgress* stepProgress = activeProgress(job))
+            {
+                stepProgress->step();
+            }
+            continue;
         }
 
         PDFOperationResult currentResult = manipulator.assemble(job.assembledDocuments[index]);
         if (!currentResult)
         {
+            setOutputStatus(manifest, int(index), OUTPUT_STATUS_FAILED, currentResult.getErrorMessage());
+            persistManifest(manifestPath, manifest);
             finishProgressIfActive(activeProgress(job));
-            return createExportError(currentResult.getErrorMessage(), std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportError(currentResult.getErrorMessage(), std::move(result.writtenFiles), manifestPath, manifest);
         }
 
         PDFDocument assembledDocument = manipulator.takeAssembledDocument();
@@ -138,7 +404,8 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled(std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportCancelled(std::move(result.writtenFiles), manifestPath, manifest);
         }
 
         if (job.hasPageGeometrySettings)
@@ -146,15 +413,19 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
             const PDFOperationResult geometryResult = PDFPageGeometry::apply(&assembledDocument, job.pageGeometrySettings);
             if (!geometryResult)
             {
+                setOutputStatus(manifest, int(index), OUTPUT_STATUS_FAILED, geometryResult.getErrorMessage());
+                persistManifest(manifestPath, manifest);
                 finishProgressIfActive(activeProgress(job));
-                return createExportError(geometryResult.getErrorMessage(), std::move(result.writtenFiles));
+                result.manifest = manifest;
+                return createExportError(geometryResult.getErrorMessage(), std::move(result.writtenFiles), manifestPath, manifest);
             }
         }
 
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled(std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportCancelled(std::move(result.writtenFiles), manifestPath, manifest);
         }
 
         if (job.hasBleedFixupSettings)
@@ -162,52 +433,62 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
             const PDFOperationResult bleedResult = PDFBleedFixup::apply(&assembledDocument, job.bleedFixupSettings);
             if (!bleedResult)
             {
+                setOutputStatus(manifest, int(index), OUTPUT_STATUS_FAILED, bleedResult.getErrorMessage());
+                persistManifest(manifestPath, manifest);
                 finishProgressIfActive(activeProgress(job));
-                return createExportError(bleedResult.getErrorMessage(), std::move(result.writtenFiles));
+                result.manifest = manifest;
+                return createExportError(bleedResult.getErrorMessage(), std::move(result.writtenFiles), manifestPath, manifest);
             }
         }
 
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled(std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportCancelled(std::move(result.writtenFiles), manifestPath, manifest);
         }
 
         if (job.optimizeImages)
         {
             PDFImageOptimizer imageOptimizer;
             PDFImageOptimizer::Settings optimizeSettings = job.imageOptimizationSettings;
-            // job.optimizeImages is authoritative (matches PageMaster UI checkbox wiring).
             optimizeSettings.enabled = true;
-            // Pass nullptr so optimize does not nest a second progress phase.
             assembledDocument = imageOptimizer.optimize(&assembledDocument, optimizeSettings, {}, nullptr);
         }
 
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled(std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportCancelled(std::move(result.writtenFiles), manifestPath, manifest);
         }
 
-        const QString& fileName = job.outputFileNames[index];
         const bool isDocumentFileAlreadyExisting = QFile::exists(fileName);
         if (!job.overwriteFiles && isDocumentFileAlreadyExisting)
         {
+            const QString message = QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                                  "Document with filename '%1' already exists.").arg(fileName);
+            setOutputStatus(manifest, int(index), OUTPUT_STATUS_FAILED, message);
+            persistManifest(manifestPath, manifest);
             finishProgressIfActive(activeProgress(job));
-            return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport", "Document with filename '%1' already exists.").arg(fileName),
-                                    std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportError(message, std::move(result.writtenFiles), manifestPath, manifest);
         }
 
-        PDFDocumentWriter writer(nullptr);
-        PDFOperationResult writeResult = writer.write(fileName, &assembledDocument, isDocumentFileAlreadyExisting);
-        if (!writeResult)
+        if (!writeDocumentAtomically(fileName, &assembledDocument, job.overwriteFiles))
         {
+            const QString message = QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                                "Could not write document to '%1'.").arg(fileName);
+            setOutputStatus(manifest, int(index), OUTPUT_STATUS_FAILED, message);
+            persistManifest(manifestPath, manifest);
             finishProgressIfActive(activeProgress(job));
-            return createExportError(writeResult.getErrorMessage(), std::move(result.writtenFiles));
+            result.manifest = manifest;
+            return createExportError(message, std::move(result.writtenFiles), manifestPath, manifest);
         }
 
+        setOutputStatus(manifest, int(index), OUTPUT_STATUS_WRITTEN);
+        persistManifest(manifestPath, manifest);
         result.writtenFiles << fileName;
-        // assembledDocument leaves scope here — at most one live assembled doc.
 
         if (PDFProgress* stepProgress = activeProgress(job))
         {
@@ -220,12 +501,7 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         finishProgressIfActive(activeProgress(job));
     }
 
-    if (isCancelRequested(job))
-    {
-        // All writes already completed; treat as success rather than cancel.
-        return result;
-    }
-
+    result.manifest = manifest;
     return result;
 }
 

@@ -142,5 +142,21 @@
     "expect": { "pass": false, "check_ids": ["bleed"] },
     "source": "hand-built",
     "notes": "Photo-like RGB gradient raster touching trim boundary."
+  },
+  {
+    "id": "white-overprint",
+    "pdf": "white-overprint.pdf",
+    "profile": "testdata/profiles/test-white-overprint.json",
+    "expect": { "pass": true, "check_ids": ["white-overprint"] },
+    "source": "hand-built",
+    "notes": "CMYK paper white with overprint enabled on a filled path -> white-overprint warning. MIC-319."
+  },
+  {
+    "id": "white-overprint-ok",
+    "pdf": "white-overprint-ok.pdf",
+    "profile": "testdata/profiles/test-white-overprint.json",
+    "expect": { "pass": true, "check_ids": [] },
+    "source": "hand-built",
+    "notes": "Same white fill without overprint -> clean pass. MIC-319."
   }
 ]

@@ -385,8 +385,8 @@ void FrisketPreflightPlugin::onPreflightProcessFinished(int exitCode, int exitSt
     const quint64 runRevision = m_preflightRunRevision;
     const bool ignoreRevision = m_preflightIgnoreRevision;
     const QString reportSourceLabel = m_preflightReportSourceLabel;
-    const QByteArray standardOutput = m_preflightStdoutBuffer;
-    const QString standardError = QString::fromLocal8Bit(m_preflightStderrBuffer).trimmed();
+    const QByteArray standardOutput = m_preflightStdoutBuffer.takeData();
+    const QString standardError = QString::fromLocal8Bit(m_preflightStderrBuffer.takeData()).trimmed();
     finishPreflightRun();
 
     if (!ignoreRevision && runRevision != m_documentRevision)
@@ -442,8 +442,7 @@ void FrisketPreflightPlugin::onPreflightStdoutReady()
         return;
     }
 
-    m_preflightStdoutBuffer.append(m_preflightProcess->readAllStandardOutput());
-    if (m_preflightStdoutBuffer.size() > preflight::PREFLIGHT_SIDECAR_STDOUT_MAX_BYTES)
+    if (m_preflightStdoutBuffer.append(m_preflightProcess->readAllStandardOutput()) == preflight::PreflightSidecarStreamBuffer::AppendResult::Overflow)
     {
         abortPreflightRun(tr("Preflight output exceeded the maximum allowed size."));
     }
@@ -456,8 +455,7 @@ void FrisketPreflightPlugin::onPreflightStderrReady()
         return;
     }
 
-    m_preflightStderrBuffer.append(m_preflightProcess->readAllStandardError());
-    if (m_preflightStderrBuffer.size() > preflight::PREFLIGHT_SIDECAR_STDERR_MAX_BYTES)
+    if (m_preflightStderrBuffer.append(m_preflightProcess->readAllStandardError()) == preflight::PreflightSidecarStreamBuffer::AppendResult::Overflow)
     {
         abortPreflightRun(tr("Preflight diagnostic output exceeded the maximum allowed size."));
     }

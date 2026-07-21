@@ -26,9 +26,16 @@
 
 #include <QGuiApplication>
 #include <QCommandLineParser>
+#include <QFileInfo>
+#include <QStringList>
 
 int main(int argc, char *argv[])
 {
+    // Prefer offscreen when requested; ensure the exe dir is searched for plugins
+    // (platforms/qoffscreen.dll) before QGuiApplication constructs the QPA plugin.
+    QCoreApplication::setLibraryPaths(QStringList{ QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath() }
+                                      + QCoreApplication::libraryPaths());
+
     QGuiApplication a(argc, argv);
     QCoreApplication::setOrganizationName("MelkaJ");
     QCoreApplication::setApplicationName("PdfTool");

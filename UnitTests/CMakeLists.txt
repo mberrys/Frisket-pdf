@@ -89,6 +89,8 @@ add_executable(UnitTestsPreflightEngine
 )
 
 target_link_libraries(UnitTestsPreflightEngine PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+target_compile_definitions(UnitTestsPreflightEngine PRIVATE
+    FRISKET_PREFLIGHT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-preflight")
 
 set_target_properties(UnitTestsPreflightEngine PROPERTIES
     WIN32_EXECUTABLE OFF
@@ -119,6 +121,20 @@ set_target_properties(UnitTestsBleedFixup PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
 )
 add_test(UnitTestsBleedFixup  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsBleedFixup")
+
+add_executable(UnitTestsOverprint
+	tst_overprinttest.cpp
+)
+
+target_link_libraries(UnitTestsOverprint PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+
+set_target_properties(UnitTestsOverprint PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsOverprint "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsOverprint")
 
 add_executable(UnitTestsPageMasterExport
 	tst_pagemasterexporttest.cpp

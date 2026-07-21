@@ -122,7 +122,7 @@ int PDFToolSeparate::execute(const PDFToolOptions& options)
             else
             {
                 pdf::PDFDocumentWriter writer(nullptr);
-                pdf::PDFOperationResult result = writer.write(fileName, &singlePageDocument, false);
+                pdf::PDFOperationResult result = writer.write(fileName, &singlePageDocument, true);
                 if (!result)
                 {
                     PDFConsole::writeError(result.getErrorMessage(), options.outputCodec);

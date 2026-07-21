@@ -31,7 +31,46 @@
 
 #include <QtEndian>
 
+#include <algorithm>
+
 #include "pdfdbgheap.h"
+
+namespace
+{
+
+// zlib/LZW/RLE output can be driven far past the compressed input size by a
+// crafted stream. Bound expansion by input size with a generous ratio, capped at
+// 256 MiB (same order as JBIG2_MAX_BITMAP_PIXELS in pdfjbig2decoder.cpp).
+constexpr int64_t STREAM_FILTER_MAX_DECOMPRESSED_BYTES = 256LL * 1024 * 1024;
+constexpr int64_t STREAM_FILTER_MAX_DECOMPRESSION_RATIO = 256;
+constexpr int STREAM_FILTER_MAX_PREDICTOR_COLUMNS = 16384;
+
+int64_t maxAllowedDecompressedSize(int64_t compressedSize)
+{
+    if (compressedSize <= 0)
+    {
+        return STREAM_FILTER_MAX_DECOMPRESSED_BYTES;
+    }
+
+    const int64_t ratioBound = compressedSize * STREAM_FILTER_MAX_DECOMPRESSION_RATIO;
+    if (ratioBound < compressedSize)
+    {
+        return STREAM_FILTER_MAX_DECOMPRESSED_BYTES;
+    }
+
+    return std::min(ratioBound, STREAM_FILTER_MAX_DECOMPRESSED_BYTES);
+}
+
+void throwIfDecompressedSizeExceeded(int64_t decompressedSize, int64_t compressedSize)
+{
+    const int64_t maxSize = maxAllowedDecompressedSize(compressedSize);
+    if (decompressedSize > maxSize)
+    {
+        throw pdf::PDFException(pdf::PDFTranslationContext::tr("Decompressed stream exceeds maximum allowed size (%1 > %2).").arg(decompressedSize).arg(maxSize));
+    }
+}
+
+}   // namespace
 
 namespace pdf
 {
@@ -331,6 +370,8 @@ QByteArray PDFLzwStreamDecoder::decompress()
         previousCode = code;
 
         // Copy the input array to the buffer
+        const std::ptrdiff_t sequenceLength = std::distance(m_sequence.begin(), m_currentSequenceEnd);
+        throwIfDecompressedSizeExceeded(result.size() + sequenceLength, m_inputByteArray.size());
         std::copy(m_sequence.begin(), m_currentSequenceEnd, std::back_inserter(result));
     }
 
@@ -532,6 +573,7 @@ QByteArray PDFFlateDecodeFilter::uncompress(const QByteArray& data)
 
         int bytesWritten = int(outputBuffer.size()) - stream.avail_out;
         result.append(reinterpret_cast<const char*>(outputBuffer.data()), bytesWritten);
+        throwIfDecompressedSizeExceeded(result.size(), data.size());
     } while (error == Z_OK);
 
     QString errorMessage;
@@ -595,6 +637,7 @@ QByteArray PDFRunLengthDecodeFilter::apply(const QByteArray& data,
             {
                 throw PDFException(PDFTranslationContext::tr("Truncated RunLengthDecode stream."));
             }
+            throwIfDecompressedSizeExceeded(result.size() + count, data.size());
             std::copy(it, std::next(it, count), std::back_inserter(result));
             std::advance(it, count);
         }
@@ -607,6 +650,7 @@ QByteArray PDFRunLengthDecodeFilter::apply(const QByteArray& data,
             }
             const int count = 257 - current;
             const char toBeCopied = *it++;
+            throwIfDecompressedSizeExceeded(result.size() + count, data.size());
             std::fill_n(std::back_inserter(result), count, toBeCopied);
         }
     }
@@ -803,7 +847,7 @@ PDFStreamPredictor PDFStreamPredictor::createPredictor(const PDFObjectFetcher& o
         int predictor = getInteger("Predictor", 1, 15, 1);
         int components = getInteger("Colors", 1, PDF_MAX_COLOR_COMPONENTS, 1);
         int bitsPerComponent = getInteger("BitsPerComponent", 1, 16, 8);
-        int columns = getInteger("Columns", 1, std::numeric_limits<int>::max(), 1);
+        int columns = getInteger("Columns", 1, STREAM_FILTER_MAX_PREDICTOR_COLUMNS, 1);
 
         return PDFStreamPredictor(static_cast<Predictor>(predictor), components, bitsPerComponent, columns);
     }

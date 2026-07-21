@@ -99,6 +99,13 @@ struct PDFOverprintMode
     {
         return !(*this == other);
     }
+
+    /// Returns true if overprint should apply to content that contains the given
+    /// fill and/or stroke operations (PDF 2.0 /op, /OP, /OPM).
+    inline bool appliesToContent(bool containsFilling, bool containsStroking) const
+    {
+        return (overprintFilling && containsFilling) || (overprintStroking && containsStroking);
+    }
 };
 
 /// Represents graphic state of the PDF (holding current graphic state parameters).

@@ -22,7 +22,9 @@ Section 8: Issues
  - 8.6.5.8 default rendering intent is perceptual instead of relative colorimetric
  - 8.6.5.9 Black point compensation is user setting, graphic state setting
    is not respected (it is ignored)
- - 8.6.7 Overprint not implemented
+ - 8.6.7 Overprint partially implemented in the transparency renderer
+   (fill/stroke-gated ExtGState OP/op); Qt painter path and full
+   overprint simulation (separations, non-Normal blends) remain incomplete
  - 8.10.2 Some form dictionary entries, in table 93, are not all being processed
  - 8.10.4 Reference XObject is not supported. Instead, proxy is displayed.
 

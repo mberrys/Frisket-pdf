@@ -9,7 +9,8 @@
     { "id": "bleed", "required": true, "amount_pt": 9, "severity": "error" },
     { "id": "trim", "severity": "warning", "tolerance_pt": 1 },
     { "id": "page-size", "severity": "warning", "tolerance_pt": 1 },
-    { "id": "color-mode", "allowed": ["CMYK", "Grayscale"], "severity": "error" }
+    { "id": "color-mode", "allowed": ["CMYK", "Grayscale"], "severity": "error" },
+    { "id": "white-overprint", "severity": "warning" }
   ],
   "fixups": [
     { "id": "rgb-to-cmyk", "confirm": true },

@@ -692,6 +692,8 @@ private:
         uint32_t activeColorMask = PDFPixelFormat::getAllColorsMask();
         bool transformSpotsToDevice = false;
         bool saveOriginalImage = false;
+        bool containsFilling = false;
+        bool containsStroking = false;
     };
 
     struct PDFTransparencyPainterState
