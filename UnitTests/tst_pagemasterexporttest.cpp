@@ -115,20 +115,23 @@ qint64 readVmHWMKilobytes()
         return 0;
     }
 
-    while (!status.atEnd())
+    const QString contents = QString::fromUtf8(status.readAll());
+    for (const QString& rawLine : contents.split(QLatin1Char('\n')))
     {
-        const QByteArray line = status.readLine().trimmed();
-        if (line.startsWith("VmHWM:"))
+        const QString line = rawLine.trimmed();
+        if (!line.startsWith(QStringLiteral("VmHWM:")))
         {
-            const QList<QByteArray> parts = line.split(' ');
-            for (const QByteArray& part : parts)
+            continue;
+        }
+
+        const QStringList parts = line.mid(6).simplified().split(QLatin1Char(' '));
+        if (!parts.isEmpty())
+        {
+            bool ok = false;
+            const qint64 value = parts.front().toLongLong(&ok);
+            if (ok)
             {
-                bool ok = false;
-                const qint64 value = part.toLongLong(&ok);
-                if (ok)
-                {
-                    return value;
-                }
+                return value;
             }
         }
     }
