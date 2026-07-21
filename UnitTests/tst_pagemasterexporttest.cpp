@@ -122,7 +122,7 @@ void PageMasterExportTest::pipelineOrder_geometryThenBleedThenWrite()
     job.pageGeometrySettings.applyMediaBox = true;
     job.pageGeometrySettings.applyCropBox = true;
     job.pageGeometrySettings.applyBleedBox = true;
-    job.pageGeometrySettings.applyTrimBox = false;
+    job.pageGeometrySettings.applyTrimBox = true;
 
     job.hasBleedFixupSettings = true;
     job.bleedFixupSettings.force = true;
