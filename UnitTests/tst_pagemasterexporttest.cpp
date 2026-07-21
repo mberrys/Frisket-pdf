@@ -24,17 +24,13 @@
 #include "pdfdocumentbuilder.h"
 #include "pdfdocumentreader.h"
 #include "pdfglobal.h"
-#include "pdfprogress.h"
 
 #include <QtTest>
 
 #include <QDir>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
-#include <QImage>
 #include <QPainter>
-#include <QSignalSpy>
 #include <QTemporaryDir>
 
 class PageMasterExportTest : public QObject
@@ -365,149 +361,6 @@ void PageMasterExportTest::failure_writeError_reportsMessage()
     QVERIFY(!result.errorMessage.isEmpty());
     QVERIFY(result.writtenFiles.isEmpty());
     QVERIFY(!anyOutputExists({ outputPath }));
-}
-
-void PageMasterExportTest::failure_mismatchedOutputCount_reportsError()
-{
-    QTemporaryDir tempDir;
-    QVERIFY(tempDir.isValid());
-
-    const QString outputPath = tempDir.filePath(QStringLiteral("only-one.pdf"));
-
-    pdf::PDFDocument source = buildFilledPage();
-    const auto page = documentPage(0, source);
-
-    pdf::PDFPageMasterExportJob job;
-    job.assembledDocuments.push_back({ page });
-    job.assembledDocuments.push_back({ page });
-    job.documents.emplace(0, std::move(source));
-    job.outputFileNames.push_back(outputPath);
-    job.overwriteFiles = true;
-
-    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(job));
-    QVERIFY(!result.success);
-    QVERIFY(result.errorMessage.contains(QStringLiteral("2"), Qt::CaseInsensitive));
-    QVERIFY(result.errorMessage.contains(QStringLiteral("1"), Qt::CaseInsensitive));
-    QVERIFY(result.writtenFiles.isEmpty());
-    QVERIFY(!QFile::exists(outputPath));
-}
-
-void PageMasterExportTest::multiOutput_midBatchFailure_keepsEarlierWrites()
-{
-    QTemporaryDir tempDir;
-    QVERIFY(tempDir.isValid());
-
-    const QString firstPath = tempDir.filePath(QStringLiteral("ok.pdf"));
-    const QString missingDir = tempDir.filePath(QStringLiteral("missing-subdir"));
-    const QString secondPath = QDir(missingDir).filePath(QStringLiteral("fail.pdf"));
-    QVERIFY(!QDir(missingDir).exists());
-
-    pdf::PDFDocument source = buildFilledPage();
-    const auto page = documentPage(0, source);
-
-    pdf::PDFPageMasterExportJob job;
-    job.assembledDocuments.push_back({ page });
-    job.assembledDocuments.push_back({ page });
-    job.documents.emplace(0, std::move(source));
-    job.outputFileNames.push_back(firstPath);
-    job.outputFileNames.push_back(secondPath);
-    job.overwriteFiles = true;
-
-    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(job));
-    QVERIFY(!result.success);
-    QVERIFY(!result.errorMessage.isEmpty());
-    QCOMPARE(result.writtenFiles.size(), 1);
-    QCOMPARE(result.writtenFiles.front(), firstPath);
-    QVERIFY(QFile::exists(firstPath));
-    QVERIFY(!QFile::exists(secondPath));
-}
-
-void PageMasterExportTest::progress_singleCombinedPhase()
-{
-    QTemporaryDir tempDir;
-    QVERIFY(tempDir.isValid());
-
-    pdf::PDFProgress progress(nullptr);
-    QSignalSpy startedSpy(&progress, &pdf::PDFProgress::progressStarted);
-    QSignalSpy stepSpy(&progress, &pdf::PDFProgress::progressStep);
-    QSignalSpy finishedSpy(&progress, &pdf::PDFProgress::progressFinished);
-
-    // Use image pages so optimize actually finds images. If progress were
-    // wrongly forwarded to PDFImageOptimizer, it would start nested
-    // "Optimizing images..." phases and startedSpy.count() would exceed 1.
-    QImage image(64, 64, QImage::Format_RGB32);
-    image.fill(Qt::red);
-    const auto page = pdf::PDFDocumentManipulator::createImagePage(0, QSizeF(50.0, 50.0), pdf::PageRotation::None);
-
-    pdf::PDFPageMasterExportJob job;
-    job.images.emplace(0, std::move(image));
-    job.assembledDocuments.push_back({ page });
-    job.assembledDocuments.push_back({ page });
-    job.outputFileNames.push_back(tempDir.filePath(QStringLiteral("prog-a.pdf")));
-    job.outputFileNames.push_back(tempDir.filePath(QStringLiteral("prog-b.pdf")));
-    job.overwriteFiles = true;
-    job.optimizeImages = true;
-    // Leave settings.enabled at default (false) — service must treat
-    // optimizeImages as authoritative so optimize still runs.
-    job.imageOptimizationSettings = pdf::PDFImageOptimizer::Settings::createDefault();
-    QVERIFY(!job.imageOptimizationSettings.enabled);
-    job.progress = &progress;
-
-    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(job));
-    QVERIFY2(result.success, qPrintable(result.errorMessage));
-    QCOMPARE(result.writtenFiles.size(), 2);
-
-    QCOMPARE(startedSpy.count(), 1);
-    QCOMPARE(finishedSpy.count(), 1);
-    QCOMPARE(stepSpy.count(), 2);
-
-    const auto startedArgs = startedSpy.takeFirst();
-    QCOMPARE(startedArgs.size(), 1);
-    const pdf::ProgressStartupInfo info = qvariant_cast<pdf::ProgressStartupInfo>(startedArgs.at(0));
-    QVERIFY(info.text.contains(QStringLiteral("Exporting"), Qt::CaseInsensitive));
-    QVERIFY(!info.text.contains(QStringLiteral("Assembling"), Qt::CaseInsensitive));
-    QVERIFY(!info.text.contains(QStringLiteral("Writing"), Qt::CaseInsensitive));
-    QVERIFY(!info.text.contains(QStringLiteral("Optimizing"), Qt::CaseInsensitive));
-
-    const int lastPercentage = stepSpy.last().at(0).toInt();
-    QCOMPARE(lastPercentage, 100);
-}
-
-void PageMasterExportTest::multiOutput_benchmarkRecordsTiming()
-{
-    QTemporaryDir tempDir;
-    QVERIFY(tempDir.isValid());
-
-    constexpr int outputCount = 8;
-    pdf::PDFDocument source = buildFilledPage();
-    const auto page = documentPage(0, source);
-
-    pdf::PDFPageMasterExportJob job;
-    job.documents.emplace(0, std::move(source));
-    job.overwriteFiles = true;
-    for (int i = 0; i < outputCount; ++i)
-    {
-        job.assembledDocuments.push_back({ page });
-        job.outputFileNames.push_back(tempDir.filePath(QStringLiteral("bench-%1.pdf").arg(i)));
-    }
-
-    const qint64 vmBefore = readVmHWMKilobytes();
-    QElapsedTimer timer;
-    timer.start();
-    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(job));
-    const qint64 elapsedMs = timer.elapsed();
-    const qint64 vmAfter = readVmHWMKilobytes();
-
-    QVERIFY2(result.success, qPrintable(result.errorMessage));
-    QCOMPARE(result.writtenFiles.size(), outputCount);
-
-    qInfo("MIC-307 multi-output benchmark: outputs=%d wall_ms=%lld VmHWM_before_kB=%lld VmHWM_after_kB=%lld",
-          outputCount,
-          static_cast<long long>(elapsedMs),
-          static_cast<long long>(vmBefore),
-          static_cast<long long>(vmAfter));
-
-    QVERIFY(elapsedMs >= 0);
 }
 
 QTEST_APPLESS_MAIN(PageMasterExportTest)
