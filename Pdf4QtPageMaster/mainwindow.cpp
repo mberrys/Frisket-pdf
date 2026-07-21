@@ -1207,6 +1207,11 @@ void MainWindow::on_actionClose_triggered()
 
 void MainWindow::on_actionAddDocuments_triggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Select PDF document(s)"), m_settings.directory, tr("PDF document (*.pdf)"));
     if (!fileNames.isEmpty())
     {
@@ -1291,6 +1296,10 @@ void MainWindow::updateActions()
     ui->actionUndo->setToolTip(undoLabel.isEmpty() ? tr("Undo") : tr("Undo %1").arg(undoLabel));
     ui->actionRedo->setToolTip(redoLabel.isEmpty() ? tr("Redo") : tr("Redo %1").arg(redoLabel));
 
+    // actionAddDocuments is auto-connected (not Operation-mapped); gate it
+    // explicitly now that setEnabled(false) is no longer used during export.
+    ui->actionAddDocuments->setEnabled(!m_isExporting);
+
     QList<QAction*> actions = findChildren<QAction*>();
     for (QAction* action : actions)
     {
@@ -1313,6 +1322,12 @@ void MainWindow::onExportProgressStarted(pdf::ProgressStartupInfo info)
     m_exportProgressBar->setValue(0);
     m_exportProgressLabel->show();
     m_exportProgressBar->show();
+    m_exportCancelButton->show();
+    // Keep Cancel disabled if the user already requested cancellation.
+    if (!m_exportCancelToken.cancel->load(std::memory_order_acquire))
+    {
+        m_exportCancelButton->setEnabled(true);
+    }
 }
 
 void MainWindow::onExportProgressStep(int percentage)
@@ -1339,7 +1354,8 @@ void MainWindow::onExportProgressFinished()
     }
 
     m_exportProgressBar->setValue(100);
-    hideExportProgress();
+    // Do not call hideExportProgress() here: assemble/write are separate
+    // progress phases, and hiding would remove Cancel between stages.
 }
 
 void MainWindow::onExportFinished()
@@ -2220,6 +2236,37 @@ void MainWindow::stopExportWatcherBounded()
     {
         delete m_exportWatcher;
         m_exportWatcher = nullptr;
+        return;
+    }
+
+    // Worker still running past the bounded wait (or finished in the gap below).
+    // Keep PDFProgress alive until the future finishes: progressAlive skips new
+    // callbacks, but a stage that already holds the raw pointer
+    // (e.g. PDFImageOptimizer::optimize) must not observe a destroyed QObject
+    // after MainWindow teardown.
+    disconnect(m_exportWatcher, nullptr, this, nullptr);
+    m_exportWatcher->setParent(nullptr);
+
+    if (m_exportWatcher->isFinished())
+    {
+        delete m_exportWatcher;
+        m_exportWatcher = nullptr;
+        return;
+    }
+
+    if (m_exportProgress)
+    {
+        disconnect(m_exportProgress, nullptr, this, nullptr);
+        m_exportProgress->setParent(nullptr);
+        QObject* progressKeeper = m_exportProgress;
+        m_exportProgress = nullptr;
+        QFutureWatcher<pdf::PDFPageMasterExportResult>* watcher = m_exportWatcher;
+        m_exportWatcher = nullptr;
+        connect(watcher, &QFutureWatcher<pdf::PDFPageMasterExportResult>::finished,
+                watcher, [watcher, progressKeeper]() {
+                    progressKeeper->deleteLater();
+                    watcher->deleteLater();
+                });
     }
     else
     {
