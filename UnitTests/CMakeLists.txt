@@ -124,7 +124,7 @@ add_executable(UnitTestsPageMasterExport
 	tst_pagemasterexporttest.cpp
 )
 
-target_link_libraries(UnitTestsPageMasterExport PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+target_link_libraries(UnitTestsPageMasterExport PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test Qt6::Concurrent)
 
 set_target_properties(UnitTestsPageMasterExport PROPERTIES
     WIN32_EXECUTABLE OFF

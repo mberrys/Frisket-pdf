@@ -47,10 +47,12 @@
 #include <QBuffer>
 #include <QComboBox>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QEventLoop>
 #include <QFormLayout>
 #include <QToolBar>
 #include <QDesktopServices>
@@ -71,6 +73,7 @@
 #include <QAbstractScrollArea>
 #include <QAbstractItemView>
 #include <QStatusBar>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QDate>
 #include <QDir>
@@ -80,6 +83,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMenuBar>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QJsonArray>
@@ -94,6 +98,28 @@
 
 namespace pdfpagemaster
 {
+
+namespace
+{
+
+bool waitForExportFinishedBounded(QFutureWatcherBase* watcher, int timeoutMs)
+{
+    if (!watcher || watcher->isFinished())
+    {
+        return true;
+    }
+
+    QEventLoop loop;
+    QObject::connect(watcher, &QFutureWatcherBase::finished, &loop, &QEventLoop::quit);
+    QTimer timer;
+    timer.setSingleShot(true);
+    QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    timer.start(timeoutMs);
+    loop.exec();
+    return watcher->isFinished();
+}
+
+} // namespace
 
 class MainWindowRecentHelper final
 {
@@ -723,6 +749,7 @@ MainWindow::MainWindow(QWidget* parent) :
     m_exportProgress(new pdf::PDFProgress(this)),
     m_exportProgressBar(new QProgressBar(this)),
     m_exportProgressLabel(new QLabel(this)),
+    m_exportCancelButton(new QPushButton(tr("Cancel"), this)),
     m_exportWatcher(nullptr),
     m_dropFeedbackLabel(new QLabel(this)),
     m_dropInsertionMarker(new QFrame(this)),
@@ -739,11 +766,15 @@ MainWindow::MainWindow(QWidget* parent) :
     m_exportProgressBar->setValue(0);
     m_exportProgressBar->setMaximumWidth(pdf::PDFWidgetUtils::scaleDPI_x(this, 180));
     m_exportProgressBar->hide();
+    m_exportCancelButton->hide();
+    m_exportCancelButton->setEnabled(false);
     statusBar()->addPermanentWidget(m_exportProgressLabel);
     statusBar()->addPermanentWidget(m_exportProgressBar);
+    statusBar()->addPermanentWidget(m_exportCancelButton);
     connect(m_exportProgress, &pdf::PDFProgress::progressStarted, this, &MainWindow::onExportProgressStarted, Qt::QueuedConnection);
     connect(m_exportProgress, &pdf::PDFProgress::progressStep, this, &MainWindow::onExportProgressStep, Qt::QueuedConnection);
     connect(m_exportProgress, &pdf::PDFProgress::progressFinished, this, &MainWindow::onExportProgressFinished, Qt::QueuedConnection);
+    connect(m_exportCancelButton, &QPushButton::clicked, this, &MainWindow::onExportCancelClicked);
 
     ui->documentItemsView->setModel(m_filterModel);
     ui->documentItemsView->setItemDelegate(m_delegate);
@@ -1019,12 +1050,7 @@ MainWindow::MainWindow(QWidget* parent) :
 
 MainWindow::~MainWindow()
 {
-    if (m_exportWatcher)
-    {
-        m_exportWatcher->waitForFinished();
-        delete m_exportWatcher;
-        m_exportWatcher = nullptr;
-    }
+    stopExportWatcherBounded();
     saveSettings();
     delete ui;
 }
@@ -1050,6 +1076,23 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     if (!dropView)
     {
         return QMainWindow::eventFilter(watched, event);
+    }
+
+    if (m_isExporting)
+    {
+        switch (event->type())
+        {
+            case QEvent::DragEnter:
+            case QEvent::DragMove:
+            case QEvent::Drop:
+            {
+                hideWorkspaceDropFeedback();
+                event->ignore();
+                return true;
+            }
+            default:
+                break;
+        }
     }
 
     switch (event->type())
@@ -1182,6 +1225,11 @@ void MainWindow::on_actionClose_triggered()
 
 void MainWindow::on_actionAddDocuments_triggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Select PDF document(s)"), m_settings.directory, tr("PDF document (*.pdf)"));
     if (!fileNames.isEmpty())
     {
@@ -1210,6 +1258,11 @@ void MainWindow::onPreviewUpdated()
 
 void MainWindow::onWorkspaceCustomContextMenuRequested(const QPoint& point)
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QWidget* sourceWidget = qobject_cast<QWidget*>(sender());
     if (QAbstractScrollArea* scrollArea = qobject_cast<QAbstractScrollArea*>(sourceWidget))
     {
@@ -1266,6 +1319,10 @@ void MainWindow::updateActions()
     ui->actionUndo->setToolTip(undoLabel.isEmpty() ? tr("Undo") : tr("Undo %1").arg(undoLabel));
     ui->actionRedo->setToolTip(redoLabel.isEmpty() ? tr("Redo") : tr("Redo %1").arg(redoLabel));
 
+    // actionAddDocuments is auto-connected (not Operation-mapped); gate it
+    // explicitly now that setEnabled(false) is no longer used during export.
+    ui->actionAddDocuments->setEnabled(!m_isExporting);
+
     QList<QAction*> actions = findChildren<QAction*>();
     for (QAction* action : actions)
     {
@@ -1288,6 +1345,12 @@ void MainWindow::onExportProgressStarted(pdf::ProgressStartupInfo info)
     m_exportProgressBar->setValue(0);
     m_exportProgressLabel->show();
     m_exportProgressBar->show();
+    m_exportCancelButton->show();
+    // Keep Cancel disabled if the user already requested cancellation.
+    if (!m_exportCancelToken.cancel->load(std::memory_order_acquire))
+    {
+        m_exportCancelButton->setEnabled(true);
+    }
 }
 
 void MainWindow::onExportProgressStep(int percentage)
@@ -1314,7 +1377,8 @@ void MainWindow::onExportProgressFinished()
     }
 
     m_exportProgressBar->setValue(100);
-    hideExportProgress();
+    // Do not call hideExportProgress() here: the combined export phase may
+    // still be running, and hiding would remove Cancel mid-batch.
 }
 
 void MainWindow::onExportFinished()
@@ -1331,6 +1395,19 @@ void MainWindow::onExportFinished()
     setExportInProgress(false);
     hideExportProgress();
 
+    if (result.cancelled)
+    {
+        if (result.writtenFiles.isEmpty())
+        {
+            statusBar()->showMessage(tr("Export cancelled."), 5000);
+        }
+        else
+        {
+            statusBar()->showMessage(tr("Export cancelled. %1 document(s) written.").arg(result.writtenFiles.size()), 5000);
+        }
+        return;
+    }
+
     if (!result.success)
     {
         QString message = result.errorMessage;
@@ -1346,8 +1423,20 @@ void MainWindow::onExportFinished()
     statusBar()->showMessage(tr("%1 document(s) exported.").arg(result.writtenFiles.size()), 5000);
 }
 
+void MainWindow::onExportCancelClicked()
+{
+    requestExportCancel();
+    m_exportProgressLabel->setText(tr("Cancelling export..."));
+    m_exportCancelButton->setEnabled(false);
+}
+
 void MainWindow::onClearRecentTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     m_settings.recentSourceFiles.clear();
     m_settings.recentWorkspaceFiles.clear();
     m_settings.recentDirectories.clear();
@@ -1357,6 +1446,11 @@ void MainWindow::onClearRecentTriggered()
 
 void MainWindow::onRecentSourceFileTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     if (!action)
     {
@@ -1398,6 +1492,11 @@ void MainWindow::onRecentSourceFileTriggered()
 
 void MainWindow::onRecentWorkspaceFileTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     if (!action)
     {
@@ -1420,6 +1519,11 @@ void MainWindow::onRecentWorkspaceFileTriggered()
 
 void MainWindow::onRecentDirectoryTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     if (!action)
     {
@@ -2124,14 +2228,44 @@ void MainWindow::setExportInProgress(bool inProgress)
 
     if (inProgress)
     {
-        m_wasEnabledBeforeExport = isEnabled();
         m_isExporting = true;
-        setEnabled(false);
+        // Keep the window/chrome enabled so Cancel and window-close work.
+        // Disable workspace chrome so non-Operation actions (recent files,
+        // search, toolbars) cannot mutate state mid-export.
+        if (QWidget* central = centralWidget())
+        {
+            central->setEnabled(false);
+        }
+        if (QMenuBar* bar = menuBar())
+        {
+            bar->setEnabled(false);
+        }
+        const auto toolbars = findChildren<QToolBar*>();
+        for (QToolBar* toolbar : toolbars)
+        {
+            toolbar->setEnabled(false);
+        }
+        m_exportCancelButton->show();
+        m_exportCancelButton->setEnabled(true);
     }
     else
     {
         m_isExporting = false;
-        setEnabled(m_wasEnabledBeforeExport);
+        if (QWidget* central = centralWidget())
+        {
+            central->setEnabled(true);
+        }
+        if (QMenuBar* bar = menuBar())
+        {
+            bar->setEnabled(true);
+        }
+        const auto toolbars = findChildren<QToolBar*>();
+        for (QToolBar* toolbar : toolbars)
+        {
+            toolbar->setEnabled(true);
+        }
+        m_exportCancelButton->hide();
+        m_exportCancelButton->setEnabled(false);
     }
 
     updateActions();
@@ -2142,6 +2276,101 @@ void MainWindow::hideExportProgress()
     m_exportProgressLabel->hide();
     m_exportProgressBar->hide();
     m_exportProgressBar->setValue(0);
+    m_exportCancelButton->hide();
+    m_exportCancelButton->setEnabled(false);
+}
+
+void MainWindow::requestExportCancel()
+{
+    m_exportCancelToken.requestCancel();
+}
+
+void MainWindow::detachExportWatcher()
+{
+    if (!m_exportWatcher)
+    {
+        return;
+    }
+
+    disconnect(m_exportWatcher, nullptr, this, nullptr);
+    m_exportWatcher->setParent(nullptr);
+    connect(m_exportWatcher, &QFutureWatcher<pdf::PDFPageMasterExportResult>::finished,
+            m_exportWatcher, &QObject::deleteLater);
+    m_exportWatcher = nullptr;
+}
+
+void MainWindow::stopExportWatcherBounded()
+{
+    if (!m_exportWatcher)
+    {
+        return;
+    }
+
+    m_exportCancelToken.requestCancelAndInvalidateProgress();
+
+    // Disconnect before the nested wait loop so onExportFinished cannot re-enter
+    // during closeEvent / ~MainWindow (UI / QMessageBox during teardown).
+    disconnect(m_exportWatcher, &QFutureWatcher<pdf::PDFPageMasterExportResult>::finished,
+               this, &MainWindow::onExportFinished);
+    if (m_exportProgress)
+    {
+        disconnect(m_exportProgress, nullptr, this, nullptr);
+    }
+
+    if (waitForExportFinishedBounded(m_exportWatcher, pdf::PDFPageMasterExport::DefaultCancelWaitMs))
+    {
+        delete m_exportWatcher;
+        m_exportWatcher = nullptr;
+        return;
+    }
+
+    // Worker still running past the bounded wait (or finished in the gap below).
+    // Keep PDFProgress alive until the future finishes: progressAlive skips new
+    // callbacks, but a stage that already holds the raw pointer
+    // (e.g. PDFImageOptimizer::optimize) must not observe a destroyed QObject
+    // after MainWindow teardown.
+    disconnect(m_exportWatcher, nullptr, this, nullptr);
+    m_exportWatcher->setParent(nullptr);
+
+    if (m_exportWatcher->isFinished())
+    {
+        delete m_exportWatcher;
+        m_exportWatcher = nullptr;
+        return;
+    }
+
+    if (m_exportProgress)
+    {
+        m_exportProgress->setParent(nullptr);
+        QObject* progressKeeper = m_exportProgress;
+        m_exportProgress = nullptr;
+        QFutureWatcher<pdf::PDFPageMasterExportResult>* watcher = m_exportWatcher;
+        m_exportWatcher = nullptr;
+        connect(watcher, &QFutureWatcher<pdf::PDFPageMasterExportResult>::finished,
+                watcher, [watcher, progressKeeper]() {
+                    progressKeeper->deleteLater();
+                    watcher->deleteLater();
+                });
+    }
+    else
+    {
+        detachExportWatcher();
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    if (m_exportWatcher && !m_exportWatcher->isFinished())
+    {
+        m_exportProgressLabel->setText(tr("Cancelling export..."));
+        m_exportProgressLabel->show();
+        m_exportCancelButton->setEnabled(false);
+        stopExportWatcherBounded();
+        setExportInProgress(false);
+        hideExportProgress();
+    }
+
+    event->accept();
 }
 
 bool MainWindow::canPerformOperation(Operation operation) const
@@ -2469,6 +2698,10 @@ void MainWindow::exportAssembledDocuments(std::vector<std::vector<pdf::PDFDocume
     job.hasBleedFixupSettings = m_hasBleedFixupSettings;
     job.bleedFixupSettings = m_bleedFixupSettings;
     job.progress = m_exportProgress;
+    m_exportCancelToken.cancel->store(false, std::memory_order_release);
+    m_exportCancelToken.progressAlive->store(true, std::memory_order_release);
+    job.cancelFlag = m_exportCancelToken.cancel.get();
+    job.progressAlive = m_exportCancelToken.progressAlive.get();
 
     if (m_hasBleedFixupSettings)
     {
@@ -2495,8 +2728,10 @@ void MainWindow::exportAssembledDocuments(std::vector<std::vector<pdf::PDFDocume
 
     m_exportWatcher = new QFutureWatcher<pdf::PDFPageMasterExportResult>(this);
     connect(m_exportWatcher, &QFutureWatcher<pdf::PDFPageMasterExportResult>::finished, this, &MainWindow::onExportFinished);
-    m_exportWatcher->setFuture(QtConcurrent::run([job = std::move(job)]() mutable
+    auto cancelToken = m_exportCancelToken;
+    m_exportWatcher->setFuture(QtConcurrent::run([job = std::move(job), cancelToken]() mutable
     {
+        Q_UNUSED(cancelToken);
         return pdf::PDFPageMasterExport::run(std::move(job));
     }));
 }
