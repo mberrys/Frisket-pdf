@@ -268,7 +268,6 @@ private:
     QSignalMapper m_mapper;
     Qt::DropAction m_dropAction;
     bool m_isExporting = false;
-    bool m_wasEnabledBeforeExport = true;
     bool m_isChangingExportProgressStep = false;
     bool m_hasPageGeometrySettings = false;
     pdf::PDFPageGeometrySettings m_pageGeometrySettings;

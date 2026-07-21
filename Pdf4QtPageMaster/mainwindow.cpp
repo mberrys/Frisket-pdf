@@ -83,6 +83,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMenuBar>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QJsonArray>
@@ -1077,6 +1078,23 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         return QMainWindow::eventFilter(watched, event);
     }
 
+    if (m_isExporting)
+    {
+        switch (event->type())
+        {
+            case QEvent::DragEnter:
+            case QEvent::DragMove:
+            case QEvent::Drop:
+            {
+                hideWorkspaceDropFeedback();
+                event->ignore();
+                return true;
+            }
+            default:
+                break;
+        }
+    }
+
     switch (event->type())
     {
         case QEvent::DragEnter:
@@ -1240,6 +1258,11 @@ void MainWindow::onPreviewUpdated()
 
 void MainWindow::onWorkspaceCustomContextMenuRequested(const QPoint& point)
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QWidget* sourceWidget = qobject_cast<QWidget*>(sender());
     if (QAbstractScrollArea* scrollArea = qobject_cast<QAbstractScrollArea*>(sourceWidget))
     {
@@ -1403,6 +1426,11 @@ void MainWindow::onExportCancelClicked()
 
 void MainWindow::onClearRecentTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     m_settings.recentSourceFiles.clear();
     m_settings.recentWorkspaceFiles.clear();
     m_settings.recentDirectories.clear();
@@ -1412,6 +1440,11 @@ void MainWindow::onClearRecentTriggered()
 
 void MainWindow::onRecentSourceFileTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     if (!action)
     {
@@ -1453,6 +1486,11 @@ void MainWindow::onRecentSourceFileTriggered()
 
 void MainWindow::onRecentWorkspaceFileTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     if (!action)
     {
@@ -1475,6 +1513,11 @@ void MainWindow::onRecentWorkspaceFileTriggered()
 
 void MainWindow::onRecentDirectoryTriggered()
 {
+    if (m_isExporting)
+    {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     if (!action)
     {
@@ -2179,16 +2222,42 @@ void MainWindow::setExportInProgress(bool inProgress)
 
     if (inProgress)
     {
-        m_wasEnabledBeforeExport = isEnabled();
         m_isExporting = true;
-        // Keep the window enabled so Cancel remains clickable; operations are
-        // gated via m_isExporting / canPerformOperation.
+        // Keep the window/chrome enabled so Cancel and window-close work.
+        // Disable workspace chrome so non-Operation actions (recent files,
+        // search, toolbars) cannot mutate state mid-export.
+        if (QWidget* central = centralWidget())
+        {
+            central->setEnabled(false);
+        }
+        if (QMenuBar* bar = menuBar())
+        {
+            bar->setEnabled(false);
+        }
+        const auto toolbars = findChildren<QToolBar*>();
+        for (QToolBar* toolbar : toolbars)
+        {
+            toolbar->setEnabled(false);
+        }
         m_exportCancelButton->show();
         m_exportCancelButton->setEnabled(true);
     }
     else
     {
         m_isExporting = false;
+        if (QWidget* central = centralWidget())
+        {
+            central->setEnabled(true);
+        }
+        if (QMenuBar* bar = menuBar())
+        {
+            bar->setEnabled(true);
+        }
+        const auto toolbars = findChildren<QToolBar*>();
+        for (QToolBar* toolbar : toolbars)
+        {
+            toolbar->setEnabled(true);
+        }
         m_exportCancelButton->hide();
         m_exportCancelButton->setEnabled(false);
     }
@@ -2232,6 +2301,16 @@ void MainWindow::stopExportWatcherBounded()
     }
 
     m_exportCancelToken.requestCancelAndInvalidateProgress();
+
+    // Disconnect before the nested wait loop so onExportFinished cannot re-enter
+    // during closeEvent / ~MainWindow (UI / QMessageBox during teardown).
+    disconnect(m_exportWatcher, &QFutureWatcher<pdf::PDFPageMasterExportResult>::finished,
+               this, &MainWindow::onExportFinished);
+    if (m_exportProgress)
+    {
+        disconnect(m_exportProgress, nullptr, this, nullptr);
+    }
+
     if (waitForExportFinishedBounded(m_exportWatcher, pdf::PDFPageMasterExport::DefaultCancelWaitMs))
     {
         delete m_exportWatcher;
@@ -2256,7 +2335,6 @@ void MainWindow::stopExportWatcherBounded()
 
     if (m_exportProgress)
     {
-        disconnect(m_exportProgress, nullptr, this, nullptr);
         m_exportProgress->setParent(nullptr);
         QObject* progressKeeper = m_exportProgress;
         m_exportProgress = nullptr;
