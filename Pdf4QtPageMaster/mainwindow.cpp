@@ -2703,44 +2703,6 @@ void MainWindow::exportAssembledDocuments(std::vector<std::vector<pdf::PDFDocume
     job.cancelFlag = m_exportCancelToken.cancel.get();
     job.progressAlive = m_exportCancelToken.progressAlive.get();
 
-    if (!outputFileNames.empty())
-    {
-        const QString manifestPath = QDir(QFileInfo(outputFileNames.front()).absolutePath()).filePath(QStringLiteral(".frisket-batch.json"));
-        if (QFile::exists(manifestPath))
-        {
-            // Only resume when the on-disk manifest enumerates exactly this job's outputs.
-            QFile manifestFile(manifestPath);
-            bool compatible = false;
-            if (manifestFile.open(QIODevice::ReadOnly))
-            {
-                const QJsonDocument document = QJsonDocument::fromJson(manifestFile.readAll());
-                if (document.isObject())
-                {
-                    const QJsonArray outputs = document.object().value(QStringLiteral("outputs")).toArray();
-                    if (outputs.size() == outputFileNames.size())
-                    {
-                        compatible = true;
-                        for (int index = 0; index < outputs.size(); ++index)
-                        {
-                            const QString entryPath = outputs.at(index).toObject().value(QStringLiteral("path")).toString();
-                            if (QFileInfo(entryPath).absoluteFilePath() != QFileInfo(outputFileNames.at(index)).absoluteFilePath())
-                            {
-                                compatible = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (compatible)
-            {
-                job.resume = true;
-                job.manifestPath = manifestPath;
-            }
-        }
-    }
-
     if (m_hasBleedFixupSettings)
     {
         if (m_hasPageGeometrySettings && m_pageGeometrySettings.applyBleedBox)

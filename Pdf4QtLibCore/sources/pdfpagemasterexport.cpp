@@ -487,7 +487,17 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         }
 
         setOutputStatus(manifest, int(index), OUTPUT_STATUS_WRITTEN);
-        persistManifest(manifestPath, manifest);
+        if (!persistManifest(manifestPath, manifest))
+        {
+            finishProgressIfActive(activeProgress(job));
+            result.manifest = manifest;
+            result.writtenFiles << fileName;
+            return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                                 "Could not update batch manifest at %1.").arg(manifestPath),
+                                     std::move(result.writtenFiles),
+                                     manifestPath,
+                                     manifest);
+        }
         result.writtenFiles << fileName;
 
         if (PDFProgress* stepProgress = activeProgress(job))
