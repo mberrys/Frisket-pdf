@@ -49,11 +49,12 @@ PDFProgress* activeProgress(const PDFPageMasterExportJob& job)
     return job.progress;
 }
 
-PDFPageMasterExportResult createExportError(QString message)
+PDFPageMasterExportResult createExportError(QString message, QStringList writtenFiles = {})
 {
     PDFPageMasterExportResult result;
     result.success = false;
     result.errorMessage = std::move(message);
+    result.writtenFiles = std::move(writtenFiles);
     return result;
 }
 
@@ -95,14 +96,25 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         manipulator.addImage(imageItem.first, imageItem.second);
     }
 
-    std::vector<std::pair<QString, PDFDocument>> assembledDocumentStorage;
-    assembledDocumentStorage.reserve(job.assembledDocuments.size());
+    if (job.assembledDocuments.size() != job.outputFileNames.size())
+    {
+        return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                             "Export job has %1 assembled output(s) but %2 output filename(s).")
+                                     .arg(job.assembledDocuments.size())
+                                     .arg(job.outputFileNames.size()));
+    }
 
-    if (PDFProgress* progress = activeProgress(job); progress && !job.assembledDocuments.empty())
+    PDFPageMasterExportResult result;
+    result.success = true;
+    result.writtenFiles.reserve(int(job.assembledDocuments.size()));
+
+    PDFProgress* progress = activeProgress(job);
+    const bool trackProgress = progress && !job.assembledDocuments.empty();
+    if (trackProgress)
     {
         ProgressStartupInfo info;
         info.showDialog = true;
-        info.text = QCoreApplication::translate("pdf::PDFPageMasterExport", "Assembling documents...");
+        info.text = QCoreApplication::translate("pdf::PDFPageMasterExport", "Exporting documents...");
         progress->start(job.assembledDocuments.size(), std::move(info));
     }
 
@@ -111,14 +123,14 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled();
+            return createExportCancelled(std::move(result.writtenFiles));
         }
 
         PDFOperationResult currentResult = manipulator.assemble(job.assembledDocuments[index]);
         if (!currentResult)
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportError(currentResult.getErrorMessage());
+            return createExportError(currentResult.getErrorMessage(), std::move(result.writtenFiles));
         }
 
         PDFDocument assembledDocument = manipulator.takeAssembledDocument();
@@ -126,7 +138,7 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled();
+            return createExportCancelled(std::move(result.writtenFiles));
         }
 
         if (job.hasPageGeometrySettings)
@@ -135,14 +147,14 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
             if (!geometryResult)
             {
                 finishProgressIfActive(activeProgress(job));
-                return createExportError(geometryResult.getErrorMessage());
+                return createExportError(geometryResult.getErrorMessage(), std::move(result.writtenFiles));
             }
         }
 
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportCancelled();
+            return createExportCancelled(std::move(result.writtenFiles));
         }
 
         if (job.hasBleedFixupSettings)
@@ -151,101 +163,61 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
             if (!bleedResult)
             {
                 finishProgressIfActive(activeProgress(job));
-                return createExportError(bleedResult.getErrorMessage());
+                return createExportError(bleedResult.getErrorMessage(), std::move(result.writtenFiles));
             }
         }
 
-        if (isCancelRequested(job))
-        {
-            finishProgressIfActive(activeProgress(job));
-            return createExportCancelled();
-        }
-
-        assembledDocumentStorage.emplace_back(job.outputFileNames[index], std::move(assembledDocument));
-        if (PDFProgress* progress = activeProgress(job))
-        {
-            progress->step();
-        }
-    }
-
-    if (PDFProgress* progress = activeProgress(job); progress && !job.assembledDocuments.empty())
-    {
-        progress->finish();
-    }
-
-    if (isCancelRequested(job))
-    {
-        return createExportCancelled();
-    }
-
-    if (job.optimizeImages)
-    {
-        PDFImageOptimizer imageOptimizer;
-        for (auto& assembledDocumentItem : assembledDocumentStorage)
-        {
-            if (isCancelRequested(job))
-            {
-                return createExportCancelled();
-            }
-
-            assembledDocumentItem.second = imageOptimizer.optimize(&assembledDocumentItem.second,
-                                                                   job.imageOptimizationSettings,
-                                                                   {},
-                                                                   activeProgress(job));
-        }
-    }
-
-    if (isCancelRequested(job))
-    {
-        return createExportCancelled();
-    }
-
-    PDFPageMasterExportResult result;
-    result.success = true;
-    result.writtenFiles.reserve(int(assembledDocumentStorage.size()));
-
-    if (PDFProgress* progress = activeProgress(job); progress && !assembledDocumentStorage.empty())
-    {
-        ProgressStartupInfo info;
-        info.showDialog = true;
-        info.text = QCoreApplication::translate("pdf::PDFPageMasterExport", "Writing documents...");
-        progress->start(assembledDocumentStorage.size(), std::move(info));
-    }
-
-    for (const auto& assembledDocumentItem : assembledDocumentStorage)
-    {
         if (isCancelRequested(job))
         {
             finishProgressIfActive(activeProgress(job));
             return createExportCancelled(std::move(result.writtenFiles));
         }
 
-        const QString& fileName = assembledDocumentItem.first;
-        const PDFDocument* document = &assembledDocumentItem.second;
+        if (job.optimizeImages)
+        {
+            PDFImageOptimizer imageOptimizer;
+            PDFImageOptimizer::Settings optimizeSettings = job.imageOptimizationSettings;
+            // job.optimizeImages is authoritative (matches PageMaster UI checkbox wiring).
+            optimizeSettings.enabled = true;
+            // Pass nullptr so optimize does not nest a second progress phase.
+            assembledDocument = imageOptimizer.optimize(&assembledDocument, optimizeSettings, {}, nullptr);
+        }
+
+        if (isCancelRequested(job))
+        {
+            finishProgressIfActive(activeProgress(job));
+            return createExportCancelled(std::move(result.writtenFiles));
+        }
+
+        const QString& fileName = job.outputFileNames[index];
         const bool isDocumentFileAlreadyExisting = QFile::exists(fileName);
         if (!job.overwriteFiles && isDocumentFileAlreadyExisting)
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport", "Document with filename '%1' already exists.").arg(fileName));
+            return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport", "Document with filename '%1' already exists.").arg(fileName),
+                                    std::move(result.writtenFiles));
         }
 
         PDFDocumentWriter writer(nullptr);
-        PDFOperationResult writeResult = writer.write(fileName, document, isDocumentFileAlreadyExisting);
+        PDFOperationResult writeResult = writer.write(fileName, &assembledDocument, isDocumentFileAlreadyExisting);
         if (!writeResult)
         {
             finishProgressIfActive(activeProgress(job));
-            return createExportError(writeResult.getErrorMessage());
+            return createExportError(writeResult.getErrorMessage(), std::move(result.writtenFiles));
         }
+
         result.writtenFiles << fileName;
-        if (PDFProgress* progress = activeProgress(job))
+        // assembledDocument leaves scope here — at most one live assembled doc.
+
+        if (PDFProgress* stepProgress = activeProgress(job))
         {
-            progress->step();
+            stepProgress->step();
         }
     }
 
-    if (PDFProgress* progress = activeProgress(job); progress && !assembledDocumentStorage.empty())
+    if (trackProgress)
     {
-        progress->finish();
+        finishProgressIfActive(activeProgress(job));
     }
 
     if (isCancelRequested(job))

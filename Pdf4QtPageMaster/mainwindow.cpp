@@ -1377,8 +1377,8 @@ void MainWindow::onExportProgressFinished()
     }
 
     m_exportProgressBar->setValue(100);
-    // Do not call hideExportProgress() here: assemble/write are separate
-    // progress phases, and hiding would remove Cancel between stages.
+    // Do not call hideExportProgress() here: the combined export phase may
+    // still be running, and hiding would remove Cancel mid-batch.
 }
 
 void MainWindow::onExportFinished()
@@ -1410,7 +1410,13 @@ void MainWindow::onExportFinished()
 
     if (!result.success)
     {
-        QMessageBox::critical(this, tr("Error"), result.errorMessage);
+        QString message = result.errorMessage;
+        if (!result.writtenFiles.isEmpty())
+        {
+            message += QLatin1Char('\n');
+            message += tr("%1 document(s) were exported before the error.").arg(result.writtenFiles.size());
+        }
+        QMessageBox::critical(this, tr("Error"), message);
         return;
     }
 
