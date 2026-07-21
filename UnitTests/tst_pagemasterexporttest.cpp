@@ -50,6 +50,7 @@ private slots:
     void failure_bleedError_noPartialWrite();
     void failure_overwriteDisabled_existingFile();
     void failure_writeError_reportsMessage();
+    void failure_mismatchedOutputCount_reportsError();
     void multiOutput_midBatchFailure_keepsEarlierWrites();
     void progress_singleCombinedPhase();
     void multiOutput_benchmarkRecordsTiming();
@@ -364,6 +365,31 @@ void PageMasterExportTest::failure_writeError_reportsMessage()
     QVERIFY(!result.errorMessage.isEmpty());
     QVERIFY(result.writtenFiles.isEmpty());
     QVERIFY(!anyOutputExists({ outputPath }));
+}
+
+void PageMasterExportTest::failure_mismatchedOutputCount_reportsError()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString outputPath = tempDir.filePath(QStringLiteral("only-one.pdf"));
+
+    pdf::PDFDocument source = buildFilledPage();
+    const auto page = documentPage(0, source);
+
+    pdf::PDFPageMasterExportJob job;
+    job.assembledDocuments.push_back({ page });
+    job.assembledDocuments.push_back({ page });
+    job.documents.emplace(0, std::move(source));
+    job.outputFileNames.push_back(outputPath);
+    job.overwriteFiles = true;
+
+    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(job));
+    QVERIFY(!result.success);
+    QVERIFY(result.errorMessage.contains(QStringLiteral("2"), Qt::CaseInsensitive));
+    QVERIFY(result.errorMessage.contains(QStringLiteral("1"), Qt::CaseInsensitive));
+    QVERIFY(result.writtenFiles.isEmpty());
+    QVERIFY(!QFile::exists(outputPath));
 }
 
 void PageMasterExportTest::multiOutput_midBatchFailure_keepsEarlierWrites()

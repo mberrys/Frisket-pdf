@@ -60,6 +60,14 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         manipulator.addImage(imageItem.first, imageItem.second);
     }
 
+    if (job.assembledDocuments.size() != job.outputFileNames.size())
+    {
+        return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                             "Export job has %1 assembled output(s) but %2 output filename(s).")
+                                     .arg(job.assembledDocuments.size())
+                                     .arg(job.outputFileNames.size()));
+    }
+
     PDFPageMasterExportResult result;
     result.success = true;
     result.writtenFiles.reserve(int(job.assembledDocuments.size()));
