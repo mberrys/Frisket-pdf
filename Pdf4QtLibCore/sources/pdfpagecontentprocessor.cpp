@@ -351,7 +351,7 @@ QList<PDFRenderError> PDFPageContentProcessor::processContents()
     {
         processContentStream(contents.getStream());
     }
-    else
+    else if (!contents.isNull())
     {
         m_errorList.append(PDFRenderError(RenderErrorType::Error, PDFTranslationContext::tr("Invalid page contents.")));
     }

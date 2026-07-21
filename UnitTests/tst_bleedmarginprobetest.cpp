@@ -20,12 +20,18 @@
 // SOFTWARE.
 
 #include "pdfbleedmarginprobe.h"
+#include "pdfcms.h"
 #include "pdfconstants.h"
 #include "pdfdocumentbuilder.h"
 #include "pdfdocumentsession.h"
+#include "pdffont.h"
+#include "pdfoptionalcontent.h"
+#include "pdfrenderer.h"
 
 #include <QtTest>
+#include <QImage>
 #include <QMarginsF>
+#include <QPainter>
 
 class BleedMarginProbeTest : public QObject
 {
@@ -35,6 +41,7 @@ private slots:
     void probeFast_emptyPage_returnsNoContent();
     void probeFast_pageWithFullBleed_returnsAllEdgesCovered();
     void probeFast_threeEdgesPresentOneEmpty_returnsSingleEmptyEdge();
+    void renderer_emptyPage_returnsNoErrors();
 };
 
 namespace
@@ -133,6 +140,37 @@ void BleedMarginProbeTest::probeFast_threeEdgesPresentOneEmpty_returnsSingleEmpt
     QVERIFY(result.right.hasContent);
     QVERIFY(result.top.hasContent);
     QVERIFY(!result.bottom.hasContent);
+}
+
+void BleedMarginProbeTest::renderer_emptyPage_returnsNoErrors()
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 200));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFOptionalContentActivity optionalContentActivity(&document, pdf::OCUsage::Export, nullptr);
+    pdf::PDFCMSManager cmsManager(nullptr);
+    cmsManager.setDocument(&document);
+    pdf::PDFCMSPointer cms = cmsManager.getCurrentCMS();
+    pdf::PDFFontCache fontCache(pdf::DEFAULT_FONT_CACHE_LIMIT, pdf::DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    fontCache.setDocument(pdf::PDFModifiedDocument(&document, &optionalContentActivity));
+    fontCache.setCacheShrinkEnabled(nullptr, false);
+
+    pdf::PDFMeshQualitySettings meshQualitySettings;
+    pdf::PDFRenderer renderer(&document,
+                              &fontCache,
+                              cms.get(),
+                              &optionalContentActivity,
+                              pdf::PDFRenderer::getDefaultFeatures(),
+                              meshQualitySettings);
+
+    QImage image(QSize(200, 200), QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QPainter painter(&image);
+    const QList<pdf::PDFRenderError> errors = renderer.render(&painter, QRectF(0, 0, 200, 200), 0);
+    painter.end();
+
+    QVERIFY(errors.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(BleedMarginProbeTest)
