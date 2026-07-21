@@ -24,16 +24,49 @@
 #include "pdfconstants.h"
 #include "pdfsentry.h"
 
+#include <QDir>
 #include <QGuiApplication>
+#include <QCoreApplication>
 #include <QCommandLineParser>
 #include <QFileInfo>
 #include <QStringList>
+
+#if defined(Q_OS_WIN)
+#include <windows.h>
+#endif
+
+namespace
+{
+
+QString executableDirectory(const char* argv0)
+{
+#if defined(Q_OS_WIN)
+    wchar_t modulePath[MAX_PATH] = {};
+    const DWORD length = ::GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+    if (length > 0 && length < MAX_PATH)
+    {
+        return QFileInfo(QString::fromWCharArray(modulePath, int(length))).absolutePath();
+    }
+#endif
+
+    const QFileInfo argvInfo(QString::fromLocal8Bit(argv0));
+    if (argvInfo.isAbsolute())
+    {
+        return argvInfo.absolutePath();
+    }
+
+    // Bare argv[0] (PATH lookup) is not the process CWD — fall back to CWD only
+    // after absolute-path resolution fails so plugin dirs still work for local runs.
+    return QDir::currentPath();
+}
+
+} // namespace
 
 int main(int argc, char *argv[])
 {
     // Prefer offscreen when requested; ensure the exe dir is searched for plugins
     // (platforms/qoffscreen.dll) before QGuiApplication constructs the QPA plugin.
-    QCoreApplication::setLibraryPaths(QStringList{ QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath() }
+    QCoreApplication::setLibraryPaths(QStringList{ executableDirectory(argv[0]) }
                                       + QCoreApplication::libraryPaths());
 
     QGuiApplication a(argc, argv);
