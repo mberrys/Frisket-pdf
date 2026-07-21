@@ -34,7 +34,9 @@
 #include <QString>
 #include <QStringList>
 
+#include <atomic>
 #include <map>
+#include <memory>
 #include <vector>
 
 namespace pdf
@@ -42,8 +44,32 @@ namespace pdf
 
 class PDFProgress;
 
+/// Shared cancel / progress-lifetime flags for a PageMaster export run (MIC-308).
+/// UI owns the shared_ptrs; the worker borrows raw pointers via the job.
+struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportCancelToken
+{
+    std::shared_ptr<std::atomic_bool> cancel = std::make_shared<std::atomic_bool>(false);
+    std::shared_ptr<std::atomic_bool> progressAlive = std::make_shared<std::atomic_bool>(true);
+
+    void requestCancel() const
+    {
+        cancel->store(true, std::memory_order_release);
+    }
+
+    void invalidateProgress() const
+    {
+        progressAlive->store(false, std::memory_order_release);
+    }
+
+    void requestCancelAndInvalidateProgress() const
+    {
+        requestCancel();
+        invalidateProgress();
+    }
+};
+
 /// Settings and inputs for a headless PageMaster-style assemble/export batch.
-/// Documents and images are owned copies. progress is borrowed (optional).
+/// Documents and images are owned copies. progress / cancelFlag / progressAlive are borrowed (optional).
 struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportJob
 {
     std::map<int, PDFDocument> documents;
@@ -59,12 +85,15 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportJob
     bool hasBleedFixupSettings = false;
     PDFBleedFixupSettings bleedFixupSettings;
     PDFProgress* progress = nullptr;
+    std::atomic_bool* cancelFlag = nullptr;
+    std::atomic_bool* progressAlive = nullptr;
 };
 
 /// Result of PDFPageMasterExport::run().
 struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportResult
 {
     bool success = false;
+    bool cancelled = false;
     QString errorMessage;
     QStringList writtenFiles;
 };
@@ -75,6 +104,8 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportResult
 class PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExport
 {
 public:
+    static constexpr int DefaultCancelWaitMs = 3000;
+
     static PDFPageMasterExportResult run(PDFPageMasterExportJob job);
 };
 

@@ -41,6 +41,8 @@
 #include <QStringList>
 #include <QUrl>
 
+#include <memory>
+
 namespace Ui
 {
 class MainWindow;
@@ -48,6 +50,7 @@ class MainWindow;
 
 class QAbstractItemView;
 class QAction;
+class QCloseEvent;
 class QEvent;
 class QFrame;
 class QLabel;
@@ -55,6 +58,7 @@ class QLineEdit;
 class QMenu;
 class QMimeData;
 class QProgressBar;
+class QPushButton;
 class QTableView;
 
 namespace pdf
@@ -160,6 +164,7 @@ public:
 protected:
     virtual bool eventFilter(QObject* watched, QEvent* event) override;
     virtual void resizeEvent(QResizeEvent* resizeEvent) override;
+    virtual void closeEvent(QCloseEvent* event) override;
 
 private slots:
     void on_actionClose_triggered();
@@ -176,6 +181,7 @@ private slots:
     void onExportProgressStep(int percentage);
     void onExportProgressFinished();
     void onExportFinished();
+    void onExportCancelClicked();
 
 private:
     void loadSettings();
@@ -226,6 +232,9 @@ private:
     bool insertDocument(const QString& fileName, int insertRow, const std::vector<pdf::PDFInteger>& pages = {});
     void setExportInProgress(bool inProgress);
     void hideExportProgress();
+    void requestExportCancel();
+    void stopExportWatcherBounded();
+    void detachExportWatcher();
 
     struct Settings
     {
@@ -249,7 +258,9 @@ private:
     pdf::PDFProgress* m_exportProgress;
     QProgressBar* m_exportProgressBar;
     QLabel* m_exportProgressLabel;
+    QPushButton* m_exportCancelButton;
     QFutureWatcher<pdf::PDFPageMasterExportResult>* m_exportWatcher;
+    pdf::PDFPageMasterExportCancelToken m_exportCancelToken;
     QLabel* m_dropFeedbackLabel;
     QFrame* m_dropInsertionMarker;
     QWidget* m_dropFeedbackViewport;
