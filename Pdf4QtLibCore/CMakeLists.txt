@@ -46,6 +46,8 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfpagegeometry.h
     sources/pdfbleedfixup.cpp
     sources/pdfbleedfixup.h
+    sources/pdfpagemasterexport.cpp
+    sources/pdfpagemasterexport.h
     sources/pdfbleedmarginprobe.cpp
     sources/pdfbleedmarginprobe.h
     sources/pdfdocumentsession.cpp
