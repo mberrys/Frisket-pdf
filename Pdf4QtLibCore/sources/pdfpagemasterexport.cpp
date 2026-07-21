@@ -35,7 +35,7 @@ namespace pdf
 namespace
 {
 
-PDFPageMasterExportResult createExportError(QString message)
+PDFPageMasterExportResult createExportError(QString message, QStringList writtenFiles = {})
 {
     PDFPageMasterExportResult result;
     result.success = false;
@@ -59,14 +59,24 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         manipulator.addImage(imageItem.first, imageItem.second);
     }
 
-    std::vector<std::pair<QString, PDFDocument>> assembledDocumentStorage;
-    assembledDocumentStorage.reserve(job.assembledDocuments.size());
+    if (job.assembledDocuments.size() != job.outputFileNames.size())
+    {
+        return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                             "Export job has %1 assembled output(s) but %2 output filename(s).")
+                                     .arg(job.assembledDocuments.size())
+                                     .arg(job.outputFileNames.size()));
+    }
 
-    if (job.progress && !job.assembledDocuments.empty())
+    PDFPageMasterExportResult result;
+    result.success = true;
+    result.writtenFiles.reserve(int(job.assembledDocuments.size()));
+
+    const bool trackProgress = job.progress && !job.assembledDocuments.empty();
+    if (trackProgress)
     {
         ProgressStartupInfo info;
         info.showDialog = true;
-        info.text = QCoreApplication::translate("pdf::PDFPageMasterExport", "Assembling documents...");
+        info.text = QCoreApplication::translate("pdf::PDFPageMasterExport", "Exporting documents...");
         job.progress->start(job.assembledDocuments.size(), std::move(info));
     }
 

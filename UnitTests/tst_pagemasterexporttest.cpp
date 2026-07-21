@@ -46,6 +46,10 @@ private slots:
     void failure_bleedError_noPartialWrite();
     void failure_overwriteDisabled_existingFile();
     void failure_writeError_reportsMessage();
+    void failure_mismatchedOutputCount_reportsError();
+    void multiOutput_midBatchFailure_keepsEarlierWrites();
+    void progress_singleCombinedPhase();
+    void multiOutput_benchmarkRecordsTiming();
 };
 
 namespace
@@ -98,6 +102,38 @@ bool anyOutputExists(const QStringList& paths)
         }
     }
     return false;
+}
+
+/// Peak resident set from /proc (Linux); returns 0 when unavailable.
+qint64 readVmHWMKilobytes()
+{
+    QFile status(QStringLiteral("/proc/self/status"));
+    if (!status.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return 0;
+    }
+
+    const QString contents = QString::fromUtf8(status.readAll());
+    for (const QString& rawLine : contents.split(QLatin1Char('\n')))
+    {
+        const QString line = rawLine.trimmed();
+        if (!line.startsWith(QStringLiteral("VmHWM:")))
+        {
+            continue;
+        }
+
+        const QStringList parts = line.mid(6).simplified().split(QLatin1Char(' '));
+        if (!parts.isEmpty())
+        {
+            bool ok = false;
+            const qint64 value = parts.front().toLongLong(&ok);
+            if (ok)
+            {
+                return value;
+            }
+        }
+    }
+    return 0;
 }
 
 } // namespace

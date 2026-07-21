@@ -1333,7 +1333,13 @@ void MainWindow::onExportFinished()
 
     if (!result.success)
     {
-        QMessageBox::critical(this, tr("Error"), result.errorMessage);
+        QString message = result.errorMessage;
+        if (!result.writtenFiles.isEmpty())
+        {
+            message += QLatin1Char('\n');
+            message += tr("%1 document(s) were exported before the error.").arg(result.writtenFiles.size());
+        }
+        QMessageBox::critical(this, tr("Error"), message);
         return;
     }
 
