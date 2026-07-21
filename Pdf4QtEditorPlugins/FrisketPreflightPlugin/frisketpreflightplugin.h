@@ -25,6 +25,7 @@
 
 #include "pdfplugin.h"
 #include "pdfdocumentdrawinterface.h"
+#include "preflightsidecarutils.h"
 
 #include <memory>
 
