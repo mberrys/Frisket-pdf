@@ -115,8 +115,11 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         if (job.optimizeImages)
         {
             PDFImageOptimizer imageOptimizer;
+            PDFImageOptimizer::Settings optimizeSettings = job.imageOptimizationSettings;
+            // job.optimizeImages is authoritative (matches PageMaster UI checkbox wiring).
+            optimizeSettings.enabled = true;
             // Pass nullptr so optimize does not nest a second progress phase.
-            assembledDocument = imageOptimizer.optimize(&assembledDocument, job.imageOptimizationSettings, {}, nullptr);
+            assembledDocument = imageOptimizer.optimize(&assembledDocument, optimizeSettings, {}, nullptr);
         }
 
         const QString& fileName = job.outputFileNames[index];

@@ -32,6 +32,7 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
 #include <QPainter>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -405,17 +406,25 @@ void PageMasterExportTest::progress_singleCombinedPhase()
     QSignalSpy stepSpy(&progress, &pdf::PDFProgress::progressStep);
     QSignalSpy finishedSpy(&progress, &pdf::PDFProgress::progressFinished);
 
-    pdf::PDFDocument source = buildFilledPage();
-    const auto page = documentPage(0, source);
+    // Use image pages so optimize actually finds images. If progress were
+    // wrongly forwarded to PDFImageOptimizer, it would start nested
+    // "Optimizing images..." phases and startedSpy.count() would exceed 1.
+    QImage image(64, 64, QImage::Format_RGB32);
+    image.fill(Qt::red);
+    const auto page = pdf::PDFDocumentManipulator::createImagePage(0, QSizeF(50.0, 50.0), pdf::PageRotation::None);
 
     pdf::PDFPageMasterExportJob job;
+    job.images.emplace(0, std::move(image));
     job.assembledDocuments.push_back({ page });
     job.assembledDocuments.push_back({ page });
-    job.documents.emplace(0, std::move(source));
     job.outputFileNames.push_back(tempDir.filePath(QStringLiteral("prog-a.pdf")));
     job.outputFileNames.push_back(tempDir.filePath(QStringLiteral("prog-b.pdf")));
     job.overwriteFiles = true;
     job.optimizeImages = true;
+    // Leave settings.enabled at default (false) — service must treat
+    // optimizeImages as authoritative so optimize still runs.
+    job.imageOptimizationSettings = pdf::PDFImageOptimizer::Settings::createDefault();
+    QVERIFY(!job.imageOptimizationSettings.enabled);
     job.progress = &progress;
 
     const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(job));
@@ -424,7 +433,7 @@ void PageMasterExportTest::progress_singleCombinedPhase()
 
     QCOMPARE(startedSpy.count(), 1);
     QCOMPARE(finishedSpy.count(), 1);
-    QVERIFY(stepSpy.count() >= 1);
+    QCOMPARE(stepSpy.count(), 2);
 
     const auto startedArgs = startedSpy.takeFirst();
     QCOMPARE(startedArgs.size(), 1);
