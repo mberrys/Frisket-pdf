@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "name": "Frisket Test - White Overprint",
+  "description": "Test-only profile for MIC-319 white-overprint detection fixtures.",
+  "checks": [
+    { "id": "white-overprint", "severity": "warning" }
+  ]
+}

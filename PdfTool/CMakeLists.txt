@@ -79,6 +79,17 @@ set_target_properties(PdfTool PROPERTIES
 
 install(TARGETS PdfTool RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR} LIBRARY DESTINATION ${PDF4QT_INSTALL_LIB_DIR})
 
+# Headless corpus/CI sets QT_QPA_PLATFORM=offscreen; windeployqt often only ships qwindows.
+# Copy qoffscreen next to PdfTool so PdfTool help/preflight do not hang on missing plugin.
+if(WIN32 AND DEFINED PDF4QT_QT_ROOT AND EXISTS "${PDF4QT_QT_ROOT}/plugins/platforms/qoffscreen.dll")
+    add_custom_command(TARGET PdfTool POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:PdfTool>/platforms"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PDF4QT_QT_ROOT}/plugins/platforms/qoffscreen.dll"
+            "$<TARGET_FILE_DIR:PdfTool>/platforms/qoffscreen.dll"
+        COMMENT "Copy qoffscreen.dll for headless PdfTool")
+endif()
+
 if(PDF4QT_ENABLE_SENTRY)
     pdf4qt_deploy_sentry_crashpad(PdfTool)
 endif()

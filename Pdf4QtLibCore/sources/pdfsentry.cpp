@@ -125,7 +125,12 @@ PDFSentrySession::PDFSentrySession(const QString& applicationId)
 
     sentry_options_t* options = sentry_options_new();
     sentry_options_set_dsn(options, dsn.toUtf8().constData());
+#ifdef Q_OS_WIN
+    const QString dbPath = databasePath();
+    sentry_options_set_database_pathw(options, reinterpret_cast<const wchar_t*>(dbPath.utf16()));
+#else
     sentry_options_set_database_path(options, databasePath().toUtf8().constData());
+#endif
     sentry_options_set_release(options, releaseName(applicationId).toUtf8().constData());
 
     const QByteArray environment = qgetenv("SENTRY_ENVIRONMENT");

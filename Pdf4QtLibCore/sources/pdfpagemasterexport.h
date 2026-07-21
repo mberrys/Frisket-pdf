@@ -31,6 +31,7 @@
 #include "pdfpagegeometry.h"
 
 #include <QImage>
+#include <QJsonObject>
 #include <QString>
 #include <QStringList>
 
@@ -87,6 +88,8 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportJob
     PDFProgress* progress = nullptr;
     std::atomic_bool* cancelFlag = nullptr;
     std::atomic_bool* progressAlive = nullptr;
+    bool resume = false;
+    QString manifestPath;
 };
 
 /// Result of PDFPageMasterExport::run().
@@ -96,6 +99,8 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportResult
     bool cancelled = false;
     QString errorMessage;
     QStringList writtenFiles;
+    QString manifestPath;
+    QJsonObject manifest;
 };
 
 /// Headless PageMaster export orchestrator (ADR-003).

@@ -385,6 +385,7 @@ if(PDF4QT_INSTALL_DEPENDENCIES AND NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
             RUNTIME DESTINATION ${PDF4QT_INSTALL_LIB_DIR}/platforms/
             FILES_MATCHING
             PATTERN "qwindows.dll"
+            PATTERN "qoffscreen.dll"
             PATTERN "*.so"
             PATTERN "*.dylib"
             PATTERN "*.pdb" EXCLUDE

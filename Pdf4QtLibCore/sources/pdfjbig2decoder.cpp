@@ -37,6 +37,19 @@ namespace pdf
 constexpr int64_t JBIG2_MAX_BITMAP_DIMENSION = 16384;
 constexpr int64_t JBIG2_MAX_BITMAP_PIXELS = JBIG2_MAX_BITMAP_DIMENSION * JBIG2_MAX_BITMAP_DIMENSION;
 
+namespace
+{
+
+void checkJBIG2BitmapDimensions(int width, int height)
+{
+    if (width < 0 || height < 0 || int64_t(width) * int64_t(height) > JBIG2_MAX_BITMAP_PIXELS)
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid JBIG2 bitmap dimensions %1x%2.").arg(width).arg(height));
+    }
+}
+
+}   // namespace
+
 class PDFJBIG2HuffmanCodeTable : public PDFJBIG2Segment
 {
 public:
@@ -2246,7 +2259,13 @@ void PDFJBIG2Decoder::processPatternDictionary(const PDFJBIG2SegmentHeader& head
     int8_t gbat0_x = -static_cast<int8_t>(HDPW);
     PDFJBIG2BitmapDecodingParameters parameters;
     parameters.MMR = HDMMR;
-    parameters.GBW = (GRAYMAX + 1) * HDPW;
+    const int64_t collectiveWidth = (int64_t(GRAYMAX) + 1) * HDPW;
+    if (collectiveWidth <= 0 || collectiveWidth > JBIG2_MAX_BITMAP_DIMENSION)
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 invalid pattern dictionary collective bitmap width."));
+    }
+
+    parameters.GBW = static_cast<int>(collectiveWidth);
     parameters.GBH = HDPH;
     parameters.GBTEMPLATE = HDTEMPLATE;
     parameters.TPGDON = false;
@@ -2893,6 +2912,8 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::getBitmap(const uint32_t segmentIndex, bool remo
 
 PDFJBIG2Bitmap PDFJBIG2Decoder::readBitmap(PDFJBIG2BitmapDecodingParameters& parameters)
 {
+    checkJBIG2BitmapDimensions(parameters.GBW, parameters.GBH);
+
     if (parameters.MMR)
     {
         // Use modified-modified-read (it corresponds to CCITT 2D encoding)
@@ -2907,6 +2928,8 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::readBitmap(PDFJBIG2BitmapDecodingParameters& par
         PDFCCITTFaxDecoder decoder(&parameters.data, ccittParameters);
         PDFImageData data = decoder.decode();
         parameters.dataEndPosition = decoder.getReader()->getPosition();
+
+        checkJBIG2BitmapDimensions(int(data.getWidth()), int(data.getHeight()));
 
         PDFJBIG2Bitmap bitmap(data.getWidth(), data.getHeight(), m_pageDefaultPixelValue);
 
@@ -3687,19 +3710,6 @@ PDFJBIG2Bitmap::PDFJBIG2Bitmap() :
 
 }
 
-namespace
-{
-
-void checkJBIG2BitmapDimensions(int width, int height)
-{
-    if (width < 0 || height < 0 || int64_t(width) * int64_t(height) > JBIG2_MAX_BITMAP_PIXELS)
-    {
-        throw PDFException(PDFTranslationContext::tr("Invalid JBIG2 bitmap dimensions %1x%2.").arg(width).arg(height));
-    }
-}
-
-}   // namespace
-
 PDFJBIG2Bitmap::PDFJBIG2Bitmap(int width, int height) :
     m_width(width),
     m_height(height)
@@ -3846,11 +3856,22 @@ std::vector<PDFJBIG2HuffmanTableEntry> PDFJBIG2HuffmanCodeTable::buildPrefixes(c
         uint16_t count = 1;
         for (uint32_t i = 1; i < result.size(); ++i)
         {
-            const uint16_t bitShift = result[i].prefixBitLength - result[i - 1].prefixBitLength;
+            const uint16_t prefixBitLength = result[i].prefixBitLength;
+            if (prefixBitLength > 15)
+            {
+                throw PDFException(PDFTranslationContext::tr("JBIG2 invalid prefix bit length in huffman table."));
+            }
+
+            const uint16_t bitShift = prefixBitLength - result[i - 1].prefixBitLength;
             if (bitShift > 0)
             {
+                if (bitShift >= 16)
+                {
+                    throw PDFException(PDFTranslationContext::tr("JBIG2 invalid prefix bit shift in huffman table."));
+                }
+
                 // Bit length of the prefix changed, we must shift the prefix by amount of new bits
-                prefix = prefix << bitShift;
+                prefix = static_cast<uint16_t>(prefix << bitShift);
                 count = 0;
             }
 
@@ -3858,7 +3879,8 @@ std::vector<PDFJBIG2HuffmanTableEntry> PDFJBIG2HuffmanCodeTable::buildPrefixes(c
             ++prefix;
             ++count;
 
-            if (count > (1 << result[i].prefixBitLength))
+            const uint16_t prefixCapacity = static_cast<uint16_t>(1u << prefixBitLength);
+            if (count > prefixCapacity)
             {
                 // We have "overflow" of values, for binary number with prefixBitLength digits (0/1), we can
                 // have only 2^prefixBitLength values, which we exceeded. This is unrecoverable error.

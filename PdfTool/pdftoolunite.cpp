@@ -211,7 +211,7 @@ int PDFToolUnite::execute(const PDFToolOptions& options)
         mergedDocument = finalBuilder.build();
 
         pdf::PDFDocumentWriter writer(nullptr);
-        pdf::PDFOperationResult result = writer.write(targetFile, &mergedDocument, false);
+        pdf::PDFOperationResult result = writer.write(targetFile, &mergedDocument, true);
         if (!result)
         {
             PDFConsole::writeError(result.getErrorMessage(), options.outputCodec);

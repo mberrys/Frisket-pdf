@@ -25,6 +25,7 @@
 #include "pdfbleedmarginprobe.h"
 #include "pdfcatalog.h"
 #include "pdfcms.h"
+#include "pdfcolorspaces.h"
 #include "pdfconstants.h"
 #include "pdfdocument.h"
 #include "pdfexception.h"
@@ -45,6 +46,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <set>
 
@@ -703,11 +705,150 @@ void runColorModeCheck(PDFDocumentSession* session,
     }
 }
 
-// LOW CONFIDENCE NOTE: This function scans only page-level Font resource
-// dictionaries. Form XObjects and appearance streams can contain their own
-// Font dictionaries that are not checked. A full content-stream walk via
-// PDFPageContentProcessor would catch those, but the resource-dict scan
-// covers the vast majority of real-world cases.
+bool isNearWhiteDevicePaint(const PDFAbstractColorSpace* colorSpace, const PDFColor& color)
+{
+    if (!colorSpace)
+    {
+        return false;
+    }
+
+    switch (colorSpace->getColorSpace())
+    {
+        case PDFAbstractColorSpace::ColorSpace::DeviceGray:
+            return color[0] >= 0.99f;
+        case PDFAbstractColorSpace::ColorSpace::DeviceRGB:
+            return color[0] >= 0.99f && color[1] >= 0.99f && color[2] >= 0.99f;
+        case PDFAbstractColorSpace::ColorSpace::DeviceCMYK:
+            return color[0] <= 0.01f && color[1] <= 0.01f && color[2] <= 0.01f && color[3] <= 0.01f;
+        default:
+            return false;
+    }
+}
+
+void runWhiteOverprintCheck(PDFDocumentSession* session,
+                            const PreflightCheckConfig& check,
+                            QList<PreflightFinding>& errors,
+                            QList<PreflightFinding>& warnings)
+{
+    PDFDocument* document = session->getDocument();
+    if (!document)
+    {
+        return;
+    }
+
+    const PDFCatalog* catalog = document->getCatalog();
+    const PDFInteger pageCount = catalog->getPageCount();
+
+    PDFOptionalContentActivity ocActivity(document, OCUsage::Export, nullptr);
+    PDFFontCache fontCache(DEFAULT_FONT_CACHE_LIMIT, DEFAULT_REALIZED_FONT_CACHE_LIMIT);
+    PDFModifiedDocument md(document, &ocActivity);
+    fontCache.setDocument(md);
+    fontCache.setCacheShrinkEnabled(nullptr, false);
+    PDFCMSManager cmsManager(nullptr);
+    cmsManager.setDocument(document);
+    PDFCMSPointer cms = cmsManager.getCurrentCMS();
+    PDFMeshQualitySettings meshQuality;
+
+    class WhiteOverprintProcessor : public PDFPageContentProcessor
+    {
+    public:
+        WhiteOverprintProcessor(const PDFPage* page,
+                                const PDFDocument* doc,
+                                const PDFFontCache* fc,
+                                const PDFCMS* cms_p,
+                                const PDFOptionalContentActivity* oc,
+                                const PDFMeshQualitySettings& mq,
+                                bool* foundWhiteOverprint)
+            : PDFPageContentProcessor(page, doc, fc, cms_p, oc, QTransform(), mq)
+            , m_foundWhiteOverprint(foundWhiteOverprint)
+        {
+        }
+
+    protected:
+        bool isContentKindSuppressed(ContentKind kind) const override
+        {
+            switch (kind)
+            {
+                case ContentKind::Shapes:
+                case ContentKind::Text:
+                case ContentKind::Forms:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        void performPathPainting(const QPainterPath& path, bool stroke, bool fill, bool text, Qt::FillRule fillRule) override
+        {
+            Q_UNUSED(path);
+            Q_UNUSED(text);
+            Q_UNUSED(fillRule);
+
+            if (isContentSuppressed() || m_foundWhiteOverprint == nullptr)
+            {
+                return;
+            }
+
+            const PDFPageContentProcessorState* state = getGraphicState();
+            const PDFOverprintMode overprintMode = state->getOverprintMode();
+
+            if (fill && overprintMode.overprintFilling
+                && isNearWhiteDevicePaint(state->getFillColorSpace(), state->getFillColorOriginal()))
+            {
+                *m_foundWhiteOverprint = true;
+            }
+
+            if (stroke && overprintMode.overprintStroking
+                && isNearWhiteDevicePaint(state->getStrokeColorSpace(), state->getStrokeColorOriginal()))
+            {
+                *m_foundWhiteOverprint = true;
+            }
+        }
+
+    private:
+        bool* m_foundWhiteOverprint = nullptr;
+    };
+
+    for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
+    {
+        const PDFPage* page = catalog->getPage(pageIndex);
+        if (!page)
+        {
+            continue;
+        }
+
+        bool foundWhiteOverprint = false;
+        WhiteOverprintProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &foundWhiteOverprint);
+        processor.processContents();
+
+        if (!foundWhiteOverprint)
+        {
+            continue;
+        }
+
+        PreflightFinding finding;
+        finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_PAGE);
+        finding.page = int(pageIndex + 1);
+        finding.type = QStringLiteral("white-overprint");
+        finding.severity = check.severity;
+        finding.checkId = check.id;
+        finding.message = PDFTranslationContext::tr(
+            "White or near-white paint is set to overprint on page %1.")
+                              .arg(pageIndex + 1);
+
+        if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
+        {
+            warnings.push_back(finding);
+        }
+        else
+        {
+            errors.push_back(finding);
+        }
+    }
+}
+
+// Scans Font resource dictionaries on the page and nested Form XObjects /
+// annotation appearance streams (resource recursion with cycle guard).
 void runEmbeddedFontsCheck(PDFDocumentSession* session,
                             const PreflightCheckConfig& check,
                             QList<PreflightFinding>& errors,
@@ -722,6 +863,134 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
     const PDFCatalog* catalog = document->getCatalog();
     const PDFInteger pageCount = catalog->getPageCount();
     std::set<PDFObjectReference> processedFonts;
+    std::set<PDFObjectReference> processedResources;
+
+    auto emitFontFinding = [&](int pageNumber, const QString& message)
+    {
+        PreflightFinding finding;
+        finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
+        finding.page = pageNumber;
+        finding.type = QStringLiteral("embedded-fonts");
+        finding.severity = check.severity;
+        finding.checkId = check.id;
+        finding.bbox = QRectF();
+        finding.message = message;
+        if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
+        {
+            warnings.push_back(finding);
+        }
+        else
+        {
+            errors.push_back(finding);
+        }
+    };
+
+    std::function<void(const PDFObject&, int)> scanResources;
+    scanResources = [&](const PDFObject& resourcesObject, int pageNumber)
+    {
+        PDFObject resources = document->getObject(resourcesObject);
+        if (!resources.isDictionary())
+        {
+            return;
+        }
+
+        if (resourcesObject.isReference())
+        {
+            const PDFObjectReference ref = resourcesObject.getReference();
+            if (processedResources.contains(ref))
+            {
+                return;
+            }
+            processedResources.insert(ref);
+        }
+
+        const PDFDictionary* fontsDict = document->getDictionaryFromObject(
+            resources.getDictionary()->get("Font"));
+        if (fontsDict)
+        {
+            for (size_t i = 0; i < fontsDict->getCount(); ++i)
+            {
+                PDFObject fontObj = fontsDict->getValue(i);
+                if (fontObj.isReference())
+                {
+                    const PDFObjectReference ref = fontObj.getReference();
+                    if (processedFonts.contains(ref))
+                    {
+                        continue;
+                    }
+                    processedFonts.insert(ref);
+                }
+
+                try
+                {
+                    PDFFontPointer font = PDFFont::createFont(
+                        fontObj, fontsDict->getKey(i).getString(), document);
+                    if (!font || font->getFontType() == FontType::Type3)
+                    {
+                        continue;
+                    }
+
+                    const FontDescriptor* fd = font->getFontDescriptor();
+                    const QString keyName = QString::fromLatin1(fontsDict->getKey(i).getString());
+                    if (!fd)
+                    {
+                        emitFontFinding(pageNumber,
+                                        PDFTranslationContext::tr(
+                                            "Font '%1' on page %2 has no font descriptor (not embedded)")
+                                            .arg(keyName)
+                                            .arg(pageNumber));
+                        continue;
+                    }
+
+                    if (!fd->isEmbedded())
+                    {
+                        const QString fontName = fd->fontName.isEmpty() ? keyName : fd->fontName;
+                        emitFontFinding(pageNumber,
+                                        PDFTranslationContext::tr(
+                                            "Font '%1' on page %2 is not embedded")
+                                            .arg(fontName)
+                                            .arg(pageNumber));
+                    }
+                }
+                catch (const PDFException&)
+                {
+                }
+            }
+        }
+
+        const PDFDictionary* xobjectDict = document->getDictionaryFromObject(
+            resources.getDictionary()->get("XObject"));
+        if (!xobjectDict)
+        {
+            return;
+        }
+
+        for (size_t i = 0; i < xobjectDict->getCount(); ++i)
+        {
+            PDFObject xobject = document->getObject(xobjectDict->getValue(i));
+            if (!xobject.isStream())
+            {
+                continue;
+            }
+
+            const PDFDictionary* streamDict = xobject.getStream()->getDictionary();
+            if (!streamDict)
+            {
+                continue;
+            }
+
+            const PDFObject subtype = document->getObject(streamDict->get("Subtype"));
+            if (subtype.getString() != "Form")
+            {
+                continue;
+            }
+
+            if (streamDict->hasKey("Resources"))
+            {
+                scanResources(streamDict->get("Resources"), pageNumber);
+            }
+        }
+    };
 
     for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
     {
@@ -731,106 +1000,44 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
             continue;
         }
 
-        PDFObject resources = document->getObject(page->getResources());
-        if (!resources.isDictionary())
-        {
-            continue;
-        }
+        const int pageNumber = int(pageIndex + 1);
+        scanResources(page->getResources(), pageNumber);
 
-        const PDFDictionary* fontsDict = document->getDictionaryFromObject(
-            resources.getDictionary()->get("Font"));
-        if (!fontsDict)
+        for (const PDFObjectReference& annotRef : page->getAnnotations())
         {
-            continue;
-        }
-
-        for (size_t i = 0; i < fontsDict->getCount(); ++i)
-        {
-            PDFObject fontObj = fontsDict->getValue(i);
-            PDFObjectReference ref;
-            if (fontObj.isReference())
+            PDFObject annotObject = document->getObjectByReference(annotRef);
+            if (!annotObject.isDictionary())
             {
-                ref = fontObj.getReference();
-                if (processedFonts.contains(ref))
-                {
-                    continue;
-                }
-                processedFonts.insert(ref);
+                continue;
             }
 
-            try
+            const PDFDictionary* annotDict = annotObject.getDictionary();
+            PDFObject appearance = document->getObject(annotDict->get("AP"));
+            if (!appearance.isDictionary())
             {
-                PDFFontPointer font = PDFFont::createFont(
-                    fontObj, fontsDict->getKey(i).getString(), document);
-                if (!font)
-                {
-                    continue;
-                }
-
-                // Type 3 fonts are always considered embedded.
-                if (font->getFontType() == FontType::Type3)
-                {
-                    continue;
-                }
-
-                const FontDescriptor* fd = font->getFontDescriptor();
-                if (!fd)
-                {
-                    // No descriptor at all -- treat as not embedded.
-                    PreflightFinding finding;
-                    finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
-                    finding.page = int(pageIndex + 1);
-                    finding.type = QStringLiteral("embedded-fonts");
-                    finding.severity = check.severity;
-                    finding.checkId = check.id;
-                    finding.bbox = QRectF();
-                    finding.message = PDFTranslationContext::tr(
-                        "Font '%1' on page %2 has no font descriptor (not embedded)")
-                        .arg(QString::fromLatin1(fontsDict->getKey(i).getString()))
-                        .arg(pageIndex + 1);
-
-                    if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
-                    {
-                        warnings.push_back(finding);
-                    }
-                    else
-                    {
-                        errors.push_back(finding);
-                    }
-                    continue;
-                }
-
-                if (!fd->isEmbedded())
-                {
-                    QString fontName = fd->fontName.isEmpty()
-                        ? QString::fromLatin1(fontsDict->getKey(i).getString())
-                        : fd->fontName;
-
-                    PreflightFinding finding;
-                    finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_OBJECT);
-                    finding.page = int(pageIndex + 1);
-                    finding.type = QStringLiteral("embedded-fonts");
-                    finding.severity = check.severity;
-                    finding.checkId = check.id;
-                    finding.bbox = QRectF();
-                    finding.message = PDFTranslationContext::tr(
-                        "Font '%1' on page %2 is not embedded")
-                        .arg(fontName)
-                        .arg(pageIndex + 1);
-
-                    if (check.severity == QStringLiteral("warning") || check.severity == QStringLiteral("info"))
-                    {
-                        warnings.push_back(finding);
-                    }
-                    else
-                    {
-                        errors.push_back(finding);
-                    }
-                }
+                continue;
             }
-            catch (const PDFException&)
+
+            const PDFDictionary* apDict = appearance.getDictionary();
+            for (size_t i = 0; i < apDict->getCount(); ++i)
             {
-                // Skip malformed fonts.
+                PDFObject appearanceStream = document->getObject(apDict->getValue(i));
+                if (appearanceStream.isDictionary())
+                {
+                    const PDFDictionary* stateDict = appearanceStream.getDictionary();
+                    for (size_t j = 0; j < stateDict->getCount(); ++j)
+                    {
+                        PDFObject nested = document->getObject(stateDict->getValue(j));
+                        if (nested.isStream() && nested.getStream()->getDictionary()->hasKey("Resources"))
+                        {
+                            scanResources(nested.getStream()->getDictionary()->get("Resources"), pageNumber);
+                        }
+                    }
+                }
+                else if (appearanceStream.isStream() && appearanceStream.getStream()->getDictionary()->hasKey("Resources"))
+                {
+                    scanResources(appearanceStream.getStream()->getDictionary()->get("Resources"), pageNumber);
+                }
             }
         }
     }
@@ -1285,6 +1492,14 @@ void PreflightEngine::registerBuiltInChecks()
                                                        QList<PreflightFinding>& warnings)
     {
         runImageResolutionCheck(session, check, errors, warnings);
+    };
+
+    m_checks[QStringLiteral("white-overprint")] = [](PDFDocumentSession* session,
+                                                       const PreflightCheckConfig& check,
+                                                       QList<PreflightFinding>& errors,
+                                                       QList<PreflightFinding>& warnings)
+    {
+        runWhiteOverprintCheck(session, check, errors, warnings);
     };
 }
 

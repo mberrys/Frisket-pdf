@@ -24,12 +24,15 @@
 #define PREFLIGHTSIDECARUTILS_H
 
 #include <cmath>
+#include <memory>
 
+#include <QByteArray>
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <QSet>
+#include <QTemporaryFile>
 
 #ifndef FRISKET_PREFLIGHT_SCHEMA_VERSION
 #define FRISKET_PREFLIGHT_SCHEMA_VERSION 2
@@ -59,6 +62,124 @@ inline bool isExpectedPreflightExitCode(int exitCode)
 
 inline constexpr int PREFLIGHT_SIDECAR_STDOUT_MAX_BYTES = 16 * 1024 * 1024;
 inline constexpr int PREFLIGHT_SIDECAR_STDERR_MAX_BYTES = 256 * 1024;
+inline constexpr int PREFLIGHT_SIDECAR_SPILL_WATERMARK_BYTES = 1024 * 1024;
+
+/// Incrementally captures sidecar process output with an in-memory watermark and spill file.
+class PreflightSidecarStreamBuffer
+{
+public:
+    enum class AppendResult
+    {
+        Ok,
+        Overflow
+    };
+
+    explicit PreflightSidecarStreamBuffer(int maxBytes)
+        : m_maxBytes(maxBytes)
+    {
+    }
+
+    AppendResult append(const QByteArray& chunk)
+    {
+        if (chunk.isEmpty())
+        {
+            return AppendResult::Ok;
+        }
+
+        const qint64 newTotal = m_totalSize + chunk.size();
+        if (newTotal > m_maxBytes)
+        {
+            return AppendResult::Overflow;
+        }
+
+        m_memory.append(chunk);
+        m_totalSize = newTotal;
+
+        if (m_memory.size() >= PREFLIGHT_SIDECAR_SPILL_WATERMARK_BYTES)
+        {
+            if (!ensureSpillOpen())
+            {
+                return AppendResult::Overflow;
+            }
+
+            if (m_spillFile->write(m_memory) != m_memory.size())
+            {
+                return AppendResult::Overflow;
+            }
+
+            if (!m_spillFile->flush())
+            {
+                return AppendResult::Overflow;
+            }
+
+            m_spilledBytes += m_memory.size();
+            m_memory.clear();
+        }
+
+        return AppendResult::Ok;
+    }
+
+    QByteArray takeData() const
+    {
+        QByteArray result;
+        result.reserve(int(m_totalSize));
+
+        if (m_spillFile && m_spillFile->isOpen())
+        {
+            m_spillFile->flush();
+            const qint64 position = m_spillFile->pos();
+            m_spillFile->seek(0);
+            result.append(m_spillFile->readAll());
+            m_spillFile->seek(position);
+        }
+
+        result.append(m_memory);
+        return result;
+    }
+
+    void clear()
+    {
+        m_memory.clear();
+        m_totalSize = 0;
+        m_spilledBytes = 0;
+        m_spillFile.reset();
+    }
+
+    qint64 totalSize() const
+    {
+        return m_totalSize;
+    }
+
+    qint64 spilledBytes() const
+    {
+        return m_spilledBytes;
+    }
+
+private:
+    bool ensureSpillOpen()
+    {
+        if (m_spillFile)
+        {
+            return m_spillFile->isOpen();
+        }
+
+        auto spillFile = std::make_unique<QTemporaryFile>();
+        spillFile->setAutoRemove(true);
+        if (!spillFile->open())
+        {
+            return false;
+        }
+
+        m_spillFile = std::move(spillFile);
+        return true;
+    }
+
+    int m_maxBytes = 0;
+    QByteArray m_memory;
+    qint64 m_totalSize = 0;
+    qint64 m_spilledBytes = 0;
+    mutable std::unique_ptr<QTemporaryFile> m_spillFile;
+};
 
 inline bool isImplementedFixupId(const QString& fixupId)
 {

@@ -40,6 +40,9 @@ private slots:
     void findingHasVisualOverlay_respectsScopeAndBbox();
     void filterAdvertisedFixups_removesUnimplementedFixups();
     void isImplementedFixupId_onlyAdvertisesAddBleed();
+    void sidecarStreamBuffer_spillsToDiskAboveWatermark();
+    void sidecarStreamBuffer_rejectsOverflowBeyondMax();
+    void sidecarStreamBuffer_spillRoundTripsContent();
 };
 
 namespace
@@ -219,6 +222,44 @@ void PreflightPluginTest::isImplementedFixupId_onlyAdvertisesAddBleed()
     QVERIFY(pdfplugin::preflight::isImplementedFixupId(QStringLiteral("add-bleed")));
     QVERIFY(!pdfplugin::preflight::isImplementedFixupId(QStringLiteral("rgb-to-cmyk")));
     QVERIFY(!pdfplugin::preflight::isImplementedFixupId(QStringLiteral("downsample-images")));
+}
+
+void PreflightPluginTest::sidecarStreamBuffer_spillsToDiskAboveWatermark()
+{
+    pdfplugin::preflight::PreflightSidecarStreamBuffer buffer(8 * 1024 * 1024);
+    const QByteArray chunk(512 * 1024, 'a');
+    for (int i = 0; i < 4; ++i)
+    {
+        QCOMPARE(buffer.append(chunk), pdfplugin::preflight::PreflightSidecarStreamBuffer::AppendResult::Ok);
+    }
+
+    QVERIFY(buffer.spilledBytes() >= pdfplugin::preflight::PREFLIGHT_SIDECAR_SPILL_WATERMARK_BYTES);
+    QCOMPARE(buffer.takeData().size(), 4 * chunk.size());
+}
+
+void PreflightPluginTest::sidecarStreamBuffer_rejectsOverflowBeyondMax()
+{
+    pdfplugin::preflight::PreflightSidecarStreamBuffer buffer(1024);
+    const QByteArray chunk(600, 'b');
+    QCOMPARE(buffer.append(chunk), pdfplugin::preflight::PreflightSidecarStreamBuffer::AppendResult::Ok);
+    QCOMPARE(buffer.append(chunk), pdfplugin::preflight::PreflightSidecarStreamBuffer::AppendResult::Overflow);
+    QCOMPARE(buffer.totalSize(), chunk.size());
+}
+
+void PreflightPluginTest::sidecarStreamBuffer_spillRoundTripsContent()
+{
+    pdfplugin::preflight::PreflightSidecarStreamBuffer buffer(8 * 1024 * 1024);
+    QByteArray expected;
+    expected.reserve(3 * 1024 * 1024);
+    for (int i = 0; i < 3; ++i)
+    {
+        const QByteArray chunk(1024 * 1024, char('A' + i));
+        QCOMPARE(buffer.append(chunk), pdfplugin::preflight::PreflightSidecarStreamBuffer::AppendResult::Ok);
+        expected.append(chunk);
+    }
+
+    QVERIFY(buffer.spilledBytes() > 0);
+    QCOMPARE(buffer.takeData(), expected);
 }
 
 QTEST_APPLESS_MAIN(PreflightPluginTest)

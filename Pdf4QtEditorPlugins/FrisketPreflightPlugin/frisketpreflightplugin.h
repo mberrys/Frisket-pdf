@@ -96,8 +96,8 @@ private:
     PreflightReportDockWidget* m_reportDockWidget = nullptr;
     QProcess* m_preflightProcess = nullptr;
     std::unique_ptr<QTemporaryDir> m_preflightTemporaryDirectory;
-    QByteArray m_preflightStdoutBuffer;
-    QByteArray m_preflightStderrBuffer;
+    preflight::PreflightSidecarStreamBuffer m_preflightStdoutBuffer{preflight::PREFLIGHT_SIDECAR_STDOUT_MAX_BYTES};
+    preflight::PreflightSidecarStreamBuffer m_preflightStderrBuffer{preflight::PREFLIGHT_SIDECAR_STDERR_MAX_BYTES};
     quint64 m_documentRevision = 0;
     quint64 m_reportDocumentRevision = 0;
     quint64 m_preflightRunRevision = 0;

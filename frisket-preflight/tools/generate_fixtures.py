@@ -397,6 +397,53 @@ def ai_art_raster_trim_edge(out_dir, tmp):
     _finalize(path, media=(0, 0, 400, 400), trim=(0, 0, 400, 400))
 
 
+def white_overprint_fail(out_dir, tmp):
+    """FAIL white-overprint: CMYK paper white with overprint enabled on a filled path."""
+    del tmp
+    path = os.path.join(out_dir, "white-overprint.pdf")
+    pdf = pikepdf.Pdf.new()
+    page = pdf.add_blank_page(page_size=(612, 792))
+    page.MediaBox = pikepdf.Array([0, 0, 612, 792])
+    page.TrimBox = pikepdf.Array([0, 0, 612, 792])
+    gs = pdf.make_indirect(pikepdf.Dictionary({
+        "/Type": pikepdf.Name("/ExtGState"),
+        "/OP": True,
+        "/op": True,
+    }))
+    page.Resources = pdf.make_indirect(pikepdf.Dictionary({
+        "/ExtGState": pdf.make_indirect(pikepdf.Dictionary({
+            "/GS1": gs,
+        })),
+    }))
+    stream = b"""/GS1 gs
+/DeviceCMYK cs
+0 0 0 0 sc
+50 50 200 200 re
+f
+"""
+    page.Contents = pdf.make_stream(stream)
+    pdf.save(path)
+
+
+def white_overprint_ok(out_dir, tmp):
+    """PASS white-overprint: same white fill without overprint enabled."""
+    del tmp
+    path = os.path.join(out_dir, "white-overprint-ok.pdf")
+    pdf = pikepdf.Pdf.new()
+    page = pdf.add_blank_page(page_size=(612, 792))
+    page.MediaBox = pikepdf.Array([0, 0, 612, 792])
+    page.TrimBox = pikepdf.Array([0, 0, 612, 792])
+    stream = b"""q
+/DeviceCMYK cs
+0 0 0 0 sc
+50 50 200 200 re
+f
+Q
+"""
+    page.Contents = pdf.make_stream(stream)
+    pdf.save(path)
+
+
 FIXTURES = [
     color_rgb,
     color_cmyk,
@@ -410,6 +457,8 @@ FIXTURES = [
     ai_art_partial_bleed,
     ai_art_hard_corners,
     ai_art_raster_trim_edge,
+    white_overprint_fail,
+    white_overprint_ok,
 ]
 
 
