@@ -255,7 +255,7 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeRaster(const PDFPage* page,
                                                             size_t pageIndex,
                                                             const PDFBleedMarginProbeSettings& settings,
                                                             const QRectF& reference,
-                                                            const QRectF& targetBleed)
+                                                            const QRectF&)
 {
     PDFBleedMarginProbeResult result;
 

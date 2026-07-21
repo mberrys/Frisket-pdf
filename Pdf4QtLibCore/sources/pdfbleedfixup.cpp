@@ -378,7 +378,7 @@ QImage buildEdgeFillImage(const QImage& pageImage,
         case PDFBleedFixupMode::Mirror:
         {
             const bool horizontal = (side == PDFBleedFixupSide::Left || side == PDFBleedFixupSide::Right);
-            return strip.mirrored(horizontal, !horizontal);
+            return strip.flipped(horizontal ? Qt::Horizontal : Qt::Vertical);
         }
         case PDFBleedFixupMode::PixelRepeat:
         {

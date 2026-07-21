@@ -145,7 +145,8 @@ bool hasRedactAnnotations(const PDFDocument* document)
     }
 
     const PDFCatalog* catalog = document->getCatalog();
-    for (PDFInteger pageIndex = 0; pageIndex < catalog->getPageCount(); ++pageIndex)
+    const PDFInteger pageCount = catalog->getPageCount();
+    for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
     {
         const PDFPage* page = catalog->getPage(pageIndex);
         if (!page)
