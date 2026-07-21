@@ -35,8 +35,7 @@
 #include "pdfaction.h"
 #include "pdfwidgetutils.h"
 #include "pdfdocumentreader.h"
-#include "pdfdocumentwriter.h"
-#include "pdfimageoptimizer.h"
+#include "pdfpagemasterexport.h"
 #include "pdfoutline.h"
 #include "pdfprogress.h"
 #include "pdfutils.h"
@@ -420,167 +419,6 @@ QString createOutputFileName(QString fileNameTemplate,
     fileNameTemplate = sanitizeOutputFileName(fileNameTemplate);
     QDir outputDirectory(directory);
     return outputDirectory.filePath(fileNameTemplate);
-}
-
-struct ExportJob
-{
-    std::map<int, DocumentItem> documents;
-    std::map<int, ImageItem> images;
-    std::vector<std::vector<pdf::PDFDocumentManipulator::AssembledPage>> assembledDocuments;
-    std::vector<QString> outputFileNames;
-    bool overwriteFiles = false;
-    pdf::PDFDocumentManipulator::OutlineMode outlineMode = pdf::PDFDocumentManipulator::OutlineMode::DocumentParts;
-    bool optimizeImages = false;
-    pdf::PDFImageOptimizer::Settings imageOptimizationSettings;
-    bool hasPageGeometrySettings = false;
-    pdf::PDFPageGeometrySettings pageGeometrySettings;
-    bool hasBleedFixupSettings = false;
-    pdf::PDFBleedFixupSettings bleedFixupSettings;
-    pdf::PDFProgress* progress = nullptr;
-};
-
-ExportResult createExportError(QString message)
-{
-    ExportResult result;
-    result.success = false;
-    result.errorMessage = qMove(message);
-    return result;
-}
-
-ExportResult runExportJob(ExportJob job)
-{
-    pdf::PDFDocumentManipulator manipulator;
-    manipulator.setOutlineMode(job.outlineMode);
-
-    for (const auto& documentItem : job.documents)
-    {
-        manipulator.addDocument(documentItem.first, &documentItem.second.document);
-    }
-    for (const auto& imageItem : job.images)
-    {
-        manipulator.addImage(imageItem.first, imageItem.second.image);
-    }
-
-    std::vector<std::pair<QString, pdf::PDFDocument>> assembledDocumentStorage;
-    assembledDocumentStorage.reserve(job.assembledDocuments.size());
-
-    if (job.progress && !job.assembledDocuments.empty())
-    {
-        pdf::ProgressStartupInfo info;
-        info.showDialog = true;
-        info.text = QCoreApplication::translate("pdfpagemaster::MainWindow", "Assembling documents...");
-        job.progress->start(job.assembledDocuments.size(), qMove(info));
-    }
-
-    for (size_t index = 0; index < job.assembledDocuments.size(); ++index)
-    {
-        pdf::PDFOperationResult currentResult = manipulator.assemble(job.assembledDocuments[index]);
-        if (!currentResult)
-        {
-            if (job.progress)
-            {
-                job.progress->finish();
-            }
-            return createExportError(currentResult.getErrorMessage());
-        }
-
-        pdf::PDFDocument assembledDocument = manipulator.takeAssembledDocument();
-        if (job.hasPageGeometrySettings)
-        {
-            const pdf::PDFOperationResult geometryResult = pdf::PDFPageGeometry::apply(&assembledDocument, job.pageGeometrySettings);
-            if (!geometryResult)
-            {
-                if (job.progress)
-                {
-                    job.progress->finish();
-                }
-                return createExportError(geometryResult.getErrorMessage());
-            }
-        }
-
-        if (job.hasBleedFixupSettings)
-        {
-            const pdf::PDFOperationResult bleedResult = pdf::PDFBleedFixup::apply(&assembledDocument, job.bleedFixupSettings);
-            if (!bleedResult)
-            {
-                if (job.progress)
-                {
-                    job.progress->finish();
-                }
-                return createExportError(bleedResult.getErrorMessage());
-            }
-        }
-
-        assembledDocumentStorage.emplace_back(std::make_pair(job.outputFileNames[index], std::move(assembledDocument)));
-        if (job.progress)
-        {
-            job.progress->step();
-        }
-    }
-
-    if (job.progress && !job.assembledDocuments.empty())
-    {
-        job.progress->finish();
-    }
-
-    if (job.optimizeImages)
-    {
-        pdf::PDFImageOptimizer imageOptimizer;
-        for (auto& assembledDocumentItem : assembledDocumentStorage)
-        {
-            assembledDocumentItem.second = imageOptimizer.optimize(&assembledDocumentItem.second, job.imageOptimizationSettings, {}, job.progress);
-        }
-    }
-
-    ExportResult result;
-    result.success = true;
-    result.writtenFiles.reserve(int(assembledDocumentStorage.size()));
-
-    if (job.progress && !assembledDocumentStorage.empty())
-    {
-        pdf::ProgressStartupInfo info;
-        info.showDialog = true;
-        info.text = QCoreApplication::translate("pdfpagemaster::MainWindow", "Writing documents...");
-        job.progress->start(assembledDocumentStorage.size(), qMove(info));
-    }
-
-    for (const auto& assembledDocumentItem : assembledDocumentStorage)
-    {
-        const QString& fileName = assembledDocumentItem.first;
-        const pdf::PDFDocument* document = &assembledDocumentItem.second;
-        const bool isDocumentFileAlreadyExisting = QFile::exists(fileName);
-        if (!job.overwriteFiles && isDocumentFileAlreadyExisting)
-        {
-            if (job.progress)
-            {
-                job.progress->finish();
-            }
-            return createExportError(QCoreApplication::translate("pdfpagemaster::MainWindow", "Document with filename '%1' already exists.").arg(fileName));
-        }
-
-        pdf::PDFDocumentWriter writer(nullptr);
-        pdf::PDFOperationResult writeResult = writer.write(fileName, document, isDocumentFileAlreadyExisting);
-        if (!writeResult)
-        {
-            if (job.progress)
-            {
-                job.progress->finish();
-            }
-            return createExportError(writeResult.getErrorMessage());
-        }
-        result.writtenFiles << fileName;
-        if (job.progress)
-        {
-            job.progress->step();
-        }
-    }
-
-    if (job.progress && !assembledDocumentStorage.empty())
-    {
-        job.progress->finish();
-    }
-
-    return result;
 }
 
 bool resolveOutlinePageIndex(const pdf::PDFDocument* document, const pdf::PDFOutlineItem* item, pdf::PDFInteger* pageIndex)
@@ -1486,7 +1324,7 @@ void MainWindow::onExportFinished()
         return;
     }
 
-    const ExportResult result = m_exportWatcher->result();
+    const pdf::PDFPageMasterExportResult result = m_exportWatcher->result();
     m_exportWatcher->deleteLater();
     m_exportWatcher = nullptr;
 
@@ -2605,9 +2443,15 @@ void MainWindow::exportAssembledDocuments(std::vector<std::vector<pdf::PDFDocume
         ++validationOutputIndex;
     }
 
-    ExportJob job;
-    job.documents = m_model->getDocuments();
-    job.images = m_model->getImages();
+    pdf::PDFPageMasterExportJob job;
+    for (const auto& documentItem : m_model->getDocuments())
+    {
+        job.documents.emplace(documentItem.first, documentItem.second.document);
+    }
+    for (const auto& imageItem : m_model->getImages())
+    {
+        job.images.emplace(imageItem.first, imageItem.second.image);
+    }
     job.assembledDocuments = std::move(assembledDocuments);
     job.outputFileNames = std::move(outputFileNames);
     job.overwriteFiles = isOverwriteEnabled;
@@ -2643,11 +2487,11 @@ void MainWindow::exportAssembledDocuments(std::vector<std::vector<pdf::PDFDocume
     m_exportProgressBar->setValue(0);
     m_exportProgressBar->show();
 
-    m_exportWatcher = new QFutureWatcher<ExportResult>(this);
-    connect(m_exportWatcher, &QFutureWatcher<ExportResult>::finished, this, &MainWindow::onExportFinished);
+    m_exportWatcher = new QFutureWatcher<pdf::PDFPageMasterExportResult>(this);
+    connect(m_exportWatcher, &QFutureWatcher<pdf::PDFPageMasterExportResult>::finished, this, &MainWindow::onExportFinished);
     m_exportWatcher->setFuture(QtConcurrent::run([job = std::move(job)]() mutable
     {
-        return runExportJob(std::move(job));
+        return pdf::PDFPageMasterExport::run(std::move(job));
     }));
 }
 
