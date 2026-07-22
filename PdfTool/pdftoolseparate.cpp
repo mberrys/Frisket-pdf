@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdftoolseparate.h"
+#include "pdftoolcancel.h"
 #include "pdfdocumentbuilder.h"
 #include "pdfexception.h"
 #include "pdfoptimizer.h"
@@ -92,6 +93,11 @@ int PDFToolSeparate::execute(const PDFToolOptions& options)
 
     for (pdf::PDFInteger pageIndex : pageIndices)
     {
+        if (isCancelRequested())
+        {
+            return ExitFailure;
+        }
+
         try
         {
             pdf::PDFDocumentBuilder documentBuilder(&document);
@@ -115,18 +121,29 @@ int PDFToolSeparate::execute(const PDFToolOptions& options)
             QString fileName = options.separatePagePattern;
             fileName.replace('%', QString::number(pageIndex + 1));
 
-            if (QFileInfo::exists(fileName))
+            if (const int blocked = validateDestructiveOutput(options, fileName))
             {
-                PDFConsole::writeError(PDFToolTranslationContext::tr("File '%1' already exists. Page %2 was not extracted.").arg(fileName).arg(pageIndex + 1), options.outputCodec);
+                return blocked;
             }
-            else
+
+            if (options.destructiveReport)
             {
-                pdf::PDFDocumentWriter writer(nullptr);
-                pdf::PDFOperationResult result = writer.write(fileName, &singlePageDocument, true);
-                if (!result)
-                {
-                    PDFConsole::writeError(result.getErrorMessage(), options.outputCodec);
-                }
+                PDFConsole::writeText(PDFToolTranslationContext::tr("Would extract page %1 to '%2'.")
+                                        .arg(pageIndex + 1)
+                                        .arg(fileName),
+                                    options.outputCodec);
+            }
+
+            if (options.destructiveDryRun)
+            {
+                continue;
+            }
+
+            pdf::PDFDocumentWriter writer(nullptr);
+            pdf::PDFOperationResult result = writer.write(fileName, &singlePageDocument, true);
+            if (!result)
+            {
+                PDFConsole::writeError(result.getErrorMessage(), options.outputCodec);
             }
         }
         catch (const pdf::PDFException &exception)
@@ -140,7 +157,7 @@ int PDFToolSeparate::execute(const PDFToolOptions& options)
 
 PDFToolAbstractApplication::Options PDFToolSeparate::getOptionsFlags() const
 {
-    return ConsoleFormat | OpenDocument | PageSelector | Separate;
+    return ConsoleFormat | OpenDocument | PageSelector | Separate | DestructiveWrite;
 }
 
 

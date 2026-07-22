@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdftoolunite.h"
+#include "pdftoolcancel.h"
 #include "pdfdocumentbuilder.h"
 #include "pdfdocumentreader.h"
 #include "pdfoptimizer.h"
@@ -66,10 +67,27 @@ int PDFToolUnite::execute(const PDFToolOptions& options)
     QString targetFile = files.back();
     files.pop_back();
 
-    if (QFileInfo::exists(targetFile))
+    if (const int blocked = validateDestructiveOutput(options, targetFile))
     {
-        PDFConsole::writeError(PDFToolTranslationContext::tr("Target file '%1' already exists. Document merging not performed.").arg(targetFile), options.outputCodec);
-        return ErrorFailedWriteToFile;
+        return blocked;
+    }
+
+    if (options.destructiveReport)
+    {
+        PDFConsole::writeText(PDFToolTranslationContext::tr("Would merge %1 document(s) into '%2'.")
+                                .arg(files.size())
+                                .arg(targetFile),
+                            options.outputCodec);
+    }
+
+    if (options.destructiveDryRun)
+    {
+        return ExitSuccess;
+    }
+
+    if (isCancelRequested())
+    {
+        return ExitFailure;
     }
 
     try
@@ -210,6 +228,12 @@ int PDFToolUnite::execute(const PDFToolOptions& options)
         }
         mergedDocument = finalBuilder.build();
 
+        if (isCancelRequested())
+        {
+            removePartialOutput(targetFile);
+            return ExitFailure;
+        }
+
         pdf::PDFDocumentWriter writer(nullptr);
         pdf::PDFOperationResult result = writer.write(targetFile, &mergedDocument, true);
         if (!result)
@@ -229,7 +253,7 @@ int PDFToolUnite::execute(const PDFToolOptions& options)
 
 PDFToolAbstractApplication::Options PDFToolUnite::getOptionsFlags() const
 {
-    return ConsoleFormat | Unite;
+    return ConsoleFormat | Unite | DestructiveWrite;
 }
 
 }   // namespace pdftool

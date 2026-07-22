@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdftooloptimize.h"
+#include "pdftoolcancel.h"
 #include "pdfdocumentwriter.h"
 #include "pdfimageoptimizer.h"
 
@@ -65,6 +66,26 @@ int PDFToolOptimize::execute(const PDFToolOptions& options)
         return ErrorDocumentReading;
     }
 
+    if (const int blocked = validateDestructiveOutput(options, options.document))
+    {
+        return blocked;
+    }
+
+    if (options.destructiveReport)
+    {
+        PDFConsole::writeText(PDFToolTranslationContext::tr("Would optimize '%1'.").arg(options.document), options.outputCodec);
+    }
+
+    if (options.destructiveDryRun)
+    {
+        return ExitSuccess;
+    }
+
+    if (isCancelRequested())
+    {
+        return ExitFailure;
+    }
+
     if (options.imageOptimizationSettings.enabled)
     {
         pdf::PDFImageOptimizer imageOptimizer;
@@ -80,6 +101,12 @@ int PDFToolOptimize::execute(const PDFToolOptions& options)
         document = optimizer.takeOptimizedDocument();
     }
 
+    if (isCancelRequested())
+    {
+        removePartialOutput(options.document);
+        return ExitFailure;
+    }
+
     pdf::PDFDocumentWriter writer(nullptr);
     pdf::PDFOperationResult result = writer.write(options.document, &document, true);
     if (!result)
@@ -93,7 +120,7 @@ int PDFToolOptimize::execute(const PDFToolOptions& options)
 
 PDFToolAbstractApplication::Options PDFToolOptimize::getOptionsFlags() const
 {
-    return ConsoleFormat | OpenDocument | Optimize;
+    return ConsoleFormat | OpenDocument | Optimize | DestructiveWrite;
 }
 
 }   // namespace pdftool
