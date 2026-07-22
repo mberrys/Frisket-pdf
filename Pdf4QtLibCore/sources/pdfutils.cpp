@@ -591,6 +591,11 @@ PDFColorScale::PDFColorScale(PDFReal min, PDFReal max) :
 
 QColor PDFColorScale::map(PDFReal value) const
 {
+    if (m_colorScales.empty())
+    {
+        return QColor();
+    }
+
     PDFReal correctedValue = qBound(m_min, value, m_max);
     PDFReal intervalValue = interpolate(correctedValue, m_min, m_max, 0.0, PDFReal(m_colorScales.size() - 1));
     PDFReal indexValue = qFloor(intervalValue);

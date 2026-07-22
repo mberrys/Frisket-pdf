@@ -136,7 +136,7 @@ void PDFCertificateManager::createCertificate(const NewCertificateInfo& info)
             BUF_MEM* pksMemoryBuffer = nullptr;
             BIO_get_mem_ptr(pksBuffer.get(), &pksMemoryBuffer);
 
-            if (!info.fileName.isEmpty())
+            if (pksMemoryBuffer && !info.fileName.isEmpty())
             {
                 QFile file(info.fileName);
                 if (file.open(QFile::WriteOnly | QFile::Truncate))
@@ -288,6 +288,14 @@ bool PDFSignatureFactory::sign(const PDFCertificateEntry& certificateEntry,
 
                     BUF_MEM* pksMemoryBuffer = nullptr;
                     BIO_get_mem_ptr(outputBuffer.get(), &pksMemoryBuffer);
+
+                    if (!pksMemoryBuffer)
+                    {
+                        EVP_PKEY_free(key);
+                        X509_free(certificate);
+                        sk_X509_free(certificates);
+                        return false;
+                    }
 
                     result = QByteArray(pksMemoryBuffer->data, int(pksMemoryBuffer->length));
 

@@ -39,6 +39,11 @@ PDFPageNavigation::PDFPageNavigation(const PDFDocument* document, QObject* paren
 
 void PDFPageNavigation::navigateToPage(size_t pageIndex)
 {
+    if (!m_document)
+    {
+        return;
+    }
+
     if (m_currentPageIndex == pageIndex)
     {
         // Jakub Melka: We are at the same page! Do nothing.
@@ -67,6 +72,11 @@ void PDFPageNavigation::navigateToPage(size_t pageIndex)
 
 void PDFPageNavigation::navigateForward()
 {
+    if (!m_document)
+    {
+        return;
+    }
+
     if (m_currentNavigationNode)
     {
         executeNavigationNode(Direction::Forward);
@@ -79,6 +89,11 @@ void PDFPageNavigation::navigateForward()
 
 void PDFPageNavigation::navigateBackward()
 {
+    if (!m_document)
+    {
+        return;
+    }
+
     if (m_currentNavigationNode)
     {
         executeNavigationNode(Direction::Backward);
@@ -91,7 +106,7 @@ void PDFPageNavigation::navigateBackward()
 
 void PDFPageNavigation::executeNavigationNode(Direction direction)
 {
-    if (!m_currentNavigationNode)
+    if (!m_document || !m_currentNavigationNode)
     {
         return;
     }

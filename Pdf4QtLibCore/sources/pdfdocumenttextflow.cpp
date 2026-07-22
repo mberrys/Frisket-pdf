@@ -1009,7 +1009,8 @@ PDFDocumentTextFlow PDFDocumentTextFlowEditor::createEditedTextFlow() const
             continue;
         }
 
-        PDFDocumentTextFlow::Item item = *getOriginalItem(i);
+        const EditedItem* editedItem = getEditedItem(i);
+        PDFDocumentTextFlow::Item item = *getOriginalItem(editedItem->originalIndex);
         item.text = getText(i);
         items.emplace_back(std::move(item));
     }
@@ -1056,7 +1057,8 @@ void PDFDocumentTextFlowEditor::createEditedFromOriginalTextFlow()
 
 void PDFDocumentTextFlowEditor::updateModifiedFlag(size_t index)
 {
-    const bool isModified = getText(index) != getOriginalItem(index)->text;
+    const EditedItem* editedItem = getEditedItem(index);
+    const bool isModified = getText(index) != getOriginalItem(editedItem->originalIndex)->text;
 
     EditedItem* item = getEditedItem(index);
     item->editedItemFlags.setFlag(Modified, isModified);

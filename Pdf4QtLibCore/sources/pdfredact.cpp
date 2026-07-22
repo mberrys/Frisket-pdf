@@ -50,6 +50,11 @@ PDFDocument PDFRedact::perform(Options options)
     PDFDocumentBuilder builder;
     builder.createDocument();
 
+    if (!m_document)
+    {
+        return builder.build();
+    }
+
     PDFRenderer renderer(m_document,
                          m_fontCache,
                          m_cms,
@@ -101,7 +106,10 @@ PDFDocument PDFRedact::perform(Options options)
 
             // We have redact annotation here
             const PDFRedactAnnotation* redactAnnotation = dynamic_cast<const PDFRedactAnnotation*>(annotation.get());
-            Q_ASSERT(redactAnnotation);
+            if (!redactAnnotation)
+            {
+                continue;
+            }
 
             redactPath = redactPath.united(redactAnnotation->getRedactionRegion().getPath());
         }

@@ -762,8 +762,10 @@ void PDFFormManager::setFormFieldValue(PDFFormField::SetValueParameters paramete
         return;
     }
 
-    Q_ASSERT(parameters.invokingFormField);
-    Q_ASSERT(parameters.invokingWidget.isValid());
+    if (!parameters.invokingFormField || !parameters.invokingWidget.isValid())
+    {
+        return;
+    }
 
     parameters.formManager = this;
     parameters.scope = PDFFormField::SetValueParameters::Scope::User;
@@ -804,6 +806,11 @@ void PDFFormManager::setFormFieldValue(PDFFormField::SetValueParameters paramete
 
 QRectF PDFFormManager::getWidgetRectangle(const PDFFormWidget& widget) const
 {
+    if (!m_document)
+    {
+        return QRectF();
+    }
+
     if (const PDFDictionary* dictionary = m_document->getDictionaryFromObject(m_document->getObjectByReference(widget.getWidget())))
     {
         PDFDocumentDataLoaderDecorator loader(m_document);

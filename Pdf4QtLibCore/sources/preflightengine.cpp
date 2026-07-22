@@ -130,6 +130,11 @@ void runBleedCheck(PDFDocumentSession* session,
                    QList<PreflightFinding>& errors,
                    QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     const PDFDocument* document = session->getDocument();
     if (!document)
     {
@@ -182,6 +187,11 @@ void runSizeCheck(SizeCheckKind kind,
                   QList<PreflightFinding>& errors,
                   QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     if (!check.hasExpectedSize)
     {
         return;
@@ -495,6 +505,11 @@ void runColorModeCheck(PDFDocumentSession* session,
                        QList<PreflightFinding>& errors,
                        QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     if (check.allowedColorModes.isEmpty())
     {
         return;
@@ -730,6 +745,11 @@ void runWhiteOverprintCheck(PDFDocumentSession* session,
                             QList<PreflightFinding>& errors,
                             QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     PDFDocument* document = session->getDocument();
     if (!document)
     {
@@ -854,6 +874,11 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
                             QList<PreflightFinding>& errors,
                             QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     PDFDocument* document = session->getDocument();
     if (!document)
     {
@@ -1055,6 +1080,11 @@ void runImageResolutionCheck(PDFDocumentSession* session,
                               QList<PreflightFinding>& errors,
                               QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     if (check.minDpi <= 0)
     {
         return;

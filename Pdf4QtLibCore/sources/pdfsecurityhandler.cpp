@@ -890,7 +890,8 @@ QByteArray PDFStandardOrPublicSecurityHandler::decryptUsingFilter(const QByteArr
         const int remainder = result.paddedData.size() % AES_BLOCK_SIZE;
         if (remainder != 0)
         {
-            result.paddedData = result.paddedData.left(result.paddedData.size() - remainder);
+            result.paddedData.clear();
+            return result;
         }
 
         return result;
@@ -2495,7 +2496,10 @@ PDFSecurityHandler::AuthorizationResult PDFPublicKeySecurityHandler::authenticat
 
                         // Calculate file encryption key
                         EVP_MD_CTX* context = EVP_MD_CTX_new();
-                        Q_ASSERT(context);
+                        if (!context)
+                        {
+                            break;
+                        }
 
                         switch (m_keyLength)
                         {

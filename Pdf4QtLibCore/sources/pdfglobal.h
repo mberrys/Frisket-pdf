@@ -26,6 +26,7 @@
 #include <QtSystemDetection>
 #include <QtCompilerDetection>
 #include <QCoreApplication>
+#include <QtNumeric>
 
 #include <limits>
 #include <tuple>
@@ -87,6 +88,18 @@ constexpr PDFReal PDF_EPSILON = 0.000001;
 static constexpr bool isValidInteger(PDFInteger integer)
 {
     return integer >= PDF_INTEGER_MIN && integer <= PDF_INTEGER_MAX;
+}
+
+template<typename T>
+inline bool pdfTryMultiply(T a, T b, T& result) noexcept
+{
+    return !qMulOverflow(a, b, &result);
+}
+
+template<typename T>
+inline bool pdfTryAdd(T a, T b, T& result) noexcept
+{
+    return !qAddOverflow(a, b, &result);
 }
 
 static inline bool isZero(PDFReal value)

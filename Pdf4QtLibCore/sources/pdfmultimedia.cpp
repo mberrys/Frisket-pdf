@@ -525,7 +525,7 @@ PDFMediaPlayParameters PDFMediaPlayParameters::parse(const PDFObjectStorage* sto
                 parameters.controllerUserInterface = loader.readBooleanFromDictionary(subdictionary, "C", false);
                 parameters.fitMode = static_cast<FitMode>(loader.readIntegerFromDictionary(subdictionary, "F", 5));
                 parameters.playAutomatically = loader.readBooleanFromDictionary(subdictionary, "A", true);
-                parameters.repeat = loader.readNumberFromDictionary(dictionary, "RC", 1.0);
+                parameters.repeat = loader.readNumberFromDictionary(subdictionary, "RC", 1.0);
 
                 if (const PDFDictionary* durationDictionary = storage->getDictionaryFromObject(subdictionary->get("D")))
                 {
@@ -737,8 +737,7 @@ PDFInteger PDFMovieActivation::parseMovieTimeFromString(const QByteArray& string
     // in big-endian format.
     if (string.size() == sizeof(quint64))
     {
-        quint64 result = reinterpret_cast<quint64>(string.data());
-        qFromBigEndian<decltype(result)>(&result, qsizetype(sizeof(decltype(result))), &result);
+        quint64 result = qFromBigEndian<quint64>(reinterpret_cast<const uchar*>(string.constData()));
         return static_cast<PDFInteger>(result);
     }
 
@@ -1192,7 +1191,7 @@ PDF3DProjection PDF3DProjection::parse(const PDFObjectStorage* storage, PDFObjec
             result.m_projectionScaleMode = loader.readEnumByName(dictionary->get("PS"), scaleModes.cbegin(), scaleModes.cend(), ScaleMode::Value);
         }
         result.m_scaleFactor = loader.readNumberFromDictionary(dictionary, "OS", 1.0);
-        result.m_scaleMode = result.m_projectionScaleMode = loader.readEnumByName(dictionary->get("OB"), scaleModes.cbegin(), scaleModes.cend(), ScaleMode::Absolute);
+        result.m_scaleMode = loader.readEnumByName(dictionary->get("OB"), scaleModes.cbegin(), scaleModes.cend(), ScaleMode::Absolute);
     }
 
     return result;

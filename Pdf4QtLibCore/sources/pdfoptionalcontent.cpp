@@ -383,8 +383,13 @@ void PDFOptionalContentActivity::setDocument(const PDFDocument* document)
 {
     if (m_document != document)
     {
-        Q_ASSERT(document);
         m_document = document;
+        if (!document)
+        {
+            m_properties = nullptr;
+            return;
+        }
+
         m_properties = document->getCatalog()->getOptionalContentProperties();
     }
 }

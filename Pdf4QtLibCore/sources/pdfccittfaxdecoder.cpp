@@ -22,7 +22,10 @@
 
 #include "pdfccittfaxdecoder.h"
 #include "pdfexception.h"
+#include "pdfglobal.h"
 #include "pdfdbgheap.h"
+
+#include <limits>
 
 namespace pdf
 {
@@ -305,6 +308,11 @@ PDFImageData PDFCCITTFaxDecoder::decode()
         throw PDFException(PDFTranslationContext::tr("Invalid decode array for CCITT fax decoder."));
     }
 
+    if (m_parameters.columns < 0 || m_parameters.columns > static_cast<PDFInteger>(std::numeric_limits<size_t>::max() - 2))
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid CCITT fax image width."));
+    }
+
     PDFBitWriter writer(1);
     std::vector<int> codingLine;
     std::vector<int> referenceLine;
@@ -568,7 +576,13 @@ PDFImageData PDFCCITTFaxDecoder::decode()
         decode = { m_parameters.decode[0], m_parameters.decode[1] };
     }
 
-    return PDFImageData(1, 1, m_parameters.columns, row, (m_parameters.columns + 7) / 8, m_parameters.maskingType, writer.takeByteArray(), { }, qMove(decode), { });
+    PDFInteger strideValue = 0;
+    if (!pdfTryAdd(m_parameters.columns, PDFInteger(7), strideValue))
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid CCITT fax image width."));
+    }
+
+    return PDFImageData(1, 1, m_parameters.columns, row, static_cast<unsigned int>(strideValue / 8), m_parameters.maskingType, writer.takeByteArray(), { }, qMove(decode), { });
 }
 
 void PDFCCITTFaxDecoder::skipFill()

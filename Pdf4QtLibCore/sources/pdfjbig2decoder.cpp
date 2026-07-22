@@ -23,6 +23,7 @@
 #include "pdfjbig2decoder.h"
 #include "pdfexception.h"
 #include "pdfccittfaxdecoder.h"
+#include "pdfglobal.h"
 #include "pdfdbgheap.h"
 
 namespace pdf
@@ -1537,7 +1538,13 @@ void PDFJBIG2Decoder::processSymbolDictionary(const PDFJBIG2SegmentHeader& heade
         }
     }
 
-    uint8_t SBSYMCODELENGTH = log2ceil(parameters.SDNUMINSYMS + parameters.SDNUMNEWSYMS);
+    uint32_t symbolCount = 0;
+    if (!pdfTryAdd(parameters.SDNUMINSYMS, parameters.SDNUMNEWSYMS, symbolCount))
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 - invalid symbol dictionary size."));
+    }
+
+    uint8_t SBSYMCODELENGTH = log2ceil(symbolCount);
     if (parameters.SDHUFF)
     {
         SBSYMCODELENGTH = qMax<uint8_t>(SBSYMCODELENGTH, 1);
@@ -1778,7 +1785,11 @@ void PDFJBIG2Decoder::processSymbolDictionary(const PDFJBIG2SegmentHeader& heade
 
     /* 6.5.5 step 5) - determine exports according to 6.5.10 */
     std::vector<bool> EXFLAGS;
-    const size_t symbolsSize = parameters.SDNUMINSYMS + parameters.SDNEWSYMS.size();
+    size_t symbolsSize = 0;
+    if (!pdfTryAdd(static_cast<size_t>(parameters.SDNUMINSYMS), parameters.SDNEWSYMS.size(), symbolsSize))
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 - invalid symbol dictionary size."));
+    }
     EXFLAGS.reserve(symbolsSize);
     bool CUREXFLAG = false;
     while (EXFLAGS.size() < symbolsSize)

@@ -75,11 +75,11 @@ public:
     {
         if constexpr (index < FlatSize)
         {
-            return m_flatBlock[size()];
+            return m_flatBlock[index];
         }
         else
         {
-            return m_variableBlock[size() - FlatSize];
+            return m_variableBlock[index - FlatSize];
         }
     }
 
@@ -88,11 +88,11 @@ public:
     {
         if constexpr (index < FlatSize)
         {
-            return m_flatBlock[size()];
+            return m_flatBlock[index];
         }
         else
         {
-            return m_variableBlock[size() - FlatSize];
+            return m_variableBlock[index - FlatSize];
         }
     }
 
@@ -156,11 +156,18 @@ public:
         }
     }
 
-    /// Returns the last element of the array
-    inline const T& back() const { return m_variableBlock.empty() ? m_flatBlock[m_flatBlockItemCount - 1] : m_variableBlock.back(); }
+    inline const T& back() const
+    {
+        Q_ASSERT(!empty());
+        return m_variableBlock.empty() ? m_flatBlock[m_flatBlockItemCount - 1] : m_variableBlock.back();
+    }
 
     /// Erases the last element from the array
-    inline void pop_back() { resize(size() - 1); }
+    inline void pop_back()
+    {
+        Q_ASSERT(!empty());
+        resize(size() - 1);
+    }
 
     bool operator==(const PDFFlatArray& other) const
     {

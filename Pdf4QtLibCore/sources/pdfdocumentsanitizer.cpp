@@ -246,8 +246,18 @@ QByteArray PDFInvisibleTextSanitizerHelper::sanitizeInvisibleTextInContent(const
 
                     if (width > 0 && height > 0 && bpc > 0)
                     {
-                        const PDFInteger stride = (width * bpc + 7) / 8;
-                        dataLength = stride * height;
+                        PDFInteger stride = 0;
+                        PDFInteger dataLengthProduct = 0;
+                        if (!pdfTryMultiply(width, bpc, stride) || !pdfTryAdd(stride, 7, stride))
+                        {
+                            continue;
+                        }
+                        stride = (stride + 7) / 8;
+                        if (!pdfTryMultiply(stride, height, dataLengthProduct))
+                        {
+                            continue;
+                        }
+                        dataLength = dataLengthProduct;
                     }
                 }
 
