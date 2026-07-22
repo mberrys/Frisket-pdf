@@ -688,7 +688,7 @@ void PDFPageContentProcessor::processContent(const QByteArray& content)
 
                             PDFInteger stride = 0;
                             PDFInteger dataLengthProduct = 0;
-                            if (!pdfTryMultiply(width, bpc, stride) || !pdfTryAdd(stride, 7, stride))
+                            if (!pdfTryMultiply(width, bpc, stride) || !pdfTryAdd(stride, PDFInteger(7), stride))
                             {
                                 throw PDFException(PDFTranslationContext::tr("Expected name in the inline image dictionary stream."));
                             }

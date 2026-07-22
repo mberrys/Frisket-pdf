@@ -20,9 +20,8 @@
     "pdf": "color-rgb.pdf",
     "profile": "profiles/frisket-default.json",
     "expect": { "pass": false, "check_ids": ["color-mode"] },
-    "pending": true,
     "source": "hand-built",
-    "notes": "DeviceRGB image (disallowed) at ~310 DPI on a page with adequate bleed and no fonts, so only color-mode fires. Implemented in MIC-148. Pending: Linux CI (and some local runs) get pass/empty findings — tracked as MIC-321 color traversal residual; do not flip expect.pass."
+    "notes": "DeviceRGB image (disallowed) at ~310 DPI on a page with adequate bleed and no fonts, so only color-mode fires."
   },
   {
     "id": "color-cmyk",

@@ -1,11 +1,18 @@
 {
+    "checks": [
+        {
+            "id": "white-overprint",
+            "status": "failed"
+        }
+    ],
     "errors": [
     ],
     "fixups_available": [
     ],
+    "inspection_complete": true,
     "pass": true,
     "profile": "Frisket Test - White Overprint",
-    "schema_version": 2,
+    "schema_version": 3,
     "warnings": [
         {
             "check_id": "white-overprint",
