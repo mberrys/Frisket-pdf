@@ -85,6 +85,9 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportJob
     PDFPageGeometrySettings pageGeometrySettings;
     bool hasBleedFixupSettings = false;
     PDFBleedFixupSettings bleedFixupSettings;
+    bool hasPreflightGate = false;
+    QString preflightProfilePath;
+    bool forcePreflight = false;
     PDFProgress* progress = nullptr;
     std::atomic_bool* cancelFlag = nullptr;
     std::atomic_bool* progressAlive = nullptr;
@@ -104,7 +107,7 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExportResult
 };
 
 /// Headless PageMaster export orchestrator (ADR-003).
-/// Locked stage order: assemble → page geometry → bleed fixup → image optimize → write.
+/// Locked stage order: assemble → preflight → page geometry → bleed fixup → image optimize → write.
 /// Synchronous and not thread-safe; callers may invoke run() from a worker thread.
 class PDF4QTLIBCORESHARED_EXPORT PDFPageMasterExport
 {

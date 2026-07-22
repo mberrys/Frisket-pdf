@@ -71,6 +71,7 @@ private slots:
     void manifest_persistedWithWrittenStatuses();
     void resume_skipsAlreadyWrittenOutputs();
     void resume_mismatchedManifestStartsFreshBatch();
+    void preflight_gate_blocksFailedOutput();
 };
 
 namespace
@@ -829,6 +830,33 @@ void PageMasterExportTest::resume_mismatchedManifestStartsFreshBatch()
     QCOMPARE(result.manifest.value(QStringLiteral("outputs")).toArray().first().toObject()
                  .value(QStringLiteral("path")).toString(),
              outputPath);
+}
+
+void PageMasterExportTest::preflight_gate_blocksFailedOutput()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString fixturePath = QStringLiteral(FRISKET_PREFLIGHT_SOURCE_DIR "/testdata/fixtures/color-rgb.pdf");
+    const QString profilePath = QStringLiteral(FRISKET_PREFLIGHT_SOURCE_DIR "/profiles/frisket-default.json");
+    QVERIFY(QFile::exists(fixturePath));
+    QVERIFY(QFile::exists(profilePath));
+
+    const QString outputPath = tempDir.filePath(QStringLiteral("preflight-blocked.pdf"));
+    pdf::PDFDocument source = readDocument(fixturePath);
+
+    pdf::PDFPageMasterExportJob job;
+    job.assembledDocuments.push_back({ documentPage(0, source) });
+    job.documents.emplace(0, std::move(source));
+    job.outputFileNames.push_back(outputPath);
+    job.overwriteFiles = true;
+    job.hasPreflightGate = true;
+    job.preflightProfilePath = profilePath;
+
+    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(job));
+    QVERIFY(!result.success);
+    QVERIFY(!QFile::exists(outputPath));
+    QVERIFY(QFile::exists(outputPath + QStringLiteral(".preflight.json")));
 }
 
 QTEST_GUILESS_MAIN(PageMasterExportTest)

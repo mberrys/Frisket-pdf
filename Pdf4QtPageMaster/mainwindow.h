@@ -273,6 +273,9 @@ private:
     pdf::PDFPageGeometrySettings m_pageGeometrySettings;
     bool m_hasBleedFixupSettings = false;
     pdf::PDFBleedFixupSettings m_bleedFixupSettings;
+    bool m_hasPreflightGate = false;
+    bool m_forcePreflight = false;
+    QString m_preflightProfilePath;
     QAction* m_actionBleedFixup = nullptr;
 
     struct WorkspaceCheckpoint
