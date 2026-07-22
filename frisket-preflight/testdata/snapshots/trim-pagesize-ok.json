@@ -1,11 +1,22 @@
 {
+    "checks": [
+        {
+            "id": "page-size",
+            "status": "ok"
+        },
+        {
+            "id": "trim",
+            "status": "ok"
+        }
+    ],
     "errors": [
     ],
     "fixups_available": [
     ],
+    "inspection_complete": true,
     "pass": true,
     "profile": "Frisket Test - Trim/Page Size",
-    "schema_version": 2,
+    "schema_version": 3,
     "warnings": [
     ]
 }

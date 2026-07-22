@@ -1,4 +1,14 @@
 {
+    "checks": [
+        {
+            "id": "page-size",
+            "status": "failed"
+        },
+        {
+            "id": "trim",
+            "status": "failed"
+        }
+    ],
     "errors": [
         {
             "bbox": [
@@ -31,9 +41,10 @@
     ],
     "fixups_available": [
     ],
+    "inspection_complete": true,
     "pass": false,
     "profile": "Frisket Test - Trim/Page Size",
-    "schema_version": 2,
+    "schema_version": 3,
     "warnings": [
     ]
 }

@@ -480,13 +480,15 @@ inline bool validateNormalizedReport(const QJsonObject& report, QString* errorMe
 
     static const QSet<QString> allowedProperties = {
         QStringLiteral("schema_version"),
+        QStringLiteral("inspection_complete"),
         QStringLiteral("pass"),
         QStringLiteral("profile"),
         QStringLiteral("engine_version"),
         QStringLiteral("pdf"),
         QStringLiteral("errors"),
         QStringLiteral("warnings"),
-        QStringLiteral("fixups_available")
+        QStringLiteral("fixups_available"),
+        QStringLiteral("checks")
     };
     if (!hasOnlyProperties(report, allowedProperties, QStringLiteral("report"), errorMessage))
     {
@@ -504,6 +506,34 @@ inline bool validateNormalizedReport(const QJsonObject& report, QString* errorMe
     if (!report.value(QStringLiteral("pass")).isBool())
     {
         return setValidationError(errorMessage, QStringLiteral("pass must be a boolean."));
+    }
+
+    if (schemaVersionValue >= 3)
+    {
+        if (!report.value(QStringLiteral("inspection_complete")).isBool())
+        {
+            return setValidationError(errorMessage, QStringLiteral("inspection_complete must be a boolean."));
+        }
+
+        const QJsonValue checksValue = report.value(QStringLiteral("checks"));
+        if (!checksValue.isArray())
+        {
+            return setValidationError(errorMessage, QStringLiteral("checks must be an array."));
+        }
+
+        const QJsonArray checks = checksValue.toArray();
+        for (int i = 0; i < checks.size(); ++i)
+        {
+            const QJsonObject checkObject = checks.at(i).toObject();
+            if (!checkObject.value(QStringLiteral("id")).isString())
+            {
+                return setValidationError(errorMessage, QStringLiteral("checks[%1].id must be a string.").arg(i));
+            }
+            if (!checkObject.value(QStringLiteral("status")).isString())
+            {
+                return setValidationError(errorMessage, QStringLiteral("checks[%1].status must be a string.").arg(i));
+            }
+        }
     }
 
     if (!report.value(QStringLiteral("profile")).isString() || report.value(QStringLiteral("profile")).toString().isEmpty())

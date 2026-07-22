@@ -4302,7 +4302,7 @@ PDFObjectReference PDFDocumentBuilder::createAnnotationPolyline(PDFObjectReferen
     objectBuilder.beginDictionaryItem("Subj");
     objectBuilder << subject;
     objectBuilder.endDictionaryItem();
-    objectBuilder.beginDictionaryItem("");
+    objectBuilder.beginDictionaryItem("LE");
     objectBuilder.beginArray();
     objectBuilder << startLineType;
     objectBuilder << endLineType;

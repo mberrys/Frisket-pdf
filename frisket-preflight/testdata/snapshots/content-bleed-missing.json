@@ -1,4 +1,14 @@
 {
+    "checks": [
+        {
+            "id": "bleed",
+            "status": "ok"
+        },
+        {
+            "id": "content-bleed",
+            "status": "failed"
+        }
+    ],
     "errors": [
     ],
     "fixups_available": [
@@ -12,9 +22,10 @@
             "safe": false
         }
     ],
+    "inspection_complete": true,
     "pass": true,
     "profile": "Sinalite Tiered Bleed",
-    "schema_version": 2,
+    "schema_version": 3,
     "warnings": [
         {
             "bbox": [

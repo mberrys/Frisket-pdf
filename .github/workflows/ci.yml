@@ -91,6 +91,11 @@ jobs:
         run: |
           ctest --output-on-failure
 
+      - name: Run preflight corpus gate
+        working-directory: pdf4qt/build
+        run: |
+          ctest -R UnitTestsPreflightCorpus --output-on-failure
+
       - name: Make DEB package
         if: github.event_name != 'pull_request'
         working-directory: pdf4qt/build

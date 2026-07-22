@@ -407,7 +407,10 @@ public:
         {
             for (const auto& node : container)
             {
-                nodes.push_back(node.getValue());
+                if (const XFA_AbstractNode* value = node.getValue())
+                {
+                    nodes.push_back(value);
+                }
             }
         }
 
@@ -11707,7 +11710,7 @@ void PDFXFAEngineImpl::draw(const QTransform& pagePointToDevicePointMatrix,
                             QList<PDFRenderError>& errors,
                             QPainter* painter)
 {
-    if (!m_document || m_layout.layoutItems.empty())
+    if (!m_document || m_layout.layoutItems.empty() || !page)
     {
         // Nothing to draw
         return;
@@ -12721,7 +12724,7 @@ void PDFXFAEngineImpl::drawUiImageEdit(const xfa::XFA_imageEdit* imageEdit,
             QRectF imageRect = nominalContentArea;
             QSizeF imageSize = QSizeF(image.size());
 
-            if (qFuzzyIsNull(imageSize.height()))
+            if (!qFuzzyIsNull(imageSize.height()))
             {
                 imageRect.setWidth(imageSize.width() * imageRect.height() / imageSize.height());
                 imageRect.moveCenter(nominalContentArea.center());
@@ -12741,7 +12744,7 @@ void PDFXFAEngineImpl::drawUiImageEdit(const xfa::XFA_imageEdit* imageEdit,
             QRectF imageRect = nominalContentArea;
             QSizeF imageSize = QSizeF(image.size());
 
-            if (qFuzzyIsNull(imageSize.width()))
+            if (!qFuzzyIsNull(imageSize.width()))
             {
                 imageRect.setHeight(imageSize.height() * imageRect.width() / imageSize.width());
                 imageRect.moveCenter(nominalContentArea.center());

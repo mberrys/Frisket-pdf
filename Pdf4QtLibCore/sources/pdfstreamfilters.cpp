@@ -149,6 +149,10 @@ QByteArray PDFAscii85DecodeFilter::apply(const QByteArray& data,
         {
             result.append(4, static_cast<char>(0));
         }
+        else if (scannedChar < 33 || scannedChar > 117)
+        {
+            break;
+        }
         else
         {
             // Scan all 5 characters, some of then can be equal to STREAM_END constant. We will
@@ -161,6 +165,10 @@ QByteArray PDFAscii85DecodeFilter::apply(const QByteArray& data,
             {
                 uint32_t character = getChar();
                 if (character == STREAM_END)
+                {
+                    break;
+                }
+                if (character < 33 || character > 117)
                 {
                     break;
                 }

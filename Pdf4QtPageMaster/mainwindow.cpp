@@ -2697,6 +2697,9 @@ void MainWindow::exportAssembledDocuments(std::vector<std::vector<pdf::PDFDocume
     job.pageGeometrySettings = m_pageGeometrySettings;
     job.hasBleedFixupSettings = m_hasBleedFixupSettings;
     job.bleedFixupSettings = m_bleedFixupSettings;
+    job.hasPreflightGate = m_hasPreflightGate;
+    job.preflightProfilePath = m_preflightProfilePath;
+    job.forcePreflight = m_forcePreflight;
     job.progress = m_exportProgress;
     m_exportCancelToken.cancel->store(false, std::memory_order_release);
     m_exportCancelToken.progressAlive->store(true, std::memory_order_release);
@@ -3306,6 +3309,11 @@ QJsonObject MainWindow::createProjectJson() const
     bleedFixupObject["enabled"] = m_hasBleedFixupSettings;
     bleedFixupObject["settings"] = bleedFixupSettingsToJson(m_bleedFixupSettings);
     settingsObject["bleedFixup"] = bleedFixupObject;
+    QJsonObject preflightObject;
+    preflightObject["enabled"] = m_hasPreflightGate;
+    preflightObject["profile"] = m_preflightProfilePath;
+    preflightObject["force"] = m_forcePreflight;
+    settingsObject["preflight"] = preflightObject;
     project["settings"] = settingsObject;
 
     return project;
@@ -3455,6 +3463,10 @@ bool MainWindow::loadProjectJson(const QJsonObject& project, QString* errorMessa
     {
         m_bleedFixupSettings = bleedFixupSettingsFromJson(bleedFixupObject["settings"].toObject());
     }
+    const QJsonObject preflightObject = settingsObject["preflight"].toObject();
+    m_hasPreflightGate = preflightObject["enabled"].toBool(false);
+    m_preflightProfilePath = preflightObject["profile"].toString();
+    m_forcePreflight = preflightObject["force"].toBool(false);
 
     updateActions();
     return true;
@@ -3764,12 +3776,33 @@ void MainWindow::performOperation(Operation operation)
             referenceCombo->setCurrentIndex(qMax(0, referenceCombo->findData(bleedFixupReferenceBoxToString(m_bleedFixupSettings.referenceBox))));
             form->addRow(tr("Reference box"), referenceCombo);
 
-            QDoubleSpinBox* bleedSpin = new QDoubleSpinBox(&dialog);
-            bleedSpin->setRange(0.0, 50.0);
-            bleedSpin->setDecimals(2);
-            bleedSpin->setSuffix(tr(" mm"));
-            bleedSpin->setValue(m_bleedFixupSettings.bleedMM.left());
-            form->addRow(tr("Bleed"), bleedSpin);
+            QDoubleSpinBox* bleedLeftSpin = new QDoubleSpinBox(&dialog);
+            bleedLeftSpin->setRange(0.0, 50.0);
+            bleedLeftSpin->setDecimals(2);
+            bleedLeftSpin->setSuffix(tr(" mm"));
+            bleedLeftSpin->setValue(m_bleedFixupSettings.bleedMM.left());
+            form->addRow(tr("Bleed left"), bleedLeftSpin);
+
+            QDoubleSpinBox* bleedTopSpin = new QDoubleSpinBox(&dialog);
+            bleedTopSpin->setRange(0.0, 50.0);
+            bleedTopSpin->setDecimals(2);
+            bleedTopSpin->setSuffix(tr(" mm"));
+            bleedTopSpin->setValue(m_bleedFixupSettings.bleedMM.top());
+            form->addRow(tr("Bleed top"), bleedTopSpin);
+
+            QDoubleSpinBox* bleedRightSpin = new QDoubleSpinBox(&dialog);
+            bleedRightSpin->setRange(0.0, 50.0);
+            bleedRightSpin->setDecimals(2);
+            bleedRightSpin->setSuffix(tr(" mm"));
+            bleedRightSpin->setValue(m_bleedFixupSettings.bleedMM.right());
+            form->addRow(tr("Bleed right"), bleedRightSpin);
+
+            QDoubleSpinBox* bleedBottomSpin = new QDoubleSpinBox(&dialog);
+            bleedBottomSpin->setRange(0.0, 50.0);
+            bleedBottomSpin->setDecimals(2);
+            bleedBottomSpin->setSuffix(tr(" mm"));
+            bleedBottomSpin->setValue(m_bleedFixupSettings.bleedMM.bottom());
+            form->addRow(tr("Bleed bottom"), bleedBottomSpin);
 
             QSpinBox* dpiSpin = new QSpinBox(&dialog);
             dpiSpin->setRange(72, 1200);
@@ -3789,6 +3822,18 @@ void MainWindow::performOperation(Operation operation)
             enableCheck->setChecked(m_hasBleedFixupSettings);
             form->addRow(QString(), enableCheck);
 
+            QCheckBox* preflightCheck = new QCheckBox(tr("Run preflight before export"), &dialog);
+            preflightCheck->setChecked(m_hasPreflightGate);
+            form->addRow(QString(), preflightCheck);
+
+            QLineEdit* profileEdit = new QLineEdit(m_preflightProfilePath, &dialog);
+            profileEdit->setPlaceholderText(tr("Path to preflight profile JSON"));
+            form->addRow(tr("Preflight profile"), profileEdit);
+
+            QCheckBox* forcePreflightCheck = new QCheckBox(tr("Export even when preflight fails"), &dialog);
+            forcePreflightCheck->setChecked(m_forcePreflight);
+            form->addRow(QString(), forcePreflightCheck);
+
             layout->addLayout(form);
             QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
             layout->addWidget(buttons);
@@ -3799,12 +3844,17 @@ void MainWindow::performOperation(Operation operation)
             {
                 m_bleedFixupSettings.mode = bleedFixupModeFromString(modeCombo->currentData().toString());
                 m_bleedFixupSettings.referenceBox = bleedFixupReferenceBoxFromString(referenceCombo->currentData().toString());
-                const qreal bleedMm = bleedSpin->value();
-                m_bleedFixupSettings.bleedMM = QMarginsF(bleedMm, bleedMm, bleedMm, bleedMm);
+                m_bleedFixupSettings.bleedMM = QMarginsF(bleedLeftSpin->value(),
+                                                           bleedTopSpin->value(),
+                                                           bleedRightSpin->value(),
+                                                           bleedBottomSpin->value());
                 m_bleedFixupSettings.dpi = dpiSpin->value();
                 m_bleedFixupSettings.samplePixels = sampleSpin->value();
                 m_bleedFixupSettings.skipIfAlreadyBleeding = skipCheck->isChecked();
                 m_hasBleedFixupSettings = enableCheck->isChecked();
+                m_hasPreflightGate = preflightCheck->isChecked();
+                m_preflightProfilePath = profileEdit->text().trimmed();
+                m_forcePreflight = forcePreflightCheck->isChecked();
             }
             break;
         }

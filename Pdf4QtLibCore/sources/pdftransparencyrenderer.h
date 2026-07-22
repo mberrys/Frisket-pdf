@@ -119,7 +119,16 @@ public:
     /// Calculates bitmap data length required to store bitmapt with given pixel format.
     /// \param width Bitmap width
     /// \param height Bitmap height
-    size_t calculateBitmapDataLength(size_t width, size_t height) const { return width * height * size_t(getChannelCount()); }
+    size_t calculateBitmapDataLength(size_t width, size_t height) const
+    {
+        size_t area = 0;
+        size_t result = 0;
+        if (!pdfTryMultiply(width, height, area) || !pdfTryMultiply(area, size_t(getChannelCount()), result))
+        {
+            return 0;
+        }
+        return result;
+    }
 
 private:
     inline explicit constexpr PDFPixelFormat(uint8_t processColors, uint8_t spotColors, uint8_t flags) :

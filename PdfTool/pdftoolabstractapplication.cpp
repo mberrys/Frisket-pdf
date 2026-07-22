@@ -26,6 +26,8 @@
 
 #include <QFileInfo>
 #include <QCommandLineParser>
+#include <QFile>
+#include <QDir>
 
 namespace pdftool
 {
@@ -207,6 +209,11 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("force", "Ignore skip-if-already-bleeding heuristic."));
         parser->addOption(QCommandLineOption("dry-run", "Compute report only; do not write an output file."));
         parser->addOption(QCommandLineOption("report", "Print before/after box report."));
+    }
+
+    if (optionFlags.testFlag(DestructiveWrite))
+    {
+        registerDestructiveWriteOptions(parser);
     }
 
     if (optionFlags.testFlag(PreflightProfile))
@@ -1371,6 +1378,13 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         options.encryptionPermissions = parser->value("enc-permissions").toUInt();
     }
 
+    if (optionFlags.testFlag(DestructiveWrite))
+    {
+        options.destructiveDryRun = parser->isSet("dry-run");
+        options.destructiveReport = parser->isSet("report");
+        options.destructiveForce = parser->isSet("force");
+    }
+
     return options;
 }
 
@@ -1589,6 +1603,48 @@ std::vector<PDFToolOptions::OptimizeFeatureInfo> PDFToolOptions::getOptimizeFlag
         OptimizeFeatureInfo{ "opt-recompress-flate", "Recompress flate streams with maximal compression.", pdf::PDFOptimizer::RecompressFlateStreams },
         OptimizeFeatureInfo{ "opt-all", "Use all optimization algorithms.", pdf::PDFOptimizer::All }
     };
+}
+
+void PDFToolAbstractApplication::registerDestructiveWriteOptions(QCommandLineParser* parser)
+{
+    parser->addOption(QCommandLineOption("dry-run", "Compute the result but do not write an output file."));
+    parser->addOption(QCommandLineOption("report", "Print a summary of the pending write operation."));
+    parser->addOption(QCommandLineOption("force", "Overwrite an existing output file without confirmation."));
+}
+
+int PDFToolAbstractApplication::validateDestructiveOutput(const PDFToolOptions& options, const QString& outputPath) const
+{
+    if (outputPath.isEmpty())
+    {
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Output document file name is not set."), options.outputCodec);
+        return ErrorInvalidArguments;
+    }
+
+    if (QFile::exists(outputPath) && !options.destructiveForce)
+    {
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Output '%1' already exists. Use --force to overwrite.").arg(outputPath), options.outputCodec);
+        return ErrorInvalidArguments;
+    }
+
+    return 0;
+}
+
+void PDFToolAbstractApplication::removePartialOutput(const QString& outputPath)
+{
+    if (outputPath.isEmpty())
+    {
+        return;
+    }
+
+    QFile::remove(outputPath);
+    const QFileInfo info(outputPath);
+    QDir dir(info.absolutePath());
+    const QString baseName = info.fileName();
+    const QStringList partials = dir.entryList({ baseName + QStringLiteral(".*") }, QDir::Files);
+    for (const QString& partial : partials)
+    {
+        QFile::remove(dir.filePath(partial));
+    }
 }
 
 }   // pdftool

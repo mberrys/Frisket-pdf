@@ -464,7 +464,7 @@ PDFViewerPreferences PDFViewerPreferences::parse(const PDFObject& catalogDiction
                 //
                 // But what should we do, if we get 0? Pages in the PDF file are numbered from 1.
                 // So if this situation occur, we also ignore the entry.
-                const PDFArray* array = duplex.getArray();
+                const PDFArray* array = printPageRange.getArray();
 
                 const size_t count = array->getCount();
                 if (count % 2 == 0 && count > 0)
@@ -669,7 +669,7 @@ PDFDocumentSecurityStore PDFDocumentSecurityStore::parse(const PDFObject& object
                         item.Cert = getDecodedStreams(vriItemDictionary->get("Cert"));
                         item.CRL = getDecodedStreams(vriItemDictionary->get("CRL"));
                         item.OCSP = getDecodedStreams(vriItemDictionary->get("OCSP"));
-                        item.created = PDFEncoding::convertToDateTime(loader.readStringFromDictionary(vriDictionary, "TU"));
+                        item.created = PDFEncoding::convertToDateTime(loader.readStringFromDictionary(vriItemDictionary, "TU"));
 
                         PDFObject timestampObject = document->getObject(vriItemDictionary->get("TS"));
                         if (timestampObject.isStream())

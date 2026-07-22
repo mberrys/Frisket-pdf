@@ -156,7 +156,18 @@ PDFFunctionPtr PDFFunction::createFunctionImpl(const PDFDocument* document, cons
             const PDFReal sampleMaxValue = sampleMaxValueInteger;
 
             // Load samples - first see, how much of them will be needed.
-            const PDFInteger sampleCount = std::accumulate(size.cbegin(), size.cend(), 1, [](PDFInteger a, PDFInteger b) { return a * b; } ) * n;
+            PDFInteger sampleCount = 1;
+            for (PDFInteger dimensionSize : size)
+            {
+                if (!pdfTryMultiply(sampleCount, dimensionSize, sampleCount))
+                {
+                    throw PDFException(PDFParsingContext::tr("Sampled function has invalid sample size."));
+                }
+            }
+            if (!pdfTryMultiply(sampleCount, PDFInteger(n), sampleCount))
+            {
+                throw PDFException(PDFParsingContext::tr("Sampled function has invalid sample size."));
+            }
             std::vector<PDFReal> samples;
             samples.resize(sampleCount, 0.0);
 
@@ -191,6 +202,11 @@ PDFFunctionPtr PDFFunction::createFunctionImpl(const PDFDocument* document, cons
 
             std::vector<uint32_t> sizeAsUint;
             std::transform(size.cbegin(), size.cend(), std::back_inserter(sizeAsUint), [](PDFInteger integer) { return static_cast<uint32_t>(integer); });
+
+            if (m > 30)
+            {
+                throw PDFException(PDFParsingContext::tr("Sampled function has invalid sample size."));
+            }
 
             return std::make_shared<PDFSampledFunction>(static_cast<uint32_t>(m), static_cast<uint32_t>(n), std::move(domain), std::move(range), std::move(sizeAsUint), std::move(samples), std::move(encode), std::move(decode), sampleMaxValue, loader.readIntegerFromDictionary(dictionary, "Order", 1));
         }

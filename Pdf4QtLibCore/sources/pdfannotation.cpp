@@ -2550,6 +2550,12 @@ void PDFHighlightAnnotation::draw(AnnotationDrawParameters& parameters) const
                 QLineF line(p1, p2);
                 LineGeometryInfo lineGeometryInfo = LineGeometryInfo::create(line);
 
+                if (qFuzzyIsNull(markSize) || qFuzzyIsNull(lineGeometryInfo.transformedLine.length()))
+                {
+                    painter.drawLine(line);
+                    continue;
+                }
+
                 bool leadingEdge = true;
                 for (PDFReal x = lineGeometryInfo.transformedLine.p1().x(); x < lineGeometryInfo.transformedLine.p2().x(); x+= markSize)
                 {

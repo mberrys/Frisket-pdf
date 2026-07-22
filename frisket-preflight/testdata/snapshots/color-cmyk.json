@@ -1,11 +1,42 @@
 {
+    "checks": [
+        {
+            "id": "embedded-fonts",
+            "status": "ok"
+        },
+        {
+            "id": "image-resolution",
+            "status": "ok"
+        },
+        {
+            "id": "bleed",
+            "status": "ok"
+        },
+        {
+            "id": "trim",
+            "status": "ok"
+        },
+        {
+            "id": "page-size",
+            "status": "ok"
+        },
+        {
+            "id": "color-mode",
+            "status": "ok"
+        },
+        {
+            "id": "white-overprint",
+            "status": "ok"
+        }
+    ],
     "errors": [
     ],
     "fixups_available": [
     ],
+    "inspection_complete": true,
     "pass": true,
     "profile": "Frisket Default",
-    "schema_version": 2,
+    "schema_version": 3,
     "warnings": [
     ]
 }

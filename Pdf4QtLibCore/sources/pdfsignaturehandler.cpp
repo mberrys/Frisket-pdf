@@ -668,7 +668,11 @@ BIO* PDFPublicKeySignatureHandler::getSignedDataBuffer(pdf::PDFSignatureVerifica
     const PDFSignature::ByteRanges& byteRanges = signature.getByteRanges();
     for (const PDFSignature::ByteRange& byteRange : byteRanges)
     {
-        size += byteRange.size;
+        if (!pdfTryAdd(size, byteRange.size, size))
+        {
+            result.addSignatureDataCoveredBySignatureMissingError();
+            return nullptr;
+        }
     }
 
     // Sanity checks
@@ -684,7 +688,13 @@ BIO* PDFPublicKeySignatureHandler::getSignedDataBuffer(pdf::PDFSignatureVerifica
     for (const PDFSignature::ByteRange& byteRange : byteRanges)
     {
         PDFInteger startOffset = byteRange.offset; // Offset to the first data byte
-        PDFInteger endOffset = byteRange.offset + byteRange.size; // Offset to the byte following last data byte
+        PDFInteger endOffset = 0;
+        if (!pdfTryAdd(byteRange.offset, byteRange.size, endOffset))
+        {
+            result.addSignatureDataCoveredBySignatureMissingError();
+            return nullptr;
+        }
+        // Offset to the byte following last data byte
 
         if (startOffset == endOffset)
         {
@@ -698,7 +708,13 @@ BIO* PDFPublicKeySignatureHandler::getSignedDataBuffer(pdf::PDFSignatureVerifica
             return nullptr;
         }
 
-        const int length = endOffset - startOffset;
+        const int length = int(endOffset - startOffset);
+        if (length < 0)
+        {
+            result.addSignatureDataCoveredBySignatureMissingError();
+            return nullptr;
+        }
+
         outputBuffer.append(sourceData.constData() + startOffset, length);
         bytesCoveredBySignature.addInterval(startOffset, endOffset - 1);
     }
@@ -714,8 +730,13 @@ BIO* PDFPublicKeySignatureHandler::getSignedDataBuffer(pdf::PDFSignatureVerifica
     }
     if (index != -1)
     {
-        int firstByteIndex = index;
-        int lastByteIndex = index + hexContents.size() - 1;
+        PDFInteger firstByteIndex = index;
+        PDFInteger lastByteIndex = 0;
+        if (!pdfTryAdd(PDFInteger(index), PDFInteger(hexContents.size()) - 1, lastByteIndex))
+        {
+            result.addSignatureDataCoveredBySignatureMissingError();
+            return nullptr;
+        }
 
         if (firstByteIndex > 0 && sourceData[firstByteIndex - 1] == '<')
         {
@@ -978,10 +999,15 @@ void PDFSignatureHandler_ETSI_RFC3161::verifySignatureTimestamp(PDFSignatureVeri
 }
 
 // This is protected by global mutex, but it is ugly
-static PDFSignatureVerificationResult* s_ETSI_currentResult = nullptr;
+thread_local PDFSignatureVerificationResult* s_ETSI_currentResult = nullptr;
 
 int PDFSignatureHandler_ETSI_base::verifyCallback(int ok, X509_STORE_CTX* context)
 {
+    if (!s_ETSI_currentResult)
+    {
+        return ok;
+    }
+
     const int errorCode = X509_STORE_CTX_get_error(context);
 
     switch (errorCode)
@@ -1237,6 +1263,8 @@ void PDFSignatureHandler_ETSI_base::verifyCertificateCAdES(PDFSignatureVerificat
     {
         result.setFlag(PDFSignatureVerificationResult::Certificate_OK, true);
     }
+
+    s_ETSI_currentResult = nullptr;
 }
 
 PDFSignatureVerificationResult PDFSignatureHandler_adbe_pkcs7_rsa_sha1::verify() const

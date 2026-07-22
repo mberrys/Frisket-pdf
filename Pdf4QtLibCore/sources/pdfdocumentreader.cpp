@@ -509,6 +509,10 @@ void PDFDocumentReader::processObjectStreams(PDFXRefTable* xrefTable, PDFObjectS
             {
                 const PDFInteger objectNumber = objectNumberAndOffset[i].first;
                 const PDFInteger offset = objectNumberAndOffset[i].second;
+                if (objectNumber < 0 || static_cast<size_t>(objectNumber) >= objects.size())
+                {
+                    continue;
+                }
                 parser.seek(offset);
 
                 PDFObject currentObject = parser.getObject();

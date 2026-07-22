@@ -126,7 +126,7 @@ add_executable(UnitTestsOverprint
 	tst_overprinttest.cpp
 )
 
-target_link_libraries(UnitTestsOverprint PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+target_link_libraries(UnitTestsOverprint PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Test)
 
 set_target_properties(UnitTestsOverprint PROPERTIES
     WIN32_EXECUTABLE OFF
@@ -141,6 +141,10 @@ add_executable(UnitTestsPageMasterExport
 )
 
 target_link_libraries(UnitTestsPageMasterExport PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test Qt6::Concurrent)
+
+target_compile_definitions(UnitTestsPageMasterExport PRIVATE
+    FRISKET_PREFLIGHT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-preflight"
+)
 
 set_target_properties(UnitTestsPageMasterExport PROPERTIES
     WIN32_EXECUTABLE OFF

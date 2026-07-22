@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdftoolabstractapplication.h"
+#include "pdftoolcancel.h"
 #include "pdfconstants.h"
 #include "pdfsentry.h"
 
@@ -30,6 +31,8 @@
 #include <QCommandLineParser>
 #include <QFileInfo>
 #include <QStringList>
+
+#include <csignal>
 
 #if defined(Q_OS_WIN)
 #include <windows.h>
@@ -58,6 +61,16 @@ QString executableDirectory(const char* argv0)
     // Bare argv[0] (PATH lookup) is not the process CWD — fall back to CWD only
     // after absolute-path resolution fails so plugin dirs still work for local runs.
     return QDir::currentPath();
+}
+
+} // namespace
+
+namespace
+{
+
+void handleTerminationSignal(int)
+{
+    pdftool::cancelRequested().store(true, std::memory_order_release);
 }
 
 } // namespace
@@ -102,6 +115,12 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addVersionOption();
     parser.process(arguments);
+
+    pdftool::resetCancelRequested();
+    std::signal(SIGINT, handleTerminationSignal);
+#ifndef Q_OS_WIN
+    std::signal(SIGTERM, handleTerminationSignal);
+#endif
 
     const QString sentryCommand = command.isEmpty() ? QStringLiteral("help") : command;
     const pdf::PDFSentryTransaction sentryTransaction(sentryCommand, "pdftool.command");

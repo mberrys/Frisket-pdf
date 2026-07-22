@@ -212,7 +212,17 @@ PDFCertificateInfo PDFCertificateInfo::getCertificateInfo(x509_st* certificate)
         QString result;
 
         const int stringLocation = X509_NAME_get_index_by_NID(name, nid, -1);
+        if (stringLocation < 0)
+        {
+            return result;
+        }
+
         X509_NAME_ENTRY* entry = X509_NAME_get_entry(name, stringLocation);
+        if (!entry)
+        {
+            return result;
+        }
+
         return getStringFromASN1_STRING(X509_NAME_ENTRY_get_data(entry));
     };
 
@@ -293,34 +303,38 @@ PDFCertificateInfo PDFCertificateInfo::getCertificateInfo(x509_st* certificate)
 
         X509_PUBKEY* publicKey = X509_get_X509_PUBKEY(certificate);
         EVP_PKEY* evpKey = X509_PUBKEY_get(publicKey);
-        const int keyType = EVP_PKEY_type(EVP_PKEY_base_id(evpKey));
-
-        PDFCertificateInfo::PublicKey key = PDFCertificateInfo::KeyUnknown;
-        switch (keyType)
+        if (evpKey)
         {
-        case EVP_PKEY_RSA:
-            key = PDFCertificateInfo::KeyRSA;
-            break;
+            const int keyType = EVP_PKEY_type(EVP_PKEY_base_id(evpKey));
 
-        case EVP_PKEY_DSA:
-            key = PDFCertificateInfo::KeyDSA;
-            break;
+            PDFCertificateInfo::PublicKey key = PDFCertificateInfo::KeyUnknown;
+            switch (keyType)
+            {
+            case EVP_PKEY_RSA:
+                key = PDFCertificateInfo::KeyRSA;
+                break;
 
-        case EVP_PKEY_DH:
-            key = PDFCertificateInfo::KeyDH;
-            break;
+            case EVP_PKEY_DSA:
+                key = PDFCertificateInfo::KeyDSA;
+                break;
 
-        case EVP_PKEY_EC:
-            key = PDFCertificateInfo::KeyEC;
-            break;
+            case EVP_PKEY_DH:
+                key = PDFCertificateInfo::KeyDH;
+                break;
 
-        default:
-            break;
+            case EVP_PKEY_EC:
+                key = PDFCertificateInfo::KeyEC;
+                break;
+
+            default:
+                break;
+            }
+            info.setPublicKey(key);
+
+            const int bits = EVP_PKEY_bits(evpKey);
+            info.setKeySize(bits);
+            EVP_PKEY_free(evpKey);
         }
-        info.setPublicKey(key);
-
-        const int bits = EVP_PKEY_bits(evpKey);
-        info.setKeySize(bits);
 
         uint32_t keyUsage = X509_get_key_usage(certificate);
         if (keyUsage != UINT32_MAX)

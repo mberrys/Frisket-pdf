@@ -39,7 +39,7 @@ namespace pdf
 {
 
 /// Report contract version emitted by PreflightResult::toJson().
-inline constexpr int PREFLIGHT_REPORT_SCHEMA_VERSION = 2;
+inline constexpr int PREFLIGHT_REPORT_SCHEMA_VERSION = 3;
 
 /// Finding location scope in normalized preflight reports.
 inline constexpr QLatin1String PREFLIGHT_FINDING_SCOPE_DOCUMENT("document");
@@ -103,14 +103,24 @@ struct PDF4QTLIBCORESHARED_EXPORT PreflightProfileData
     QList<PreflightFixupConfig> fixups;
 };
 
+/// Per-check execution status in schema v3 reports.
+struct PDF4QTLIBCORESHARED_EXPORT PreflightCheckStatus
+{
+    QString id;
+    QString status;
+    QString reason;
+};
+
 /// Result of a preflight run.
 struct PDF4QTLIBCORESHARED_EXPORT PreflightResult
 {
     bool pass = true;
+    bool inspectionComplete = true;
     QString profileName;
     QList<PreflightFinding> errors;
     QList<PreflightFinding> warnings;
     QList<PreflightFixupConfig> fixupsAvailable;
+    QList<PreflightCheckStatus> checkStatuses;
 
     QJsonObject toJson(const QString& pdfPath = QString()) const;
 };

@@ -686,8 +686,18 @@ void PDFPageContentProcessor::processContent(const QByteArray& content)
                                 throw PDFException(PDFTranslationContext::tr("Expected name in the inline image dictionary stream."));
                             }
 
-                            const PDFInteger stride = (width * bpc + 7) / 8;
-                            dataLength = stride * height;
+                            PDFInteger stride = 0;
+                            PDFInteger dataLengthProduct = 0;
+                            if (!pdfTryMultiply(width, bpc, stride) || !pdfTryAdd(stride, PDFInteger(7), stride))
+                            {
+                                throw PDFException(PDFTranslationContext::tr("Expected name in the inline image dictionary stream."));
+                            }
+                            stride = (stride + 7) / 8;
+                            if (!pdfTryMultiply(stride, height, dataLengthProduct))
+                            {
+                                throw PDFException(PDFTranslationContext::tr("Expected name in the inline image dictionary stream."));
+                            }
+                            dataLength = dataLengthProduct;
                         }
 
                         // We will once more find the "EI" operator, due to recomputed dataLength.

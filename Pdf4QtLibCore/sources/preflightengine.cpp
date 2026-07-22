@@ -43,6 +43,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSet>
 
 #include <algorithm>
 #include <cmath>
@@ -97,6 +98,275 @@ QJsonObject findingToJson(const PreflightFinding& finding)
     return object;
 }
 
+constexpr int PREFLIGHT_MAX_FORM_DEPTH = 32;
+
+QString classifyPaintedColorSpace(const PDFAbstractColorSpace* colorSpace)
+{
+    if (!colorSpace)
+    {
+        return QString();
+    }
+
+    const PDFAbstractColorSpace* base = colorSpace;
+    while (base && base->getColorSpace() == PDFAbstractColorSpace::ColorSpace::Indexed)
+    {
+        base = static_cast<const PDFIndexedColorSpace*>(base)->getBaseColorSpace().get();
+    }
+
+    if (!base)
+    {
+        return QString();
+    }
+
+    switch (base->getColorSpace())
+    {
+        case PDFAbstractColorSpace::ColorSpace::DeviceRGB:
+            return QStringLiteral("DeviceRGB");
+        case PDFAbstractColorSpace::ColorSpace::DeviceCMYK:
+            return QStringLiteral("DeviceCMYK");
+        case PDFAbstractColorSpace::ColorSpace::DeviceGray:
+            return QStringLiteral("DeviceGray");
+        case PDFAbstractColorSpace::ColorSpace::CalRGB:
+        case PDFAbstractColorSpace::ColorSpace::ICCBased:
+        case PDFAbstractColorSpace::ColorSpace::Lab:
+            return QStringLiteral("DeviceRGB");
+        case PDFAbstractColorSpace::ColorSpace::CalGray:
+            return QStringLiteral("DeviceGray");
+        case PDFAbstractColorSpace::ColorSpace::DeviceN:
+        case PDFAbstractColorSpace::ColorSpace::Separation:
+            return QStringLiteral("DeviceCMYK");
+        default:
+            return QString();
+    }
+}
+
+void recordPaintedColorSpace(const PDFAbstractColorSpace* colorSpace, QSet<QString>* paintedSpaces)
+{
+    if (!paintedSpaces)
+    {
+        return;
+    }
+
+    const QString name = classifyPaintedColorSpace(colorSpace);
+    if (!name.isEmpty())
+    {
+        paintedSpaces->insert(name);
+    }
+}
+
+void recordPaintedImageColorSpace(const PDFImage& image, QSet<QString>* paintedSpaces)
+{
+    if (!paintedSpaces)
+    {
+        return;
+    }
+
+    const QString name = classifyPaintedColorSpace(image.getColorSpace().get());
+    if (!name.isEmpty())
+    {
+        paintedSpaces->insert(name);
+        return;
+    }
+
+    switch (image.getImageData().getComponents())
+    {
+        case 1:
+            paintedSpaces->insert(QStringLiteral("DeviceGray"));
+            break;
+        case 3:
+            paintedSpaces->insert(QStringLiteral("DeviceRGB"));
+            break;
+        case 4:
+            paintedSpaces->insert(QStringLiteral("DeviceCMYK"));
+            break;
+        default:
+            break;
+    }
+}
+
+void recordColorSpaceObject(const PDFDocument* document,
+                            const PDFDictionary* colorSpaceDictionary,
+                            const PDFObject& colorSpaceObject,
+                            QSet<QString>* paintedSpaces)
+{
+    if (!document || !paintedSpaces)
+    {
+        return;
+    }
+
+    if (!colorSpaceObject.isName() && !colorSpaceObject.isArray())
+    {
+        return;
+    }
+
+    try
+    {
+        const PDFColorSpacePointer colorSpace = PDFAbstractColorSpace::createColorSpace(
+            colorSpaceDictionary, document, colorSpaceObject);
+        recordPaintedColorSpace(colorSpace.get(), paintedSpaces);
+    }
+    catch (const PDFException&)
+    {
+        // Ignore invalid color space entries.
+    }
+}
+
+void collectColorSpacesFromResources(const PDFDocument* document,
+                                     const PDFObject& resourcesObject,
+                                     QSet<QString>* paintedSpaces,
+                                     std::set<PDFObjectReference>& visitedForms,
+                                     int depth)
+{
+    if (!document || !paintedSpaces || depth > PREFLIGHT_MAX_FORM_DEPTH)
+    {
+        return;
+    }
+
+    const PDFObject resources = document->getObject(resourcesObject);
+    if (!resources.isDictionary())
+    {
+        return;
+    }
+
+    const PDFDictionary* resourcesDict = resources.getDictionary();
+    const PDFDictionary* colorSpaceDictionary = document->getDictionaryFromObject(resourcesDict->get("ColorSpace"));
+
+    if (colorSpaceDictionary)
+    {
+        for (size_t i = 0; i < colorSpaceDictionary->getCount(); ++i)
+        {
+            recordColorSpaceObject(document,
+                                   colorSpaceDictionary,
+                                   document->getObject(colorSpaceDictionary->getValue(i)),
+                                   paintedSpaces);
+        }
+    }
+
+    const PDFDictionary* xobjectDict = document->getDictionaryFromObject(resourcesDict->get("XObject"));
+    if (!xobjectDict)
+    {
+        return;
+    }
+
+    PDFDocumentDataLoaderDecorator loader(document);
+    for (size_t i = 0; i < xobjectDict->getCount(); ++i)
+    {
+        const PDFObject& entry = xobjectDict->getValue(i);
+        const PDFObject xobject = document->getObject(entry);
+        if (!xobject.isStream())
+        {
+            continue;
+        }
+
+        const PDFDictionary* streamDict = xobject.getStream()->getDictionary();
+        if (!streamDict)
+        {
+            continue;
+        }
+
+        const QByteArray subtype = loader.readNameFromDictionary(streamDict, "Subtype");
+        if (subtype == "Image")
+        {
+            if (streamDict->hasKey("ColorSpace"))
+            {
+                recordColorSpaceObject(document,
+                                       colorSpaceDictionary,
+                                       document->getObject(streamDict->get("ColorSpace")),
+                                       paintedSpaces);
+            }
+        }
+        else if (subtype == "Form")
+        {
+            PDFObjectReference formRef;
+            if (entry.isReference())
+            {
+                formRef = entry.getReference();
+            }
+            else if (xobject.getReference().isValid())
+            {
+                formRef = xobject.getReference();
+            }
+
+            if (formRef.isValid() && visitedForms.insert(formRef).second)
+            {
+                collectColorSpacesFromResources(document,
+                                                streamDict->get("Resources"),
+                                                paintedSpaces,
+                                                visitedForms,
+                                                depth + 1);
+            }
+        }
+    }
+}
+
+QRectF imageBoundsFromCtm(const QTransform& ctm, int pixelWidth, int pixelHeight)
+{
+    const QPointF corners[4] = {
+        ctm.map(QPointF(0, 0)),
+        ctm.map(QPointF(pixelWidth, 0)),
+        ctm.map(QPointF(pixelWidth, pixelHeight)),
+        ctm.map(QPointF(0, pixelHeight))
+    };
+
+    QRectF bounds;
+    for (const QPointF& corner : corners)
+    {
+        bounds |= QRectF(corner, corner);
+    }
+    return bounds.normalized();
+}
+
+void processAnnotationAppearanceStreams(PDFDocument* document,
+                                        const PDFPage* page,
+                                        int pageNumber,
+                                        const std::function<void(const PDFPage*, PDFObjectReference)>& processForm)
+{
+    if (!document || !page)
+    {
+        return;
+    }
+
+    for (const PDFObjectReference& annotRef : page->getAnnotations())
+    {
+        PDFObject annotObject = document->getObjectByReference(annotRef);
+        if (!annotObject.isDictionary())
+        {
+            continue;
+        }
+
+        const PDFDictionary* annotDict = annotObject.getDictionary();
+        PDFObject appearance = document->getObject(annotDict->get("AP"));
+        if (!appearance.isDictionary())
+        {
+            continue;
+        }
+
+        const PDFDictionary* apDict = appearance.getDictionary();
+        for (size_t i = 0; i < apDict->getCount(); ++i)
+        {
+            PDFObject appearanceStream = document->getObject(apDict->getValue(i));
+            if (appearanceStream.isDictionary())
+            {
+                const PDFDictionary* stateDict = appearanceStream.getDictionary();
+                for (size_t j = 0; j < stateDict->getCount(); ++j)
+                {
+                    PDFObject nested = document->getObject(stateDict->getValue(j));
+                    if (nested.isStream())
+                    {
+                        processForm(page, nested.getReference());
+                    }
+                }
+            }
+            else if (appearanceStream.isStream())
+            {
+                processForm(page, appearanceStream.getReference());
+            }
+        }
+    }
+
+    Q_UNUSED(pageNumber);
+}
+
 QString defaultFixupDescription(const QString& fixupId)
 {
     if (fixupId == QStringLiteral("rgb-to-cmyk"))
@@ -130,6 +400,11 @@ void runBleedCheck(PDFDocumentSession* session,
                    QList<PreflightFinding>& errors,
                    QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     const PDFDocument* document = session->getDocument();
     if (!document)
     {
@@ -182,6 +457,11 @@ void runSizeCheck(SizeCheckKind kind,
                   QList<PreflightFinding>& errors,
                   QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     if (!check.hasExpectedSize)
     {
         return;
@@ -495,6 +775,11 @@ void runColorModeCheck(PDFDocumentSession* session,
                        QList<PreflightFinding>& errors,
                        QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     if (check.allowedColorModes.isEmpty())
     {
         return;
@@ -509,7 +794,6 @@ void runColorModeCheck(PDFDocumentSession* session,
     const PDFCatalog* catalog = document->getCatalog();
     const PDFInteger pageCount = catalog->getPageCount();
 
-    // Build a lookup of allowed color space names ("DeviceRGB", "DeviceCMYK", "DeviceGray").
     QSet<QString> allowed;
     for (const QString& mode : check.allowedColorModes)
     {
@@ -527,11 +811,6 @@ void runColorModeCheck(PDFDocumentSession* session,
         }
     }
 
-    // Per-page resource-dictionary scan using a content-processor walk.
-    // For full accuracy a PDFPageContentProcessor subclass could intercept
-    // CS/cs/RG/rg/K/k operators; this resource-level pass catches all
-    // explicitly declared color spaces plus image color spaces (which cover
-    // the common preflight cases).
     PDFOptionalContentActivity ocActivity(document, OCUsage::Export, nullptr);
     PDFFontCache fontCache(DEFAULT_FONT_CACHE_LIMIT, DEFAULT_REALIZED_FONT_CACHE_LIMIT);
     PDFModifiedDocument md(document, &ocActivity);
@@ -551,10 +830,19 @@ void runColorModeCheck(PDFDocumentSession* session,
                            const PDFCMS* cms_p,
                            const PDFOptionalContentActivity* oc,
                            const PDFMeshQualitySettings& mq,
-                           QSet<QString>* disallowed)
+                           QSet<QString>* paintedSpaces)
             : PDFPageContentProcessor(page, doc, fc, cms_p, oc, QTransform(), mq)
-            , m_disallowed(disallowed)
+            , m_paintedSpaces(paintedSpaces)
         {
+        }
+
+        void processFormStream(const PDFStream* stream)
+        {
+            if (!stream || isContentSuppressed())
+            {
+                return;
+            }
+            processForm(stream);
         }
 
     protected:
@@ -565,9 +853,33 @@ void runColorModeCheck(PDFDocumentSession* session,
                 case ContentKind::Images:
                 case ContentKind::Tiling:
                 case ContentKind::Forms:
+                case ContentKind::Shapes:
+                case ContentKind::Text:
                     return false;
                 default:
                     return true;
+            }
+        }
+
+        void performPathPainting(const QPainterPath& path, bool stroke, bool fill, bool text, Qt::FillRule fillRule) override
+        {
+            Q_UNUSED(path);
+            Q_UNUSED(text);
+            Q_UNUSED(fillRule);
+
+            if (isContentSuppressed())
+            {
+                return;
+            }
+
+            const PDFPageContentProcessorState* state = getGraphicState();
+            if (fill)
+            {
+                recordPaintedColorSpace(state->getFillColorSpace(), m_paintedSpaces);
+            }
+            if (stroke)
+            {
+                recordPaintedColorSpace(state->getStrokeColorSpace(), m_paintedSpaces);
             }
         }
 
@@ -575,37 +887,30 @@ void runColorModeCheck(PDFDocumentSession* session,
                                            const PDFStream* stream,
                                            PDFObjectReference reference) override
         {
-            Q_UNUSED(stream);
             Q_UNUSED(reference);
             if (isContentSuppressed())
             {
                 return true;
             }
-            const PDFAbstractColorSpace* cs = image.getColorSpace().get();
-            while (cs && cs->getColorSpace() == PDFAbstractColorSpace::ColorSpace::Indexed)
+
+            if (stream)
             {
-                cs = static_cast<const PDFIndexedColorSpace*>(cs)->getBaseColorSpace().get();
-            }
-            if (cs)
-            {
-                QString csName;
-                switch (cs->getColorSpace())
+                const PDFDictionary* streamDictionary = stream->getDictionary();
+                if (streamDictionary && streamDictionary->hasKey("ColorSpace"))
                 {
-                    case PDFAbstractColorSpace::ColorSpace::DeviceRGB:  csName = QStringLiteral("DeviceRGB"); break;
-                    case PDFAbstractColorSpace::ColorSpace::DeviceCMYK: csName = QStringLiteral("DeviceCMYK"); break;
-                    case PDFAbstractColorSpace::ColorSpace::DeviceGray: csName = QStringLiteral("DeviceGray"); break;
-                    default: break;
-                }
-                if (!csName.isEmpty() && !m_disallowed->contains(csName))
-                {
-                    m_disallowed->insert(csName);
+                    recordColorSpaceObject(getDocument(),
+                                           getColorSpaceDictionary(),
+                                           getDocument()->getObject(streamDictionary->get("ColorSpace")),
+                                           m_paintedSpaces);
                 }
             }
+
+            recordPaintedImageColorSpace(image, m_paintedSpaces);
             return true;
         }
 
     private:
-        QSet<QString>* m_disallowed;
+        QSet<QString>* m_paintedSpaces;
     };
 
     for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
@@ -616,55 +921,23 @@ void runColorModeCheck(PDFDocumentSession* session,
             continue;
         }
 
-        QSet<QString> foundSpaces;
+        QSet<QString> paintedSpaces;
+        std::set<PDFObjectReference> visitedForms;
+        collectColorSpacesFromResources(document, page->getResources(), &paintedSpaces, visitedForms, 0);
 
-        // 1) Page-level ColorSpace resource dictionary
-        PDFObject resources = document->getObject(page->getResources());
-        if (resources.isDictionary() && resources.getDictionary()->hasKey("ColorSpace"))
-        {
-            const PDFDictionary* csDict = document->getDictionaryFromObject(
-                resources.getDictionary()->get("ColorSpace"));
-            if (csDict)
+        ColorModeProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &paintedSpaces);
+        processor.processContents();
+
+        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, PDFObjectReference formRef) {
+            PDFObject formObject = document->getObjectByReference(formRef);
+            if (formObject.isStream())
             {
-                for (size_t i = 0; i < csDict->getCount(); ++i)
-                {
-                    PDFColorSpacePointer csPtr;
-                    try
-                    {
-                        csPtr = PDFAbstractColorSpace::createColorSpace(
-                            csDict, document, document->getObject(csDict->getValue(i)));
-                    }
-                    catch (const PDFException&)
-                    {
-                        continue;
-                    }
-                    if (!csPtr) continue;
-
-                    QString csName;
-                    switch (csPtr->getColorSpace())
-                    {
-                        case PDFAbstractColorSpace::ColorSpace::DeviceRGB:  csName = QStringLiteral("DeviceRGB"); break;
-                        case PDFAbstractColorSpace::ColorSpace::DeviceCMYK: csName = QStringLiteral("DeviceCMYK"); break;
-                        case PDFAbstractColorSpace::ColorSpace::DeviceGray: csName = QStringLiteral("DeviceGray"); break;
-                        default: break;
-                    }
-                    if (!csName.isEmpty())
-                    {
-                        foundSpaces.insert(csName);
-                    }
-                }
+                processor.processFormStream(formObject.getStream());
             }
-        }
+        });
 
-        // 2) Image color spaces (content-stream walk)
-        {
-            ColorModeProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &foundSpaces);
-            processor.processContents();
-        }
-
-        // Check if any found color space is NOT in the allowed set.
         QStringList disallowed;
-        for (const QString& cs : foundSpaces)
+        for (const QString& cs : paintedSpaces)
         {
             if (!allowed.contains(cs))
             {
@@ -684,7 +957,10 @@ void runColorModeCheck(PDFDocumentSession* session,
             QString modeList;
             for (const QString& mode : check.allowedColorModes)
             {
-                if (!modeList.isEmpty()) modeList += QStringLiteral(", ");
+                if (!modeList.isEmpty())
+                {
+                    modeList += QStringLiteral(", ");
+                }
                 modeList += mode;
             }
             finding.message = PDFTranslationContext::tr(
@@ -730,6 +1006,11 @@ void runWhiteOverprintCheck(PDFDocumentSession* session,
                             QList<PreflightFinding>& errors,
                             QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     PDFDocument* document = session->getDocument();
     if (!document)
     {
@@ -762,6 +1043,15 @@ void runWhiteOverprintCheck(PDFDocumentSession* session,
             : PDFPageContentProcessor(page, doc, fc, cms_p, oc, QTransform(), mq)
             , m_foundWhiteOverprint(foundWhiteOverprint)
         {
+        }
+
+        void processFormStream(const PDFStream* stream)
+        {
+            if (!stream || isContentSuppressed())
+            {
+                return;
+            }
+            processForm(stream);
         }
 
     protected:
@@ -821,6 +1111,14 @@ void runWhiteOverprintCheck(PDFDocumentSession* session,
         WhiteOverprintProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &foundWhiteOverprint);
         processor.processContents();
 
+        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, PDFObjectReference formRef) {
+            PDFObject formObject = document->getObjectByReference(formRef);
+            if (formObject.isStream())
+            {
+                processor.processFormStream(formObject.getStream());
+            }
+        });
+
         if (!foundWhiteOverprint)
         {
             continue;
@@ -854,6 +1152,11 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
                             QList<PreflightFinding>& errors,
                             QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     PDFDocument* document = session->getDocument();
     if (!document)
     {
@@ -1055,6 +1358,11 @@ void runImageResolutionCheck(PDFDocumentSession* session,
                               QList<PreflightFinding>& errors,
                               QList<PreflightFinding>& warnings)
 {
+    if (!session)
+    {
+        return;
+    }
+
     if (check.minDpi <= 0)
     {
         return;
@@ -1087,6 +1395,7 @@ void runImageResolutionCheck(PDFDocumentSession* session,
             PDFObjectReference ref;
             qreal minDpiX = std::numeric_limits<qreal>::max();
             qreal minDpiY = std::numeric_limits<qreal>::max();
+            QRectF bbox;
         };
 
         ImageDpiProcessor(const PDFPage* page,
@@ -1099,6 +1408,15 @@ void runImageResolutionCheck(PDFDocumentSession* session,
             : PDFPageContentProcessor(page, doc, fc, cms_p, oc, QTransform(), mq)
             , m_results(results)
         {
+        }
+
+        void processFormStream(const PDFStream* stream)
+        {
+            if (!stream || isContentSuppressed())
+            {
+                return;
+            }
+            processForm(stream);
         }
 
     protected:
@@ -1144,6 +1462,9 @@ void runImageResolutionCheck(PDFDocumentSession* session,
             info.ref = reference;
             info.minDpiX = static_cast<qreal>(image.getImageData().getWidth()) / widthInches;
             info.minDpiY = static_cast<qreal>(image.getImageData().getHeight()) / heightInches;
+            info.bbox = imageBoundsFromCtm(ctm,
+                                           image.getImageData().getWidth(),
+                                           image.getImageData().getHeight());
             m_results->push_back(info);
             return true;
         }
@@ -1164,6 +1485,14 @@ void runImageResolutionCheck(PDFDocumentSession* session,
         ImageDpiProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &images);
         processor.processContents();
 
+        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, PDFObjectReference formRef) {
+            PDFObject formObject = document->getObjectByReference(formRef);
+            if (formObject.isStream())
+            {
+                processor.processFormStream(formObject.getStream());
+            }
+        });
+
         for (const auto& img : images)
         {
             const qreal dpi = qMin(img.minDpiX, img.minDpiY);
@@ -1177,7 +1506,7 @@ void runImageResolutionCheck(PDFDocumentSession* session,
                 finding.type = QStringLiteral("image-resolution");
                 finding.severity = check.severity;
                 finding.checkId = check.id;
-                finding.bbox = QRectF();
+                finding.bbox = img.bbox;
                 finding.message = PDFTranslationContext::tr(
                     "Image resolution %1 DPI is below minimum %2 DPI on page %3")
                     .arg(qRound(dpi))
@@ -1236,7 +1565,8 @@ QJsonObject PreflightResult::toJson(const QString& pdfPath) const
 
     QJsonObject root;
     root.insert(QStringLiteral("schema_version"), PREFLIGHT_REPORT_SCHEMA_VERSION);
-    root.insert(QStringLiteral("pass"), errors.isEmpty());
+    root.insert(QStringLiteral("inspection_complete"), inspectionComplete);
+    root.insert(QStringLiteral("pass"), pass);
     root.insert(QStringLiteral("profile"), profileName);
     root.insert(QStringLiteral("engine_version"), QCoreApplication::applicationVersion());
     if (!pdfPath.isEmpty())
@@ -1246,6 +1576,20 @@ QJsonObject PreflightResult::toJson(const QString& pdfPath) const
     root.insert(QStringLiteral("errors"), errorsArray);
     root.insert(QStringLiteral("warnings"), warningsArray);
     root.insert(QStringLiteral("fixups_available"), fixupsArray);
+
+    QJsonArray checksArray;
+    for (const PreflightCheckStatus& status : checkStatuses)
+    {
+        QJsonObject checkObject;
+        checkObject.insert(QStringLiteral("id"), status.id);
+        checkObject.insert(QStringLiteral("status"), status.status);
+        if (!status.reason.isEmpty())
+        {
+            checkObject.insert(QStringLiteral("reason"), status.reason);
+        }
+        checksArray.append(checkObject);
+    }
+    root.insert(QStringLiteral("checks"), checksArray);
 
     return root;
 }
@@ -1296,25 +1640,50 @@ PreflightResult PreflightEngine::run(const PreflightProfileData& profile)
 {
     PreflightResult result;
     result.profileName = profile.name;
+    result.inspectionComplete = true;
 
     for (const PreflightCheckConfig& check : profile.checks)
     {
+        PreflightCheckStatus status;
+        status.id = check.id;
+
         if (!check.enabled)
         {
+            status.status = QStringLiteral("skipped");
+            status.reason = QStringLiteral("disabled");
+            result.checkStatuses.push_back(status);
             continue;
         }
 
         auto it = m_checks.find(check.id);
         if (it == m_checks.end())
         {
-            // Unknown check ids are ignored (per profile schema note).
+            status.status = QStringLiteral("unsupported");
+            status.reason = QStringLiteral("unknown check id");
+            result.checkStatuses.push_back(status);
+            result.inspectionComplete = false;
+
+            PreflightFinding finding;
+            finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_DOCUMENT);
+            finding.type = QStringLiteral("profile");
+            finding.severity = QStringLiteral("error");
+            finding.checkId = check.id;
+            finding.message = PDFTranslationContext::tr("Unknown preflight check '%1'.").arg(check.id);
+            result.errors.push_back(finding);
             continue;
         }
 
+        const int errorsBefore = result.errors.size();
+        const int warningsBefore = result.warnings.size();
         it->second(m_session, check, result.errors, result.warnings);
+
+        const bool checkFailed = result.errors.size() > errorsBefore;
+        const bool checkWarned = result.warnings.size() > warningsBefore;
+        status.status = (checkFailed || checkWarned) ? QStringLiteral("failed") : QStringLiteral("ok");
+        result.checkStatuses.push_back(status);
     }
 
-    result.pass = result.errors.isEmpty();
+    result.pass = result.errors.isEmpty() && result.inspectionComplete;
     result.fixupsAvailable = profile.fixups;
 
     qreal addBleedAmountPt = 0.0;
@@ -1404,11 +1773,21 @@ bool PreflightEngine::parseProfile(const QJsonObject& profileObject, PreflightPr
         check.rasterWhiteThreshold = checkObject.value(QStringLiteral("raster_white_threshold")).toDouble(0.9975);
 
         check.minDpi = checkObject.value(QStringLiteral("min_dpi")).toInt(0);
+        if (check.id == QStringLiteral("image-resolution") && check.minDpi <= 0)
+        {
+            errorMessage = PDFTranslationContext::tr("Check '%1' requires positive min_dpi.").arg(check.id);
+            return false;
+        }
 
         const QJsonArray allowedModes = checkObject.value(QStringLiteral("allowed")).toArray();
         for (const QJsonValue& val : allowedModes)
         {
             check.allowedColorModes.append(val.toString());
+        }
+        if (check.id == QStringLiteral("color-mode") && check.allowedColorModes.isEmpty())
+        {
+            errorMessage = PDFTranslationContext::tr("Check '%1' requires non-empty allowed color modes.").arg(check.id);
+            return false;
         }
 
         profile.checks.push_back(check);

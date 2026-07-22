@@ -2376,14 +2376,27 @@ PDFFontPointer PDFFont::createFont(const PDFObject& object, QByteArray fontId, c
                      const PDFArray* wArray = wArrayObject.getArray();
                      const size_t size = wArray->getCount();
 
+                     static constexpr CID MAX_W_ARRAY_RANGE = 1'000'000;
                      for (size_t i = 0; i < size;)
                      {
                          CID startCID = fontLoader.readInteger(wArray->getItem(i++), 0);
+                         if (i >= size)
+                         {
+                             break;
+                         }
                          const PDFObject& arrayOrCID = document->getObject(wArray->getItem(i++));
 
                          if (arrayOrCID.isInt())
                          {
+                             if (i >= size)
+                             {
+                                 break;
+                             }
                              CID endCID = arrayOrCID.getInteger();
+                             if (endCID < startCID || static_cast<uint64_t>(endCID - startCID) > MAX_W_ARRAY_RANGE)
+                             {
+                                 continue;
+                             }
                              PDFReal width = fontLoader.readInteger(wArray->getItem(i++), 0);
                              for (CID currentCID = startCID; currentCID <= endCID; ++currentCID)
                              {
@@ -2468,7 +2481,12 @@ PDFFontPointer PDFFont::createFont(const PDFObject& object, QByteArray fontId, c
                 const PDFObject& item = document->getObject(differencesArray->getItem(i));
                 if (item.isInt())
                 {
-                    currentOffset = static_cast<size_t>(item.getInteger());
+                    const PDFInteger offsetValue = item.getInteger();
+                    if (offsetValue < 0 || offsetValue > 255)
+                    {
+                        throw PDFException(PDFTranslationContext::tr("Invalid differences in encoding entry of type 3 font."));
+                    }
+                    currentOffset = static_cast<size_t>(offsetValue);
                 }
                 else if (item.isName())
                 {

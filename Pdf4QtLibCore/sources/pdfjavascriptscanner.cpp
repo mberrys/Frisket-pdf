@@ -55,7 +55,10 @@ PDFJavaScriptScanner::Entries PDFJavaScriptScanner::scan(const std::vector<PDFIn
                     case ActionType::JavaScript:
                     {
                         const PDFActionJavaScript* javascriptAction = dynamic_cast<const PDFActionJavaScript*>(a);
-                        Q_ASSERT(javascriptAction);
+                        if (!javascriptAction)
+                        {
+                            break;
+                        }
 
                         result.emplace_back(type, pageIndex, javascriptAction->getJavaScript());
                         break;
@@ -64,7 +67,10 @@ PDFJavaScriptScanner::Entries PDFJavaScriptScanner::scan(const std::vector<PDFIn
                     case ActionType::Rendition:
                     {
                         const PDFActionRendition* renditionAction = dynamic_cast<const PDFActionRendition*>(a);
-                        Q_ASSERT(renditionAction);
+                        if (!renditionAction)
+                        {
+                            break;
+                        }
 
                         if (!renditionAction->getJavaScript().isEmpty())
                         {
@@ -160,7 +166,10 @@ PDFJavaScriptScanner::Entries PDFJavaScriptScanner::scan(const std::vector<PDFIn
                         case AnnotationType::Link:
                         {
                             const PDFLinkAnnotation* linkAnnotation = dynamic_cast<const PDFLinkAnnotation*>(annotationPtr.get());
-                            Q_ASSERT(linkAnnotation);
+                            if (!linkAnnotation)
+                            {
+                                break;
+                            }
 
                             scanAction(PDFJavaScriptEntry::Type::Annotation, pageIndex, linkAnnotation->getAction());
                             break;
@@ -169,7 +178,10 @@ PDFJavaScriptScanner::Entries PDFJavaScriptScanner::scan(const std::vector<PDFIn
                         case AnnotationType::Screen:
                         {
                             const PDFScreenAnnotation* screenAnnotation = dynamic_cast<const PDFScreenAnnotation*>(annotationPtr.get());
-                            Q_ASSERT(screenAnnotation);
+                            if (!screenAnnotation)
+                            {
+                                break;
+                            }
 
                             scanAction(PDFJavaScriptEntry::Type::Annotation, pageIndex, screenAnnotation->getAction());
                             scanContainer(PDFJavaScriptEntry::Type::Annotation, pageIndex, screenAnnotation->getAdditionalActions().getActions());
@@ -179,7 +191,10 @@ PDFJavaScriptScanner::Entries PDFJavaScriptScanner::scan(const std::vector<PDFIn
                         case AnnotationType::Widget:
                         {
                             const PDFWidgetAnnotation* widgetAnnotation = dynamic_cast<const PDFWidgetAnnotation*>(annotationPtr.get());
-                            Q_ASSERT(widgetAnnotation);
+                            if (!widgetAnnotation)
+                            {
+                                break;
+                            }
 
                             scanAction(PDFJavaScriptEntry::Type::Annotation, pageIndex, widgetAnnotation->getAction());
                             scanContainer(PDFJavaScriptEntry::Type::Annotation, pageIndex, widgetAnnotation->getAdditionalActions().getActions());

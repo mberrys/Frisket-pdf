@@ -50,6 +50,7 @@ private slots:
     void run_contentBleedRasterConfirm_emitsBleedMarginEmptyAndNeedsAutoBleed();
     void run_whiteOverprint_emitsWarningForWhitePaintWithOverprint();
     void run_whiteOverprint_passesWhenOverprintOff();
+    void run_colorRgbFixtureFailsColorMode();
 };
 
 namespace
@@ -188,8 +189,12 @@ void PreflightEngineTest::run_unknownCheckIdIsIgnored()
     profile.insert(QStringLiteral("checks"), checks);
 
     pdf::PreflightResult result = engine.run(profile);
-    QVERIFY(result.pass);
-    QVERIFY(result.errors.isEmpty());
+    QVERIFY(!result.pass);
+    QVERIFY(!result.inspectionComplete);
+    QCOMPARE(result.errors.size(), 1);
+    QCOMPARE(result.errors.first().type, QStringLiteral("profile"));
+    QCOMPARE(result.checkStatuses.size(), 1);
+    QCOMPARE(result.checkStatuses.first().status, QStringLiteral("unsupported"));
 }
 
 void PreflightEngineTest::run_includesProfileFixups()
@@ -455,6 +460,40 @@ void PreflightEngineTest::run_whiteOverprint_passesWhenOverprintOff()
     QVERIFY(result.pass);
     QCOMPARE(result.errors.size(), 0);
     QCOMPARE(result.warnings.size(), 0);
+}
+
+void PreflightEngineTest::run_colorRgbFixtureFailsColorMode()
+{
+    const QString fixturePath = QStringLiteral(FRISKET_PREFLIGHT_SOURCE_DIR "/testdata/fixtures/color-rgb.pdf");
+    QVERIFY(QFile::exists(fixturePath));
+
+    pdf::PDFDocumentReader reader(nullptr, [](bool*) { return QString(); }, true, false);
+    pdf::PDFDocument document = reader.readFromFile(fixturePath);
+    QCOMPARE(reader.getReadingResult(), pdf::PDFDocumentReader::Result::OK);
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PreflightEngine engine(&session);
+
+    QJsonObject profile;
+    profile.insert(QStringLiteral("name"), QStringLiteral("Color mode test"));
+    QJsonArray checks;
+    checks.append(QJsonObject{
+        { QStringLiteral("id"), QStringLiteral("color-mode") },
+        { QStringLiteral("allowed"), QJsonArray{ QStringLiteral("CMYK"), QStringLiteral("Grayscale") } },
+        { QStringLiteral("severity"), QStringLiteral("error") }
+    });
+    profile.insert(QStringLiteral("checks"), checks);
+
+    const pdf::PreflightResult result = engine.run(profile);
+    QVERIFY(!result.pass);
+    QCOMPARE(result.errors.size(), 1);
+    QCOMPARE(result.errors.first().type, QStringLiteral("color-mode"));
+    QCOMPARE(result.errors.first().checkId, QStringLiteral("color-mode"));
+    QVERIFY(result.inspectionComplete);
+
+    const QJsonObject report = result.toJson();
+    QCOMPARE(report.value(QStringLiteral("schema_version")).toInt(), pdf::PREFLIGHT_REPORT_SCHEMA_VERSION);
+    QVERIFY(report.value(QStringLiteral("inspection_complete")).toBool());
 }
 
 QTEST_GUILESS_MAIN(PreflightEngineTest)

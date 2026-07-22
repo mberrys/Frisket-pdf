@@ -86,11 +86,22 @@ PDFFloatBitmap::PDFFloatBitmap(size_t width, size_t height, PDFPixelFormat forma
 {
     Q_ASSERT(format.isValid());
 
-    m_data.resize(format.calculateBitmapDataLength(width, height), static_cast<PDFColorComponent>(0.0f));
+    const size_t dataLength = format.calculateBitmapDataLength(width, height);
+    if (dataLength == 0)
+    {
+        throw PDFException(PDFTranslationContext::tr("Invalid bitmap dimensions."));
+    }
+
+    m_data.resize(dataLength, static_cast<PDFColorComponent>(0.0f));
 
     if (m_format.hasActiveColorMask())
     {
-        m_activeColorMask.resize(width * height, 0);
+        size_t maskLength = 0;
+        if (!pdfTryMultiply(width, height, maskLength))
+        {
+            throw PDFException(PDFTranslationContext::tr("Invalid bitmap dimensions."));
+        }
+        m_activeColorMask.resize(maskLength, 0);
     }
 }
 

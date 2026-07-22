@@ -1,11 +1,22 @@
 {
+    "checks": [
+        {
+            "id": "bleed",
+            "status": "ok"
+        },
+        {
+            "id": "content-bleed",
+            "status": "ok"
+        }
+    ],
     "errors": [
     ],
     "fixups_available": [
     ],
+    "inspection_complete": true,
     "pass": true,
     "profile": "Sinalite Tiered Bleed",
-    "schema_version": 2,
+    "schema_version": 3,
     "warnings": [
     ]
 }

@@ -645,18 +645,26 @@ PDFRGB PDFBlendFunction::nonseparable_ClipColor(PDFRGB C)
 
     if (n < 0.0f)
     {
-        const PDFColorComponent factor = 1.0f / (l - n);
-        result[0] = l + (result[0] - l) * l * factor;
-        result[1] = l + (result[1] - l) * l * factor;
-        result[2] = l + (result[2] - l) * l * factor;
+        const PDFColorComponent denominator = l - n;
+        if (!qFuzzyIsNull(denominator))
+        {
+            const PDFColorComponent factor = 1.0f / denominator;
+            result[0] = l + (result[0] - l) * l * factor;
+            result[1] = l + (result[1] - l) * l * factor;
+            result[2] = l + (result[2] - l) * l * factor;
+        }
     }
 
     if (x > 1.0f)
     {
-        const PDFColorComponent factor = 1.0f / (x - l);
-        result[0] = l + (result[0] - l) * (1.0f - l) * factor;
-        result[1] = l + (result[1] - l) * (1.0f - l) * factor;
-        result[2] = l + (result[2] - l) * (1.0f - l) * factor;
+        const PDFColorComponent denominator = x - l;
+        if (!qFuzzyIsNull(denominator))
+        {
+            const PDFColorComponent factor = 1.0f / denominator;
+            result[0] = l + (result[0] - l) * (1.0f - l) * factor;
+            result[1] = l + (result[1] - l) * (1.0f - l) * factor;
+            result[2] = l + (result[2] - l) * (1.0f - l) * factor;
+        }
     }
 
     return result;

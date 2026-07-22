@@ -1049,6 +1049,10 @@ cmsHPROFILE PDFLittleCMS::createProfile(const QString& id, const PDFColorProfile
                 if (cmsWhitePointFromTemp(&whitePoint, identifier.temperature))
                 {
                     cmsToneCurve* gammaCurve = cmsBuildGamma(cmsContext(), identifier.gamma);
+                    if (!gammaCurve)
+                    {
+                        break;
+                    }
                     cmsHPROFILE profile = cmsCreateGrayProfile(&whitePoint, gammaCurve);
                     cmsFreeToneCurve(gammaCurve);
                     return profile;
@@ -1069,7 +1073,16 @@ cmsHPROFILE PDFLittleCMS::createProfile(const QString& id, const PDFColorProfile
                     primaries.Green = { identifier.primaryG.x(), identifier.primaryG.y(), 1.0 };
                     primaries.Blue = { identifier.primaryB.x(), identifier.primaryB.y(), 1.0 };
                     cmsToneCurve* gammaCurve = cmsBuildGamma(cmsContext(), identifier.gamma);
+                    if (!gammaCurve)
+                    {
+                        break;
+                    }
                     cmsToneCurve* toneCurves[3] = { gammaCurve, cmsDupToneCurve(gammaCurve), cmsDupToneCurve(gammaCurve) };
+                    if (!toneCurves[1] || !toneCurves[2])
+                    {
+                        cmsFreeToneCurveTriple(toneCurves);
+                        break;
+                    }
                     cmsHPROFILE profile = cmsCreateRGBProfile(&whitePoint, &primaries, toneCurves);
                     cmsFreeToneCurveTriple(toneCurves);
                     return profile;

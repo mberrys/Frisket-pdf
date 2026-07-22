@@ -231,7 +231,10 @@ void PDFUpdateObjectVisitor::visitArray(const PDFArray* array)
     acceptArray(array);
 
     // We have all objects on the stack
-    Q_ASSERT(array->getCount() <= m_objectStack.size());
+    if (array->getCount() > m_objectStack.size())
+    {
+        return;
+    }
 
     auto it = std::next(m_objectStack.cbegin(), m_objectStack.size() - array->getCount());
     std::vector<PDFObject> objects(it, m_objectStack.cend());
@@ -250,7 +253,10 @@ void PDFUpdateObjectVisitor::visitDictionary(const PDFDictionary* dictionary)
     for (size_t i = 0, count = dictionary->getCount(); i < count; ++i)
     {
         dictionary->getValue(i).accept(this);
-        Q_ASSERT(!m_objectStack.empty());
+        if (m_objectStack.empty())
+        {
+            continue;
+        }
         entries.emplace_back(dictionary->getKey(i), m_objectStack.back());
         m_objectStack.pop_back();
     }

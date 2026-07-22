@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdftoolredact.h"
+#include "pdftoolcancel.h"
 #include "pdfdocumentwriter.h"
 #include "pdfconstants.h"
 #include "pdfredact.h"
@@ -67,6 +68,28 @@ int PDFToolRedact::execute(const PDFToolOptions& options)
         return ErrorDocumentReading;
     }
 
+    if (const int blocked = validateDestructiveOutput(options, options.redactedDocument))
+    {
+        return blocked;
+    }
+
+    if (options.destructiveReport)
+    {
+        PDFConsole::writeText(PDFToolTranslationContext::tr("Would redact '%1' to '%2'.")
+                                .arg(options.document, options.redactedDocument),
+                            options.outputCodec);
+    }
+
+    if (options.destructiveDryRun)
+    {
+        return ExitSuccess;
+    }
+
+    if (isCancelRequested())
+    {
+        return ExitFailure;
+    }
+
     // We are ready to redact the document
     pdf::PDFOptionalContentActivity optionalContentActivity(&document, pdf::OCUsage::Export, nullptr);
     pdf::PDFCMSManager cmsManager(nullptr);
@@ -82,6 +105,12 @@ int PDFToolRedact::execute(const PDFToolOptions& options)
     pdf::PDFRedact redactor(&document, &fontCache, cms.get(), &optionalContentActivity, &meshQualitySettings, Qt::black);
     pdf::PDFDocument redactedDocument = redactor.perform(options.redactOptions);
 
+    if (isCancelRequested())
+    {
+        removePartialOutput(options.redactedDocument);
+        return ExitFailure;
+    }
+
     pdf::PDFDocumentWriter writer(nullptr);
     pdf::PDFOperationResult result = writer.write(options.redactedDocument, &redactedDocument, true);
     if (!result)
@@ -95,7 +124,7 @@ int PDFToolRedact::execute(const PDFToolOptions& options)
 
 PDFToolAbstractApplication::Options PDFToolRedact::getOptionsFlags() const
 {
-    return ConsoleFormat | OpenDocument | ColorManagementSystem | Redact;
+    return ConsoleFormat | OpenDocument | ColorManagementSystem | Redact | DestructiveWrite;
 }
 
 }   // namespace pdftool

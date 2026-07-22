@@ -340,6 +340,11 @@ bool PDFOptimizer::performShrinkObjectStorage()
     freeIndices.reserve(objects.size() / 8);
 
     const size_t objectCount = objects.size();
+    if (objectCount <= 1)
+    {
+        return false;
+    }
+
     for (size_t sourceIndex = 1; sourceIndex < objectCount; ++sourceIndex)
     {
         if (isFree(objects[sourceIndex]))
