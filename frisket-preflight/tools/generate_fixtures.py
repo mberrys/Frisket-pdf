@@ -444,6 +444,49 @@ Q
     pdf.save(path)
 
 
+def white_overprint_in_form(out_dir, tmp):
+    """FAIL white-overprint: white overprint paint inside a Form XObject."""
+    del tmp
+    path = os.path.join(out_dir, "white-overprint-form.pdf")
+    pdf = pikepdf.Pdf.new()
+    page = pdf.add_blank_page(page_size=(612, 792))
+    page.MediaBox = pikepdf.Array([0, 0, 612, 792])
+    page.TrimBox = pikepdf.Array([0, 0, 612, 792])
+    gs = pdf.make_indirect(pikepdf.Dictionary({
+        "/Type": pikepdf.Name("/ExtGState"),
+        "/OP": True,
+        "/op": True,
+    }))
+    form_resources = pdf.make_indirect(pikepdf.Dictionary({
+        "/ExtGState": pdf.make_indirect(pikepdf.Dictionary({
+            "/GS1": gs,
+        })),
+    }))
+    form_stream = b"""/GS1 gs
+/DeviceCMYK cs
+0 0 0 0 sc
+50 50 200 200 re
+f
+"""
+    form = pdf.make_stream(form_stream, {
+        "/Type": pikepdf.Name("/XObject"),
+        "/Subtype": pikepdf.Name("/Form"),
+        "/BBox": pikepdf.Array([0, 0, 612, 792]),
+        "/Resources": form_resources,
+    })
+    page.Resources = pdf.make_indirect(pikepdf.Dictionary({
+        "/XObject": pdf.make_indirect(pikepdf.Dictionary({
+            "/Fm1": form,
+        })),
+    }))
+    page.Contents = pdf.make_stream(b"""q
+1 0 0 1 0 0 cm
+/Fm1 Do
+Q
+""")
+    pdf.save(path)
+
+
 FIXTURES = [
     color_rgb,
     color_cmyk,
@@ -459,6 +502,7 @@ FIXTURES = [
     ai_art_raster_trim_edge,
     white_overprint_fail,
     white_overprint_ok,
+    white_overprint_in_form,
 ]
 
 

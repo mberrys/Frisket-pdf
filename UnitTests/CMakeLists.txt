@@ -100,6 +100,40 @@ set_target_properties(UnitTestsPreflightEngine PROPERTIES
 )
 add_test(UnitTestsPreflightEngine "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsPreflightEngine")
 
+add_executable(UnitTestsOcrPageGate
+    tst_ocrpagegatetest.cpp
+)
+
+target_link_libraries(UnitTestsOcrPageGate PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
+target_compile_definitions(UnitTestsOcrPageGate PRIVATE
+    FRISKET_PREFLIGHT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-preflight")
+
+set_target_properties(UnitTestsOcrPageGate PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsOcrPageGate "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsOcrPageGate")
+
+add_executable(UnitTestsOcrCli
+    tst_ocrclitest.cpp
+)
+
+target_link_libraries(UnitTestsOcrCli PRIVATE Qt6::Core Qt6::Test)
+target_compile_definitions(UnitTestsOcrCli PRIVATE
+    FRISKET_PREFLIGHT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-preflight"
+    FRISKET_OCR_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-ocr"
+    PDF4QT_BUILD_BIN_DIR="${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}")
+
+set_target_properties(UnitTestsOcrCli PROPERTIES
+    WIN32_EXECUTABLE OFF
+    MACOSX_BUNDLE OFF
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}
+)
+add_test(UnitTestsOcrCli "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsOcrCli")
+
 add_executable(UnitTestsBleedMarginProbe
 	tst_bleedmarginprobetest.cpp
 )
@@ -126,7 +160,7 @@ add_executable(UnitTestsOverprint
 	tst_overprinttest.cpp
 )
 
-target_link_libraries(UnitTestsOverprint PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Test)
+target_link_libraries(UnitTestsOverprint PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Test)
 
 set_target_properties(UnitTestsOverprint PROPERTIES
     WIN32_EXECUTABLE OFF

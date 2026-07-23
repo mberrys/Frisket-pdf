@@ -332,6 +332,20 @@ private:
     std::vector<uint32_t> m_activeColorMask;
 };
 
+/// Maps ExtGState /OP, /op, /OPM to the blend overprint mode for fill/stroke content.
+inline PDFFloatBitmap::OverprintMode selectBlendOverprintMode(const PDFOverprintMode& overprintMode,
+                                                              bool containsFilling,
+                                                              bool containsStroking)
+{
+    if (!overprintMode.appliesToContent(containsFilling, containsStroking))
+    {
+        return PDFFloatBitmap::OverprintMode::NoOveprint;
+    }
+
+    return overprintMode.overprintMode == 0 ? PDFFloatBitmap::OverprintMode::Overprint_Mode_0
+                                            : PDFFloatBitmap::OverprintMode::Overprint_Mode_1;
+}
+
 /// Float bitmap with color space
 class PDF4QTLIBCORESHARED_EXPORT PDFFloatBitmapWithColorSpace : public PDFFloatBitmap
 {
