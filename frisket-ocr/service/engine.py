@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 _reader = None
+_reader_languages: tuple[str, ...] | None = None
 
 
 def _finite(value: Any, default: float = 0.0) -> float:
@@ -25,17 +26,19 @@ def model_storage_directory() -> str:
 
 
 def get_reader(languages: list[str]):
-    global _reader
-    if _reader is None:
+    global _reader, _reader_languages
+    lang_key = tuple(sorted(str(language) for language in languages))
+    if _reader is None or _reader_languages != lang_key:
         import easyocr
 
         os.makedirs(model_storage_directory(), exist_ok=True)
         _reader = easyocr.Reader(
-            languages,
+            list(lang_key),
             gpu=False,
             model_storage_directory=model_storage_directory(),
             verbose=False,
         )
+        _reader_languages = lang_key
     return _reader
 
 

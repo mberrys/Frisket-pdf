@@ -51,14 +51,23 @@ namespace
 
 static PDFToolOcrApplication s_ocrApplication;
 
-QString defaultSidecarPath()
+QString bundledOcrSidecarPath(const QString& applicationDirectory)
 {
-    const QString applicationDirectory = QCoreApplication::applicationDirPath();
 #ifdef Q_OS_WIN
     return QDir(applicationDirectory).filePath(QStringLiteral("FrisketOcrService/FrisketOcrService.exe"));
 #else
     return QDir(applicationDirectory).filePath(QStringLiteral("FrisketOcrService/FrisketOcrService"));
 #endif
+}
+
+QString devOcrSidecarPath(const QString& applicationDirectory)
+{
+#ifdef Q_OS_WIN
+    const QString relativePath = QStringLiteral("../../../../frisket-ocr/tools/dev_ocr_sidecar.cmd");
+#else
+    const QString relativePath = QStringLiteral("../../../../frisket-ocr/tools/dev_ocr_sidecar.sh");
+#endif
+    return QDir::cleanPath(QDir(applicationDirectory).filePath(relativePath));
 }
 
 bool sidecarIsRunnable(const QString& path)
@@ -78,6 +87,35 @@ bool sidecarIsRunnable(const QString& path)
 #else
     return info.isExecutable();
 #endif
+}
+
+QString resolveOcrSidecarPath()
+{
+    const QString applicationDirectory = QCoreApplication::applicationDirPath();
+
+    const QByteArray envSidecar = qgetenv("FRISKET_OCR_SIDECAR");
+    if (!envSidecar.isEmpty())
+    {
+        const QString path = QString::fromUtf8(envSidecar);
+        if (sidecarIsRunnable(path))
+        {
+            return path;
+        }
+    }
+
+    const QString bundledPath = bundledOcrSidecarPath(applicationDirectory);
+    if (sidecarIsRunnable(bundledPath))
+    {
+        return bundledPath;
+    }
+
+    const QString devPath = devOcrSidecarPath(applicationDirectory);
+    if (sidecarIsRunnable(devPath))
+    {
+        return devPath;
+    }
+
+    return bundledPath;
 }
 
 QJsonObject mediaBoxObject(const pdf::PDFPage* page)
@@ -319,7 +357,7 @@ int PDFToolOcrApplication::execute(const PDFToolOptions& options)
         return OcrContractError;
     }
 
-    const QString sidecarPath = options.ocrSidecarPath.isEmpty() ? defaultSidecarPath() : options.ocrSidecarPath;
+    const QString sidecarPath = options.ocrSidecarPath.isEmpty() ? resolveOcrSidecarPath() : options.ocrSidecarPath;
     OcrSidecarClient sidecar;
     QString sidecarError;
     if (!sidecar.start(sidecarPath, sidecarError))
