@@ -316,6 +316,7 @@ void FrisketPreflightPlugin::startPreflightOnFile(const QString& filePath,
     connect(m_preflightProcess, &QProcess::readyReadStandardError, this, &FrisketPreflightPlugin::onPreflightStderrReady);
 
     updateActions();
+    m_preflightProcess->setWorkingDirectory(QCoreApplication::applicationDirPath());
     m_preflightProcess->start(pdfToolPath, { QStringLiteral("preflight"), stagedPath, QStringLiteral("--profile"), profilePath });
 }
 
@@ -371,6 +372,7 @@ void FrisketPreflightPlugin::onRunPreflightTriggered()
     connect(m_preflightProcess, &QProcess::readyReadStandardError, this, &FrisketPreflightPlugin::onPreflightStderrReady);
 
     updateActions();
+    m_preflightProcess->setWorkingDirectory(QCoreApplication::applicationDirPath());
     m_preflightProcess->start(pdfToolPath, { QStringLiteral("preflight"), snapshotPath, QStringLiteral("--profile"), profilePath });
 }
 

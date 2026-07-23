@@ -24,7 +24,6 @@
 #include "pdfconstants.h"
 #include "pdfsecurityhandler.h"
 #include "pdfwidgetutils.h"
-#include "pdfviewersettings.h"
 #include "pdfapplicationtranslator.h"
 #include "pdfsettings.h"
 

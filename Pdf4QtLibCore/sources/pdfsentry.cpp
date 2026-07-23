@@ -144,6 +144,8 @@ PDFSentrySession::PDFSentrySession(const QString& applicationId)
 
     configureCrashpadHandler(options);
 
+    sentry_options_set_send_default_pii(options, 0);
+
     const double tracesSampleRateValue = tracesSampleRate();
     if (tracesSampleRateValue > 0.0)
     {
