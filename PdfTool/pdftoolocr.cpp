@@ -34,6 +34,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QImageWriter>
 #include <QJsonArray>
@@ -129,24 +130,47 @@ public:
             errorMessage = PDFToolTranslationContext::tr("Failed to write OCR request to sidecar.");
             return false;
         }
-
-        if (!m_process.waitForReadyRead(120000))
+        if (!m_process.waitForBytesWritten(30000))
         {
-            errorMessage = PDFToolTranslationContext::tr("Timed out waiting for OCR sidecar response.");
+            errorMessage = PDFToolTranslationContext::tr("Timed out writing OCR request to sidecar.");
             return false;
         }
 
-        const QByteArray outputLine = m_process.readLine();
-        QJsonParseError parseError;
-        const QJsonDocument document = QJsonDocument::fromJson(outputLine, &parseError);
-        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+        // EasyOCR startup can take a while and native libs may emit blank
+        // stdout lines; keep reading until a JSON object line arrives.
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < 120000)
         {
-            errorMessage = PDFToolTranslationContext::tr("Invalid OCR sidecar JSON: %1").arg(parseError.errorString());
-            return false;
+            if (!m_process.canReadLine())
+            {
+                if (!m_process.waitForReadyRead(qMax(1, 120000 - int(timer.elapsed()))))
+                {
+                    break;
+                }
+                continue;
+            }
+
+            const QByteArray outputLine = m_process.readLine().trimmed();
+            if (outputLine.isEmpty())
+            {
+                continue;
+            }
+
+            QJsonParseError parseError;
+            const QJsonDocument document = QJsonDocument::fromJson(outputLine, &parseError);
+            if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            {
+                errorMessage = PDFToolTranslationContext::tr("Invalid OCR sidecar JSON: %1").arg(parseError.errorString());
+                return false;
+            }
+
+            response = document.object();
+            return true;
         }
 
-        response = document.object();
-        return true;
+        errorMessage = PDFToolTranslationContext::tr("Timed out waiting for OCR sidecar response.");
+        return false;
     }
 
     void stop()

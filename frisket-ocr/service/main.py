@@ -3,9 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 from engine import run_ocr
+
+# PdfTool reads the first LF-terminated stdout line as the IPC response.
+# EasyOCR/torch native code can write to OS fd 1 and bypass sys.stdout, so
+# keep a private fd for JSON and point fd 1 at stderr for the process lifetime.
+_JSON_FD = os.dup(1)
+os.dup2(2, 1)
+
+
+def _write_response(response: dict) -> None:
+    payload = (json.dumps(response, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+    os.write(_JSON_FD, payload)
 
 
 def main() -> int:
@@ -26,8 +38,7 @@ def main() -> int:
                     "ok": False,
                     "error": str(exc),
                 }
-        sys.stdout.write(json.dumps(response, separators=(",", ":")) + "\n")
-        sys.stdout.flush()
+        _write_response(response)
     return 0
 
 

@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import math
 import os
 from typing import Any
 
 _reader = None
+
+
+def _finite(value: Any, default: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
 
 
 def model_storage_directory() -> str:
@@ -21,7 +30,12 @@ def get_reader(languages: list[str]):
         import easyocr
 
         os.makedirs(model_storage_directory(), exist_ok=True)
-        _reader = easyocr.Reader(languages, gpu=False, model_storage_directory=model_storage_directory())
+        _reader = easyocr.Reader(
+            languages,
+            gpu=False,
+            model_storage_directory=model_storage_directory(),
+            verbose=False,
+        )
     return _reader
 
 
@@ -47,10 +61,10 @@ def pixel_bbox_to_pdf(bbox_pixels: list[list[float]], image_width: int, image_he
     y_pt = media_y + (1.0 - bottom_px / image_height) * media_h
 
     return {
-        "x": x_pt,
-        "y": y_pt,
-        "width": width_pt,
-        "height": height_pt,
+        "x": _finite(x_pt),
+        "y": _finite(y_pt),
+        "width": _finite(width_pt),
+        "height": _finite(height_pt),
     }
 
 
@@ -81,7 +95,7 @@ def run_ocr(request: dict[str, Any]) -> dict[str, Any]:
         lines.append(
             {
                 "text": text,
-                "confidence": float(confidence),
+                "confidence": _finite(confidence),
                 "bbox": pixel_bbox_to_pdf(bbox_pixels, image_width, image_height, media_box),
             }
         )
