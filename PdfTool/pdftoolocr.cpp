@@ -34,6 +34,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QImageWriter>
 #include <QJsonArray>
@@ -50,14 +51,23 @@ namespace
 
 static PDFToolOcrApplication s_ocrApplication;
 
-QString defaultSidecarPath()
+QString bundledOcrSidecarPath(const QString& applicationDirectory)
 {
-    const QString applicationDirectory = QCoreApplication::applicationDirPath();
 #ifdef Q_OS_WIN
     return QDir(applicationDirectory).filePath(QStringLiteral("FrisketOcrService/FrisketOcrService.exe"));
 #else
     return QDir(applicationDirectory).filePath(QStringLiteral("FrisketOcrService/FrisketOcrService"));
 #endif
+}
+
+QString devOcrSidecarPath(const QString& applicationDirectory)
+{
+#ifdef Q_OS_WIN
+    const QString relativePath = QStringLiteral("../../../../frisket-ocr/tools/dev_ocr_sidecar.cmd");
+#else
+    const QString relativePath = QStringLiteral("../../../../frisket-ocr/tools/dev_ocr_sidecar.sh");
+#endif
+    return QDir::cleanPath(QDir(applicationDirectory).filePath(relativePath));
 }
 
 bool sidecarIsRunnable(const QString& path)
@@ -77,6 +87,35 @@ bool sidecarIsRunnable(const QString& path)
 #else
     return info.isExecutable();
 #endif
+}
+
+QString resolveOcrSidecarPath()
+{
+    const QString applicationDirectory = QCoreApplication::applicationDirPath();
+
+    const QByteArray envSidecar = qgetenv("FRISKET_OCR_SIDECAR");
+    if (!envSidecar.isEmpty())
+    {
+        const QString path = QString::fromUtf8(envSidecar);
+        if (sidecarIsRunnable(path))
+        {
+            return path;
+        }
+    }
+
+    const QString bundledPath = bundledOcrSidecarPath(applicationDirectory);
+    if (sidecarIsRunnable(bundledPath))
+    {
+        return bundledPath;
+    }
+
+    const QString devPath = devOcrSidecarPath(applicationDirectory);
+    if (sidecarIsRunnable(devPath))
+    {
+        return devPath;
+    }
+
+    return bundledPath;
 }
 
 QJsonObject mediaBoxObject(const pdf::PDFPage* page)
@@ -129,24 +168,47 @@ public:
             errorMessage = PDFToolTranslationContext::tr("Failed to write OCR request to sidecar.");
             return false;
         }
-
-        if (!m_process.waitForReadyRead(120000))
+        if (!m_process.waitForBytesWritten(30000))
         {
-            errorMessage = PDFToolTranslationContext::tr("Timed out waiting for OCR sidecar response.");
+            errorMessage = PDFToolTranslationContext::tr("Timed out writing OCR request to sidecar.");
             return false;
         }
 
-        const QByteArray outputLine = m_process.readLine();
-        QJsonParseError parseError;
-        const QJsonDocument document = QJsonDocument::fromJson(outputLine, &parseError);
-        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+        // EasyOCR startup can take a while and native libs may emit blank
+        // stdout lines; keep reading until a JSON object line arrives.
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < 120000)
         {
-            errorMessage = PDFToolTranslationContext::tr("Invalid OCR sidecar JSON: %1").arg(parseError.errorString());
-            return false;
+            if (!m_process.canReadLine())
+            {
+                if (!m_process.waitForReadyRead(qMax(1, 120000 - int(timer.elapsed()))))
+                {
+                    break;
+                }
+                continue;
+            }
+
+            const QByteArray outputLine = m_process.readLine().trimmed();
+            if (outputLine.isEmpty())
+            {
+                continue;
+            }
+
+            QJsonParseError parseError;
+            const QJsonDocument document = QJsonDocument::fromJson(outputLine, &parseError);
+            if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            {
+                errorMessage = PDFToolTranslationContext::tr("Invalid OCR sidecar JSON: %1").arg(parseError.errorString());
+                return false;
+            }
+
+            response = document.object();
+            return true;
         }
 
-        response = document.object();
-        return true;
+        errorMessage = PDFToolTranslationContext::tr("Timed out waiting for OCR sidecar response.");
+        return false;
     }
 
     void stop()
@@ -295,7 +357,7 @@ int PDFToolOcrApplication::execute(const PDFToolOptions& options)
         return OcrContractError;
     }
 
-    const QString sidecarPath = options.ocrSidecarPath.isEmpty() ? defaultSidecarPath() : options.ocrSidecarPath;
+    const QString sidecarPath = options.ocrSidecarPath.isEmpty() ? resolveOcrSidecarPath() : options.ocrSidecarPath;
     OcrSidecarClient sidecar;
     QString sidecarError;
     if (!sidecar.start(sidecarPath, sidecarError))

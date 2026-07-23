@@ -18,6 +18,16 @@ Run interactively:
 python service\main.py
 ```
 
+For `PdfTool ocr` without `--sidecar`, resolution order is:
+
+1. `FRISKET_OCR_SIDECAR` environment variable
+2. Bundled `FrisketOcrService/FrisketOcrService.exe` next to `PdfTool`
+3. Dev launcher `frisket-ocr/tools/dev_ocr_sidecar.cmd` (relative to a build-tree `PdfTool`)
+
+```powershell
+PdfTool ocr scan.pdf --console-format json --sidecar frisket-ocr\tools\dev_ocr_sidecar.cmd
+```
+
 Send one JSON line per request on stdin, read one JSON line per response on stdout.
 
 ## Build PyInstaller bundle
