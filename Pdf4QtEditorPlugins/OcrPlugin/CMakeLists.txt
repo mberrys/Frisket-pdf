@@ -20,18 +20,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-if(PDF4QT_PLUGIN_AUDIOBOOK)
-    add_subdirectory(AudioBookPlugin)
-endif()
-add_subdirectory(DimensionsPlugin)
-add_subdirectory(ObjectInspectorPlugin)
-add_subdirectory(OutputPreviewPlugin)
-add_subdirectory(RedactPlugin)
-add_subdirectory(SignaturePlugin)
-add_subdirectory(SoftProofingPlugin)
-add_subdirectory(EditorPlugin)
-add_subdirectory(FrisketPreflightPlugin)
-add_subdirectory(OcrPlugin)
-if(PDF4QT_PLUGIN_SCANNER)
-    add_subdirectory(ScannerPlugin)
-endif()
+set(OCR_PLUGIN_SOURCES
+    ocrplugin.cpp
+    ocrreportdockwidget.cpp
+)
+
+add_library(OcrPlugin SHARED ${OCR_PLUGIN_SOURCES})
+
+target_link_libraries(OcrPlugin PRIVATE Pdf4QtLibCore Pdf4QtLibWidgets Qt6::Core Qt6::Gui Qt6::Widgets)
+
+target_compile_definitions(OcrPlugin PRIVATE FRISKET_OCR_SCHEMA_VERSION=1)
+
+set_target_properties(OcrPlugin PROPERTIES
+                      VERSION ${PDF4QT_VERSION}
+                      SOVERSION ${PDF4QT_VERSION}
+                      LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_PLUGINS_DIR}
+                      RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_PLUGINS_DIR})
+
+install(TARGETS OcrPlugin RUNTIME DESTINATION ${PDF4QT_PLUGINS_DIR} LIBRARY DESTINATION ${PDF4QT_PLUGINS_DIR})

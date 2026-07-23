@@ -24,6 +24,7 @@ $requiredFiles = @(
     @{ Path = (Join-Path $InstallDir "Pdf4QtEditor.exe"); Label = "Editor" },
     @{ Path = (Join-Path $InstallDir "PdfTool.exe"); Label = "PdfTool" },
     @{ Path = (Join-Path $pluginsDir "FrisketPreflightPlugin.dll"); Label = "Frisket preflight plugin" },
+    @{ Path = (Join-Path $pluginsDir "OcrPlugin.dll"); Label = "Frisket OCR plugin" },
     @{ Path = (Join-Path $shareProfilesDir "frisket-default.json"); Label = "Default preflight profile" },
     @{ Path = (Join-Path $shareProfilesDir "schemas\profile.schema.json"); Label = "Profile schema" },
     @{ Path = (Join-Path $shareProfilesDir "schemas\report.schema.json"); Label = "Report schema" }
@@ -54,6 +55,22 @@ if ($preflightExit -ne 0 -and $preflightExit -ne 1) {
     throw "PdfTool preflight failed with unexpected exit code $preflightExit`: $preflightOutput"
 }
 Write-Host "OK: PdfTool preflight completed (exit $preflightExit)"
+
+$ocrSidecar = Join-Path $InstallDir "FrisketOcrService\FrisketOcrService.exe"
+if (Test-Path -LiteralPath $ocrSidecar) {
+    $repoRoot = Split-Path -Parent $PSScriptRoot
+    $mockSidecar = Join-Path $repoRoot "frisket-ocr\tools\mock_ocr_sidecar.cmd"
+    $scanFixture = Join-Path $repoRoot "frisket-preflight\testdata\fixtures\image-dpi-low.pdf"
+    if ((Test-Path -LiteralPath $mockSidecar) -and (Test-Path -LiteralPath $scanFixture)) {
+        $ocrOutput = & $pdfTool ocr $scanFixture --console-format json --sidecar $mockSidecar 2>&1
+        $ocrExit = $LASTEXITCODE
+        if ($ocrExit -ne 0 -and $ocrExit -ne 1) {
+            throw "PdfTool ocr failed with unexpected exit code $ocrExit`: $ocrOutput"
+        }
+        Write-Host "OK: PdfTool ocr completed with mock sidecar (exit $ocrExit)"
+    }
+    Write-Host "OK: FrisketOcrService bundle present"
+}
 
 if (-not $SkipEditorLaunch) {
     $editor = Join-Path $InstallDir "Pdf4QtEditor.exe"

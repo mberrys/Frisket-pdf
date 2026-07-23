@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfpagecontentprocessor.h"
+#include "pdftransparencyrenderer.h"
 
 #include <QtTest>
 
@@ -30,6 +31,7 @@ class OverprintTest : public QObject
 
 private slots:
     void overprintMode_appliesToContent_respectsFillStrokeFlags();
+    void selectBlendOverprintMode_respectsFillStrokeGating();
 };
 
 void OverprintTest::overprintMode_appliesToContent_respectsFillStrokeFlags()
@@ -54,6 +56,33 @@ void OverprintTest::overprintMode_appliesToContent_respectsFillStrokeFlags()
     QVERIFY(mode.appliesToContent(true, false));
     QVERIFY(mode.appliesToContent(false, true));
     QVERIFY(!mode.appliesToContent(false, false));
+}
+
+void OverprintTest::selectBlendOverprintMode_respectsFillStrokeGating()
+{
+    pdf::PDFOverprintMode mode;
+    mode.overprintFilling = true;
+    mode.overprintStroking = false;
+    mode.overprintMode = 0;
+
+    QCOMPARE(pdf::selectBlendOverprintMode(mode, true, false),
+             pdf::PDFFloatBitmap::OverprintMode::Overprint_Mode_0);
+    QCOMPARE(pdf::selectBlendOverprintMode(mode, false, true),
+             pdf::PDFFloatBitmap::OverprintMode::NoOveprint);
+    QCOMPARE(pdf::selectBlendOverprintMode(mode, false, false),
+             pdf::PDFFloatBitmap::OverprintMode::NoOveprint);
+
+    mode.overprintFilling = false;
+    mode.overprintStroking = true;
+
+    QCOMPARE(pdf::selectBlendOverprintMode(mode, false, true),
+             pdf::PDFFloatBitmap::OverprintMode::Overprint_Mode_0);
+    QCOMPARE(pdf::selectBlendOverprintMode(mode, true, false),
+             pdf::PDFFloatBitmap::OverprintMode::NoOveprint);
+
+    mode.overprintMode = 1;
+    QCOMPARE(pdf::selectBlendOverprintMode(mode, false, true),
+             pdf::PDFFloatBitmap::OverprintMode::Overprint_Mode_1);
 }
 
 QTEST_APPLESS_MAIN(OverprintTest)

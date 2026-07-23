@@ -1,0 +1,18 @@
+Frisket OCR Service bundles the following third-party components:
+
+EasyOCR — Apache License 2.0
+  https://github.com/JaidedAI/EasyOCR
+
+PyTorch — BSD-style license
+  https://github.com/pytorch/pytorch
+
+torchvision — BSD 3-Clause
+  https://github.com/pytorch/vision
+
+Pillow — HPND License
+  https://github.com/python-pillow/Pillow
+
+NumPy — BSD 3-Clause
+  https://github.com/numpy/numpy
+
+See each project's LICENSE file in the PyInstaller bundle for full text.

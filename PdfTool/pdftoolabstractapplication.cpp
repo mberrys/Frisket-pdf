@@ -221,6 +221,14 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("profile", "Frisket preflight profile (JSON).", "profile"));
     }
 
+    if (optionFlags.testFlag(OcrOptions))
+    {
+        parser->addOption(QCommandLineOption("sidecar", "Path to FrisketOcrService executable.", "path"));
+        parser->addOption(QCommandLineOption("dpi", "Rasterization DPI for OCR pages.", "dpi", "300"));
+        parser->addOption(QCommandLineOption("languages", "Comma-separated EasyOCR language codes.", "codes", "en"));
+        parser->addOption(QCommandLineOption("min-text-chars", "Skip OCR when page has at least this many non-whitespace characters.", "n", "20"));
+    }
+
     if (optionFlags.testFlag(VerifyRedaction))
     {
         parser->addPositionalArgument("original", "Original document containing redact annotations.");
@@ -612,6 +620,26 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
     if (optionFlags.testFlag(PreflightProfile))
     {
         options.preflightProfilePath = parser->value("profile");
+    }
+
+    if (optionFlags.testFlag(OcrOptions))
+    {
+        options.ocrSidecarPath = parser->value("sidecar");
+        bool ok = false;
+        const int dpi = parser->value("dpi").toInt(&ok);
+        if (ok && dpi > 0)
+        {
+            options.ocrDpi = dpi;
+        }
+        if (parser->isSet("languages"))
+        {
+            options.ocrLanguages = parser->value("languages");
+        }
+        const int minTextChars = parser->value("min-text-chars").toInt(&ok);
+        if (ok && minTextChars >= 0)
+        {
+            options.ocrMinTextChars = minTextChars;
+        }
     }
 
     if (optionFlags.testFlag(VerifyRedaction))

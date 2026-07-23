@@ -186,6 +186,12 @@ struct PDFToolOptions
     // For option 'PreflightProfile'
     QString preflightProfilePath;
 
+    // For option 'OcrOptions'
+    QString ocrSidecarPath;
+    int ocrDpi = 300;
+    QString ocrLanguages = QStringLiteral("en");
+    int ocrMinTextChars = 20;
+
     // For option 'VerifyRedaction'
     QStringList verifyRedactionFiles;
     pdf::PDFRedact::Options verifyRedactionOptions = {};
@@ -289,6 +295,7 @@ public:
         PreflightProfile                = 0x08000000,       ///< Frisket preflight profile path
         VerifyRedaction                 = 0x10000000,       ///< Settings for verify-redaction tool
         DestructiveWrite                = 0x20000000,       ///< Shared --dry-run/--report/--force for overwrite commands
+        OcrOptions                      = 0x40000000,       ///< Frisket OCR sidecar settings
     };
     Q_DECLARE_FLAGS(Options, Option)
 

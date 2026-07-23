@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frisket.app/schemas/ocr-report.schema.json",
+  "title": "Frisket OCR Report",
+  "type": "object",
+  "required": ["schema_version", "pass", "pdf", "pages", "skipped_pages", "errors"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "pass": { "type": "boolean" },
+    "pdf": { "type": "string" },
+    "pages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pageEntry" }
+    },
+    "skipped_pages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/skippedPage" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/errorEntry" }
+    }
+  },
+  "$defs": {
+    "bbox": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "line": {
+      "type": "object",
+      "required": ["text", "confidence", "bbox"],
+      "properties": {
+        "text": { "type": "string" },
+        "confidence": { "type": "number" },
+        "bbox": { "$ref": "#/$defs/bbox" }
+      },
+      "additionalProperties": false
+    },
+    "pageEntry": {
+      "type": "object",
+      "required": ["page", "status"],
+      "properties": {
+        "page": { "type": "integer", "minimum": 1 },
+        "status": { "type": "string", "enum": ["ocr", "skipped_has_text", "failed"] },
+        "text": { "type": "string" },
+        "lines": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/line" }
+        },
+        "error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "skippedPage": {
+      "type": "object",
+      "required": ["page", "reason"],
+      "properties": {
+        "page": { "type": "integer", "minimum": 1 },
+        "reason": { "type": "string", "enum": ["has_text", "no_image_content"] }
+      },
+      "additionalProperties": false
+    },
+    "errorEntry": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "message": { "type": "string" },
+        "page": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

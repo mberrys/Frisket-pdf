@@ -38,19 +38,6 @@ namespace pdf
 namespace
 {
 
-PDFFloatBitmap::OverprintMode selectBlendOverprintMode(const PDFOverprintMode& overprintMode,
-                                                       bool containsFilling,
-                                                       bool containsStroking)
-{
-    if (!overprintMode.appliesToContent(containsFilling, containsStroking))
-    {
-        return PDFFloatBitmap::OverprintMode::NoOveprint;
-    }
-
-    return overprintMode.overprintMode == 0 ? PDFFloatBitmap::OverprintMode::Overprint_Mode_0
-                                            : PDFFloatBitmap::OverprintMode::Overprint_Mode_1;
-}
-
 template<typename Callback>
 void forEachTile(const QRect& rect, const QSize& tileSize, Callback&& callback)
 {

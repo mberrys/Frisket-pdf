@@ -58,6 +58,8 @@ add_executable(PdfTool
     pdftoolpreflight.cpp
     pdftoolpreflight.h
     pdftoolpreflightchecks.h
+    pdftoolocr.cpp
+    pdftoolocr.h
     pdftoolverifyredaction.cpp
     pdftoolverifyredaction.h
     pdftoolsentryverify.cpp

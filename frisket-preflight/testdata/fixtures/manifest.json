@@ -158,5 +158,13 @@
     "expect": { "pass": true, "check_ids": [] },
     "source": "hand-built",
     "notes": "Same white fill without overprint -> clean pass. MIC-319."
+  },
+  {
+    "id": "white-overprint-form",
+    "pdf": "white-overprint-form.pdf",
+    "profile": "testdata/profiles/test-white-overprint.json",
+    "expect": { "pass": true, "check_ids": ["white-overprint"] },
+    "source": "hand-built",
+    "notes": "White overprint inside a Form XObject painted via Do. MIC-306."
   }
 ]

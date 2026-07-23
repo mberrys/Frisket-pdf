@@ -1,6 +1,22 @@
 # Sprint Plan — Cycle 2 (Jul 20 – Aug 3, 2026): PageMaster Export Hardening
 
-Status: committed. Linear cycle 2 is populated; ordering below is encoded as blocking
+Status: **mostly complete** (refresh 2026-07-23). Batch stack MIC-307–312 and MIC-319 **Done**. Remaining V1 focus: **MIC-301** (In Review) and **MIC-320** (Todo). OCR must not displace those gates.
+
+## Outcome table
+
+| Issue | Role | Status |
+|-------|------|--------|
+| MIC-311 | Headless PageMaster export service + tests | Done |
+| MIC-308 | Cooperative cancel + non-blocking close | Done |
+| MIC-307 | One-output-at-a-time memory bound | Done |
+| MIC-309 | Atomic writes + manifest + resume | Done |
+| MIC-312 | Batch preflight gate + per-output reports | Done |
+| MIC-319 | White-overprint detection findings | Done |
+| MIC-320 | Overprint-correct rendering | Todo (V1 gate) |
+| MIC-301 | Windows installer / clean-machine | In Review (V1 gate) |
+
+Original committed plan retained below for history.
+
 relations on the issues.
 
 ## Context

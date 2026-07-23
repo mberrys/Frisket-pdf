@@ -139,6 +139,36 @@ if(WIN32 AND MSVC AND PDF4QT_INSTALL_PREPARE_WIX_INSTALLER)
         set(PDF4QT_WIX_PLUGIN_SCANNER "")
     endif()
 
+    set(PDF4QT_WIX_PLUGIN_OCR [=[
+      <Component Id="cmpOcrPlugin" Directory="dir_pdfplugins" Guid="{C8F5B2D3-4E6A-4F91-8B2C-3D9E8F7A6B51}">
+        <File Id="filOcrPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\OcrPlugin.dll" />
+      </Component>
+]=])
+
+    if(PDF4QT_BUNDLE_OCR_SERVICE)
+        set(PDF4QT_WIX_FEATURE_OCR_SERVICE [=[
+          <ComponentGroupRef Id="PDF4QT_Ocr_Service"/>
+]=])
+        set(PDF4QT_WIX_FRAGMENT_OCR_SERVICE [=[
+  <Fragment>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Directory Id="dir_FrisketOcrService" Name="FrisketOcrService" />
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="PDF4QT_Ocr_Service">
+      <Component Id="cmpFrisketOcrServiceExe" Directory="dir_FrisketOcrService" Guid="{D9A6C3E4-5F7B-4A02-9C3D-4E0F9A8B7C62}">
+        <File Id="filFrisketOcrServiceExe" KeyPath="yes" Source="$(var.MyInstallDir)\FrisketOcrService\FrisketOcrService.exe" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+]=])
+    else()
+        set(PDF4QT_WIX_FEATURE_OCR_SERVICE "")
+        set(PDF4QT_WIX_FRAGMENT_OCR_SERVICE "")
+    endif()
+
     if(PDF4QT_ENABLE_SENTRY)
         set(PDF4QT_WIX_SENTRY_CRASHPAD [=[
       <Component Id="cmpCrashpadHandler" Directory="INSTALLFOLDER" Guid="{F4A2C8E1-6B3D-4F90-9C1A-2E7D5B8A4F31}">
