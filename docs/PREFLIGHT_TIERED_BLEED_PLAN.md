@@ -1,22 +1,13 @@
 # Tiered Bleed Preflight — Design Plan (M0)
 
-Status: **draft — M0, pending review** (locks names before Core code; 2026-07-10).
+Status: **implemented** (Tier-1/Tier-2 shipped; residual raster golden = Linear MIC-325). M0 locks below remain authoritative.
 Scope: Frisket-pdf / PDF4QT 1.6.0.0. Phase 1 — CLI engine.
 Primary API names: **`PDFDocumentSession`** (`pdfdocumentsession.*`), **`PDFBleedMarginProbe`** (`pdfbleedmarginprobe.*`), **`PreflightEngine`** (PdfTool orchestrator).
 Finding types: **`content-bleed`**, **`bleed-margin-empty`**, **`needs-auto-bleed`**.
 Profile params: **`raster_confirm`** (bool), **`raster_confirm_dpi`** (default 150), **`raster_white_threshold`** (default 0.9975) — per-check.
-Epic: [MIC-151](https://linear.app/mbx2/issue/MIC-151). This doc: [MIC-152](https://linear.app/mbx2/issue/MIC-152).
-Related: MIC-153 (`PDFDocumentSession`), MIC-155 (`PDFBleedMarginProbe`), MIC-137/136/138 (plugin + overlays), MIC-121/122/141 (`add-bleed` fixup consumers), MIC-134 (box `bleed` check, done).
-
-## Goal
-
-Status: **draft — M0, pending review** (locks names before Core code; 2026-07-10).
-Scope: Frisket-pdf / PDF4QT 1.6.0.0. Phase 1 — CLI engine.
-Primary API names: **`PDFDocumentSession`** (`pdfdocumentsession.*`), **`PDFBleedMarginProbe`** (`pdfbleedmarginprobe.*`), **`PreflightEngine`** (PdfTool orchestrator).
-Finding types: **`content-bleed`**, **`bleed-margin-empty`**, **`needs-auto-bleed`**.
-Profile params: **`raster_confirm`** (bool), **`raster_confirm_dpi`** (default 150), **`raster_white_threshold`** (default 0.9975) — per-check.
-Epic: [MIC-151](https://linear.app/mbx2/issue/MIC-151). This doc: [MIC-152](https://linear.app/mbx2/issue/MIC-152).
-Related: MIC-153 (`PDFDocumentSession`), MIC-155 (`PDFBleedMarginProbe`), MIC-137/136/138 (plugin + overlays), MIC-121/122/141 (`add-bleed` fixup consumers), MIC-134 (box `bleed` check, done).
+Plan issue: [MIC-152](https://linear.app/mbx2/issue/MIC-152). Implementation: MIC-158/155/160. Residual golden: [MIC-325](https://linear.app/mbx2/issue/MIC-325).
+**Note:** Linear [MIC-151](https://linear.app/mbx2/issue/MIC-151) is now the deferred *performance* epic — not this bleed feature.
+Related: MIC-153 (`PDFDocumentSession`, deferred), MIC-155 (`PDFBleedMarginProbe`), MIC-137/136/138 (plugin + overlays), MIC-121/122/141 (`add-bleed` fixup consumers), MIC-134 (box `bleed` check, done).
 
 ## Goal
 
