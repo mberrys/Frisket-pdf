@@ -88,7 +88,7 @@ void PageItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
             m_previewRenderer->requestPreview(item, pageImageRect, sourceIndex.row(), m_dpiScaleRatio);
         }
 
-        painter->setPen(QPen(Qt::black));
+        painter->setPen(QPen(option.palette.color(QPalette::Mid)));
         painter->setBrush(Qt::NoBrush);
         painter->drawRect(pageImageRect);
     }

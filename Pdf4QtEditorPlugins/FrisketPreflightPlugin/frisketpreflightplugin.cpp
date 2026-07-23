@@ -28,6 +28,8 @@
 #include "pdfdocumentwriter.h"
 #include "pdfdrawspacecontroller.h"
 #include "pdfdrawwidget.h"
+#include "pdfuitheme.h"
+#include "pdfwidgetutils.h"
 #include "pdfwidgetutils.h"
 
 #include <QAction>
@@ -624,18 +626,18 @@ void FrisketPreflightPlugin::drawPage(QPainter* painter,
 
         if (finding.severity == QStringLiteral("error"))
         {
-            borderColor = QColor(220, 38, 38);
-            fillColor = QColor(220, 38, 38, isSelected ? 90 : 55);
+            borderColor = pdf::PDFUITheme::severityErrorColor();
+            fillColor = QColor(borderColor.red(), borderColor.green(), borderColor.blue(), isSelected ? 90 : 55);
         }
         else if (finding.severity == QStringLiteral("warning"))
         {
-            borderColor = QColor(234, 88, 12);
-            fillColor = QColor(234, 88, 12, isSelected ? 85 : 50);
+            borderColor = pdf::PDFUITheme::severityWarningColor();
+            fillColor = QColor(borderColor.red(), borderColor.green(), borderColor.blue(), isSelected ? 85 : 50);
         }
         else
         {
-            borderColor = QColor(37, 99, 235);
-            fillColor = QColor(37, 99, 235, isSelected ? 80 : 45);
+            borderColor = pdf::PDFUITheme::severityInfoColor();
+            fillColor = QColor(borderColor.red(), borderColor.green(), borderColor.blue(), isSelected ? 80 : 45);
         }
 
         painter->setPen(QPen(borderColor, isSelected ? selectedLineWidth : lineWidth));
@@ -761,6 +763,8 @@ void FrisketPreflightPlugin::onApplyBleedFixupRequested()
             outputPathEdit->setText(selectedPath);
         }
     });
+
+    pdf::PDFWidgetUtils::style(&dialog);
 
     if (dialog.exec() != QDialog::Accepted)
     {

@@ -31,6 +31,7 @@
 #include "pdfwidgetannotation.h"
 #include "pdfpainterutils.h"
 #include "pdfwidgetutils.h"
+#include "pdfuitheme.h"
 
 #include <QTimer>
 #include <QPainter>
@@ -809,8 +810,7 @@ QColor PDFDrawWidgetProxy::getPaperColor()
 
 void PDFDrawWidgetProxy::drawPages(QPainter* painter, QRect rect, PDFRenderer::Features features)
 {
-    const bool darkScheme = PDFWidgetUtils::isDarkTheme();
-    QColor backgroundColor = darkScheme ? QColor(34, 34, 34) : QColor(Qt::lightGray);
+    const QColor backgroundColor = pdf::PDFUITheme::canvasSurroundColor();
 
     painter->fillRect(rect, backgroundColor);
     QTransform baseMatrix = painter->worldTransform();

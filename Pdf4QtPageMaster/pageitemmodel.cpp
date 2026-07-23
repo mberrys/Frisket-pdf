@@ -22,7 +22,10 @@
 
 #include "pageitemmodel.h"
 
+#include "pdfuitheme.h"
+
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QImageReader>
 #include <QMimeData>
 #include <QCollator>
@@ -1284,16 +1287,18 @@ QString PageItemModel::getItemTooltipText(const PageGroupItem* item) const
         return QString();
     }
 
-    auto tableRow = [](const QString& label, const QString& value)
+    const QString mutedColor = pdf::PDFUITheme::mutedTextColor(QGuiApplication::palette()).name(QColor::HexRgb);
+
+    auto tableRow = [mutedColor](const QString& label, const QString& value)
     {
         if (value.isEmpty())
         {
             return QString();
         }
 
-        return QString("<tr><td style=\"padding:2px 10px 2px 0; white-space:nowrap; color:#666666;\">%1</td>"
-                       "<td style=\"padding:2px 0;\"><b>%2</b></td></tr>")
-                .arg(label.toHtmlEscaped(), value.toHtmlEscaped());
+        return QString("<tr><td style=\"padding:2px 10px 2px 0; white-space:nowrap; color:%1;\">%2</td>"
+                       "<td style=\"padding:2px 0;\"><b>%3</b></td></tr>")
+                .arg(mutedColor, label.toHtmlEscaped(), value.toHtmlEscaped());
     };
 
     QStringList texts;
@@ -1343,7 +1348,8 @@ QString PageItemModel::getItemTooltipText(const PageGroupItem* item) const
         int itemIndex = 1;
         for (const PageGroupItem::GroupItem& groupItem : item->groups)
         {
-            texts << QString("<tr><td style=\"padding:1px 8px 1px 0; color:#666666;\">%1.</td><td style=\"padding:1px 0;\">%2</td></tr>")
+            texts << QString("<tr><td style=\"padding:1px 8px 1px 0; color:%1;\">%2.</td><td style=\"padding:1px 0;\">%3</td></tr>")
+                     .arg(mutedColor)
                      .arg(itemIndex++)
                      .arg(getSourceFileName(groupItem).toHtmlEscaped());
         }

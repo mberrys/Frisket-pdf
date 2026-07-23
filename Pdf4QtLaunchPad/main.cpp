@@ -24,6 +24,7 @@
 #include "launchapplication.h"
 #include "pdfapplicationtranslator.h"
 #include "pdfsettings.h"
+#include "pdfwidgetutils.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -43,12 +44,18 @@ int main(int argc, char *argv[])
 
     QCommandLineParser parser;
     QCommandLineOption configPath = pdf::PDFSettings::getConfigPathOption();
+    QCommandLineOption lightGui(QStringLiteral("theme-light"), QStringLiteral("Use a light theme for the GUI."));
+    QCommandLineOption darkGui(QStringLiteral("theme-dark"), QStringLiteral("Use a dark theme for the GUI."));
     parser.setApplicationDescription(QCoreApplication::applicationName());
     parser.addOption(configPath);
+    parser.addOption(lightGui);
+    parser.addOption(darkGui);
     parser.addHelpOption();
     parser.addPositionalArgument("file", "The PDF file to open in PDF4QT Viewer.");
     parser.process(application);
     pdf::PDFSettings::applyCommandLineSettingsPath(parser);
+
+    pdf::PDFWidgetUtils::initApplicationColorScheme(parser.isSet(lightGui), parser.isSet(darkGui));
 
     const QStringList positionalArguments = parser.positionalArguments();
     if (!positionalArguments.isEmpty())

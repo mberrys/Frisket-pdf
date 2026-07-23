@@ -34,6 +34,7 @@
 
 #include "pdfaction.h"
 #include "pdfwidgetutils.h"
+#include "pdfuitheme.h"
 #include "pdfdocumentreader.h"
 #include "pdfpagemasterexport.h"
 #include "pdfoutline.h"
@@ -2003,7 +2004,8 @@ void MainWindow::updateWorkspaceDropFeedback(QAbstractItemView* view, const QPoi
         m_dropFeedbackViewport = viewport;
     }
 
-    const QColor markerColor = accepted ? viewport->palette().color(QPalette::Active, QPalette::Highlight) : QColor(180, 60, 60);
+    const QColor markerColor = accepted ? viewport->palette().color(QPalette::Active, QPalette::Highlight)
+                                      : pdf::PDFUITheme::severityErrorColor();
     m_dropInsertionMarker->setStyleSheet(QStringLiteral("background:%1; border:0px;").arg(markerColor.name()));
 
     if (view == m_detailsView)
@@ -2049,7 +2051,7 @@ void MainWindow::updateWorkspaceDropFeedback(QAbstractItemView* view, const QPoi
     m_dropInsertionMarker->raise();
 
     m_dropFeedbackLabel->setText(message);
-    m_dropFeedbackLabel->setStyleSheet(QStringLiteral("QLabel { background: rgba(30, 30, 30, 210); color: white; border-radius: 4px; padding: 6px 10px; }"));
+    m_dropFeedbackLabel->setStyleSheet(pdf::PDFUITheme::overlayLabelStyleSheet(viewport->palette()));
     m_dropFeedbackLabel->adjustSize();
     const QSize labelSize = m_dropFeedbackLabel->sizeHint();
     const int x = qBound(8, viewportPosition.x() - labelSize.width() / 2, qMax(8, viewport->width() - labelSize.width() - 8));
