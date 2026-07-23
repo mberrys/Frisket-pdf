@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfocrpagegate.h"
+#include "pdfdocumentbuilder.h"
 #include "pdfdocumentreader.h"
 #include "pdfdocumentsession.h"
 
@@ -34,6 +35,7 @@ class OcrPageGateTest : public QObject
 private slots:
     void fontEmbeddedPage_isSkipped();
     void imageOnlyPage_needsOcr();
+    void blankPage_isSkippedAsEmpty();
 };
 
 namespace
@@ -76,6 +78,20 @@ void OcrPageGateTest::imageOnlyPage_needsOcr()
         pdf::PDFOcrPageGate::classifyPage(&session, 0, settings);
 
     QCOMPARE(need, pdf::PDFOcrPageGate::PageOcrNeed::NeedsOcr);
+}
+
+void OcrPageGateTest::blankPage_isSkippedAsEmpty()
+{
+    pdf::PDFDocumentBuilder builder;
+    builder.appendPage(QRectF(0, 0, 200, 200));
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PDFOcrPageGate::Settings settings;
+    const pdf::PDFOcrPageGate::PageOcrNeed need =
+        pdf::PDFOcrPageGate::classifyPage(&session, 0, settings);
+
+    QCOMPARE(need, pdf::PDFOcrPageGate::PageOcrNeed::SkipEmpty);
 }
 
 QTEST_MAIN(OcrPageGateTest)

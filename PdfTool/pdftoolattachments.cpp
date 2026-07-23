@@ -164,6 +164,8 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
             return ErrorInvalidArguments;
         }
 
+        bool anyAttachmentSkipped = false;
+
         for (const FileInfo& info : embeddedFiles)
         {
             if (!info.isSaved)
@@ -185,6 +187,7 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
                 if (!pdf::PDFFilenameSanitizer::isPathContained(outputFile, options.attachmentsOutputDirectory))
                 {
                     PDFConsole::writeError(PDFToolTranslationContext::tr("Attachment filename '%1' would escape the target directory. Skipping.").arg(info.fileName), options.outputCodec);
+                    anyAttachmentSkipped = true;
                     continue;
                 }
             }
@@ -210,6 +213,11 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
                 PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to save attachment to file. %1").arg(e.getMessage()), options.outputCodec);
                 return ErrorFailedWriteToFile;
             }
+        }
+
+        if (anyAttachmentSkipped)
+        {
+            return ErrorInvalidArguments;
         }
     }
 

@@ -41,6 +41,7 @@ private slots:
     void probeFast_emptyPage_returnsNoContent();
     void probeFast_pageWithFullBleed_returnsAllEdgesCovered();
     void probeFast_threeEdgesPresentOneEmpty_returnsSingleEmptyEdge();
+    void probeFast_asymmetricBleedDepth_treatsZeroDepthAsNotApplicable();
     void renderer_emptyPage_returnsNoErrors();
 };
 
@@ -140,6 +141,38 @@ void BleedMarginProbeTest::probeFast_threeEdgesPresentOneEmpty_returnsSingleEmpt
     QVERIFY(result.right.hasContent);
     QVERIFY(result.top.hasContent);
     QVERIFY(!result.bottom.hasContent);
+}
+
+void BleedMarginProbeTest::probeFast_asymmetricBleedDepth_treatsZeroDepthAsNotApplicable()
+{
+    pdf::PDFDocumentBuilder builder;
+    const pdf::PDFObjectReference page = builder.appendPage(QRectF(0, 0, 220, 220));
+    builder.setPageTrimBox(page, QRectF(10, 10, 200, 200));
+
+    pdf::PDFPageContentStreamBuilder pageContentStreamBuilder(&builder,
+                                                              pdf::PDFContentStreamBuilder::CoordinateSystem::PDF);
+    if (QPainter* painter = pageContentStreamBuilder.begin(page))
+    {
+        painter->fillRect(QRectF(0, 0, 220, 220), Qt::black);
+        pageContentStreamBuilder.end(painter);
+    }
+
+    pdf::PDFDocument document = builder.build();
+
+    pdf::PDFDocumentSession session(&document);
+    pdf::PDFBleedMarginProbe probe(&session);
+
+    const pdf::PDFCatalog* catalog = document.getCatalog();
+    const pdf::PDFPage* pagePtr = catalog->getPage(0);
+
+    pdf::PDFBleedMarginProbeSettings settings;
+    settings.bleedMM = QMarginsF(3, 0, 3, 0);
+    settings.referenceBox = pdf::PDFBleedFixupSettings::ReferenceBox::TrimBox;
+
+    const pdf::PDFBleedMarginProbeResult result = probe.probeFast(pagePtr, 0, settings);
+    QVERIFY(result.allEdgesCovered());
+    QVERIFY(result.left.hasContent);
+    QVERIFY(result.right.hasContent);
 }
 
 void BleedMarginProbeTest::renderer_emptyPage_returnsNoErrors()

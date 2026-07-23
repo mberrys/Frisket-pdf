@@ -396,11 +396,13 @@ int PDFToolOcrApplication::execute(const PDFToolOptions& options)
     }
 
     bool anyPageFailed = false;
+    bool cancelled = false;
 
     for (pdf::PDFInteger pageIndex : pageIndices)
     {
         if (cancelRequested().load(std::memory_order_acquire))
         {
+            cancelled = true;
             break;
         }
 
@@ -430,6 +432,20 @@ int PDFToolOcrApplication::execute(const PDFToolOptions& options)
             pdf::PDFOcrPageResult pageResult;
             pageResult.page = oneBasedPage;
             pageResult.status = QStringLiteral("skipped_has_text");
+            report.pages.push_back(pageResult);
+            continue;
+        }
+
+        if (need == pdf::PDFOcrPageGate::PageOcrNeed::SkipEmpty)
+        {
+            pdf::PDFOcrSkippedPage skipped;
+            skipped.page = oneBasedPage;
+            skipped.reason = QStringLiteral("empty");
+            report.skippedPages.push_back(skipped);
+
+            pdf::PDFOcrPageResult pageResult;
+            pageResult.page = oneBasedPage;
+            pageResult.status = QStringLiteral("skipped_empty");
             report.pages.push_back(pageResult);
             continue;
         }
@@ -512,6 +528,11 @@ int PDFToolOcrApplication::execute(const PDFToolOptions& options)
     const QByteArray reportJson = QJsonDocument(report.toJson()).toJson(QJsonDocument::Compact);
     PDFConsole::writeData(reportJson);
     PDFConsole::writeData(QByteArray("\n"));
+
+    if (cancelled)
+    {
+        return OcrCancelled;
+    }
 
     if (anyPageFailed)
     {

@@ -36,6 +36,7 @@ private slots:
     void isNormalizedReport_requiresTheSidecarContract();
     void isNormalizedReport_acceptsFixupParams();
     void isNormalizedReport_acceptsSchemaV2ScopeFixtures();
+    void isNormalizedReport_acceptsSchemaV3InspectionIncompletePass();
     void isNormalizedReport_rejectsInvalidScopeCombinations();
     void findingHasVisualOverlay_respectsScopeAndBbox();
     void filterAdvertisedFixups_removesUnimplementedFixups();
@@ -171,6 +172,21 @@ void PreflightPluginTest::isNormalizedReport_acceptsSchemaV2ScopeFixtures()
     QVERIFY(pdfplugin::preflight::isNormalizedReport(scopeFixtureReport(documentScopeFinding(), false)));
     QVERIFY(pdfplugin::preflight::isNormalizedReport(scopeFixtureReport(pageScopeFinding(), false)));
     QVERIFY(pdfplugin::preflight::isNormalizedReport(scopeFixtureReport(objectScopeFinding(), true)));
+}
+
+void PreflightPluginTest::isNormalizedReport_acceptsSchemaV3InspectionIncompletePass()
+{
+    QJsonObject report;
+    report.insert(QStringLiteral("schema_version"), 3);
+    report.insert(QStringLiteral("inspection_complete"), false);
+    report.insert(QStringLiteral("pass"), false);
+    report.insert(QStringLiteral("profile"), QStringLiteral("Frisket Default"));
+    report.insert(QStringLiteral("errors"), QJsonArray());
+    report.insert(QStringLiteral("warnings"), QJsonArray());
+    report.insert(QStringLiteral("fixups_available"), QJsonArray());
+    report.insert(QStringLiteral("checks"), QJsonArray());
+
+    QVERIFY(pdfplugin::preflight::isNormalizedReport(report));
 }
 
 void PreflightPluginTest::isNormalizedReport_rejectsInvalidScopeCombinations()
