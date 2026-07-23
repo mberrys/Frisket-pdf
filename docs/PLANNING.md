@@ -36,21 +36,29 @@ See [AGENTS.md](../AGENTS.md) § Page boxes and prepress fixups. In short:
 - PageMaster: geometry before content fixups
 - Prefer one API + mode enum over parallel pipelines
 
-## Worked example: MIC-151
+## Worked example: tiered bleed preflight (MIC-152 plan)
 
-MIC-151 (two-tier bleed preflight) follows the M0-before-code process:
+Two-tier bleed preflight followed the M0-before-code process. The plan doc is
+[PREFLIGHT_TIERED_BLEED_PLAN.md](PREFLIGHT_TIERED_BLEED_PLAN.md) (Linear MIC-152).
 
-1. **Plan doc:** [PREFLIGHT_TIERED_BLEED_PLAN.md](PREFLIGHT_TIERED_BLEED_PLAN.md) locks the
-   Tier-1/Tier-2 flow, class names (`PDFDocumentSession`, `PreflightEngine`,
-   `PDFBleedMarginProbe`), profile params, and report extensions before any code.
-2. **Related issues:** MIC-154 (PreflightEngine refactor) and MIC-157 (PDFDocumentSession) are
-   scaffolding issues; MIC-158 (content-bleed check) and MIC-159 (strip probe) depend on them.
-   All were blocked until M0 locked the shared shapes.
-3. **Surface order:** PdfTool preflight first (thin driver), then Editor plugin (QProcess),
-   then PageMaster batch. Same order as MIRROR_BLEED_PLAN.md.
-4. **New trap to lock early:** Tier-1 box checks and Tier-2 content checks must share the
-   same reference-box fallback (TrimBox → CropBox → MediaBox). Don't let them diverge — if
-   they pick different boxes, the "skip Tier-2 when Tier-1 passes" gate is unsound.
+**Issue-ID note (2026-07-23):** Linear **MIC-151** was retitled to the deferred
+*performance infrastructure* epic. Do not treat MIC-151 as the bleed epic anymore.
+Bleed detection work landed as MIC-158/155/160 (+ residual **MIC-325** for the
+Tier-2 raster golden). Session/cache research lives under MIC-151/153/156/157
+(Post-V1, benchmark-gated).
+
+1. **Plan doc:** PREFLIGHT_TIERED_BLEED_PLAN.md locks the Tier-1/Tier-2 flow,
+   class names (`PDFDocumentSession`, `PreflightEngine`, `PDFBleedMarginProbe`),
+   profile params, and report extensions before any code.
+2. **Related issues:** content-bleed (MIC-158), strip probe (MIC-155), Tier-2
+   triggers (MIC-160). Deferred session/mmap work is benchmark-gated, not a
+   prerequisite for the checks.
+3. **Surface order:** PdfTool preflight first (thin driver), then Editor plugin
+   (QProcess), then PageMaster batch. Same order as MIRROR_BLEED_PLAN.md.
+4. **Trap to lock early:** Tier-1 box checks and Tier-2 content checks must share
+   the same reference-box fallback (TrimBox → CropBox → MediaBox). Don't let them
+   diverge — if they pick different boxes, the "skip Tier-2 when Tier-1 passes"
+   gate is unsound.
 
 ## What not to put in AGENTS.md
 
