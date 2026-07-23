@@ -1,0 +1,7 @@
+{
+    "Name" : "Frisket OCR",
+    "Author" : "Michael Berry",
+    "Version" : "1.0.0",
+    "License" : "MIT",
+    "Description" : "Run Frisket OCR on image-only pages and display extracted text."
+}

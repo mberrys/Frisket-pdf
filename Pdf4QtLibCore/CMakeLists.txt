@@ -50,6 +50,10 @@ add_library(Pdf4QtLibCore SHARED
     sources/pdfpagemasterexport.h
     sources/pdfbleedmarginprobe.cpp
     sources/pdfbleedmarginprobe.h
+    sources/pdfocrpagegate.cpp
+    sources/pdfocrpagegate.h
+    sources/pdfocrreport.cpp
+    sources/pdfocrreport.h
     sources/pdfdocumentsession.cpp
     sources/pdfdocumentsession.h
     sources/preflightengine.cpp

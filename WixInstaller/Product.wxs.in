@@ -20,6 +20,7 @@
         <Feature Id="feature_PDF4QT_Editor_Plugins" Absent="allow" AllowAdvertise="no" Title="Plugin Pack" Level="1" Description="${PDF4QT_WIX_PLUGIN_PACK_DESCRIPTION}">
           <ComponentGroupRef Id="PDF4QT_Editor_Plugins"/>
           <ComponentGroupRef Id="PDF4QT_Frisket_Data"/>
+${PDF4QT_WIX_FEATURE_OCR_SERVICE}
         </Feature>
       </Feature>
 ${PDF4QT_WIX_FEATURE_VIEWER}
@@ -272,6 +273,7 @@ ${PDF4QT_WIX_SENTRY_CRASHPAD}
 ${PDF4QT_WIX_FRAGMENT_VIEWER}
 ${PDF4QT_WIX_FRAGMENT_PAGEMASTER}
 ${PDF4QT_WIX_FRAGMENT_DIFF}
+${PDF4QT_WIX_FRAGMENT_OCR_SERVICE}
 
   <Fragment>
     <ComponentGroup Id="PDF4QT_Editor_Plugins">
@@ -300,6 +302,7 @@ ${PDF4QT_WIX_PLUGIN_AUDIOBOOK}
       <Component Id="cmpFrisketPreflightPlugin" Directory="dir_pdfplugins" Guid="{A4E8C2F1-9B3D-4E71-A5C6-8F2D1E0B7A94}">
         <File Id="filFrisketPreflightPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\FrisketPreflightPlugin.dll" />
       </Component>
+${PDF4QT_WIX_PLUGIN_OCR}
 ${PDF4QT_WIX_PLUGIN_SCANNER}
     </ComponentGroup>
   </Fragment>

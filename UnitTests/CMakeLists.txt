@@ -121,10 +121,11 @@ add_executable(UnitTestsOcrCli
 )
 
 target_link_libraries(UnitTestsOcrCli PRIVATE Qt6::Core Qt6::Test)
+add_dependencies(UnitTestsOcrCli PdfTool)
 target_compile_definitions(UnitTestsOcrCli PRIVATE
     FRISKET_PREFLIGHT_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-preflight"
     FRISKET_OCR_SOURCE_DIR="${CMAKE_SOURCE_DIR}/frisket-ocr"
-    PDF4QT_BUILD_BIN_DIR="${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}")
+    PDFTOOL_EXECUTABLE_PATH="$<TARGET_FILE:PdfTool>")
 
 set_target_properties(UnitTestsOcrCli PROPERTIES
     WIN32_EXECUTABLE OFF
