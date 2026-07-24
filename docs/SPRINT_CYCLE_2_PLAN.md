@@ -1,6 +1,6 @@
 # Sprint Plan — Cycle 2 (Jul 20 – Aug 3, 2026): PageMaster Export Hardening
 
-Status: **mostly complete** (refresh 2026-07-24). Batch stack MIC-307–312 and MIC-319 **Done**. Remaining V1 focus: **MIC-301** (In Review), **MIC-320** (Todo), and **MIC-336** (macOS support + Win/Linux/macOS packaging compatibility pass). OCR must not displace those gates.
+Status: **mostly complete** (refresh 2026-07-24). Batch stack MIC-307–312 and MIC-319 **Done**. Remaining V1 focus: **MIC-301** (In Review). **MIC-320** ships as a documented limitation with in-app disclosure; **MIC-336** is retargeted post-V1 (macOS is not a V1 platform). OCR must not displace those gates.
 
 ## Outcome table
 
@@ -14,7 +14,7 @@ Status: **mostly complete** (refresh 2026-07-24). Batch stack MIC-307–312 and 
 | MIC-319 | White-overprint detection findings | Done |
 | MIC-320 | Overprint-correct rendering | Todo (V1 gate) |
 | MIC-301 | Windows installer / clean-machine | In Review (V1 gate) |
-| MIC-336 | macOS + 3-OS packaging compatibility pass | Todo (V1 platform gate) |
+| MIC-336 | macOS + packaging compatibility pass | Retargeted post-V1 (not a V1 gate) |
 
 Original committed plan retained below for history.
 
