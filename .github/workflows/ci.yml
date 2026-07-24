@@ -205,7 +205,11 @@ jobs:
   # This gap is how a broken master went unnoticed: a docs-only pull request merged with
   # no CI signal, and the pre-existing failure only surfaced on the push run.
   ci_ok:
-    if: always()
+    # Not `always()`: that also fires when concurrency cancel-in-progress supersedes the
+    # run, reporting a red check against a commit nobody is waiting on. `!cancelled()`
+    # still runs when a build job *failed* (unlike success()) and when both were skipped
+    # by paths-ignore, but skips cleanly on cancellation.
+    if: ${{ !cancelled() }}
     needs: [build_ubuntu, build_windows]
     runs-on: ubuntu-latest
     # Reads only the `needs` context; no repository access required.
