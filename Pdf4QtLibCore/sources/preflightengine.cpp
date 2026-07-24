@@ -387,6 +387,12 @@ QString defaultFixupDescription(const QString& fixupId)
 
 bool isBleedAdequate(const PDFPage* page, qreal amountPt, qreal tolerancePt, QRectF& bboxForReport)
 {
+    if (!page)
+    {
+        bboxForReport = QRectF();
+        return false;
+    }
+
     const QRectF media = page->getMediaBox().normalized();
     const QRectF trim = preflight::resolveEffectiveBox(page->getTrimBox(), page->getCropBox(), media);
     const QRectF bleed = page->getBleedBox().normalized();
@@ -417,6 +423,11 @@ void runBleedCheck(PDFDocumentSession* session,
     for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
     {
         const PDFPage* page = catalog->getPage(pageIndex);
+        if (!page)
+        {
+            continue;
+        }
+
         QRectF bbox;
         const bool adequate = isBleedAdequate(page, check.amountPt, check.tolerancePt, bbox);
         if (adequate)
@@ -480,6 +491,11 @@ void runSizeCheck(SizeCheckKind kind,
     for (PDFInteger pageIndex = 0; pageIndex < pageCount; ++pageIndex)
     {
         const PDFPage* page = catalog->getPage(pageIndex);
+        if (!page)
+        {
+            continue;
+        }
+
         const QRectF media = page->getMediaBox().normalized();
         const QRectF box = (kind == SizeCheckKind::Trim)
                                ? preflight::resolveEffectiveBox(page->getTrimBox(), page->getCropBox(), media)

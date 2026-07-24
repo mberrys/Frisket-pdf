@@ -36,7 +36,8 @@ public:
         OcrSuccess = 0,
         OcrPartialFailure = 1,
         OcrContractError = 2,
-        OcrSidecarUnavailable = 3
+        OcrSidecarUnavailable = 3,
+        OcrCancelled = 4
     };
 
     virtual QString getStandardString(StandardString standardString) const override;

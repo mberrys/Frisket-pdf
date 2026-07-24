@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
         pdf::PDFSecurityHandler::setNoDRMMode();
     }
 
-    pdf::PDFWidgetUtils::setDarkTheme(parser.isSet(lightGui), parser.isSet(darkGui));
+    pdf::PDFWidgetUtils::initApplicationColorScheme(parser.isSet(lightGui), parser.isSet(darkGui));
     installPageMasterStyle(application);
 
     pdf::PDFApplicationTranslator translator;

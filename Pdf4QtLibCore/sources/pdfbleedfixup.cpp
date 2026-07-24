@@ -97,6 +97,10 @@ void appendContentReference(PDFDocumentBuilder* builder,
             {
                 contentReferences.push_back(object.getReference());
             }
+            else if (object.isStream())
+            {
+                contentReferences.push_back(builder->addObject(object));
+            }
         }
     }
 }
@@ -679,10 +683,12 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
         flags |= PDFModifiedDocument::PageContents;
     }
 
-    if (modifier.finalize())
+    if (!modifier.finalize())
     {
-        *document = *modifier.getDocument();
+        return PDFTranslationContext::tr("Failed to finalize document modifications.");
     }
+
+    *document = *modifier.getDocument();
 
     if (modificationFlags)
     {

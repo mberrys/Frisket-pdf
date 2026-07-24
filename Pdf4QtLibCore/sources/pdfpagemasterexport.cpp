@@ -587,14 +587,15 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         setOutputStatus(manifest, int(index), OUTPUT_STATUS_WRITTEN);
         if (!persistManifest(manifestPath, manifest))
         {
+            QFile::remove(fileName);
+            const QString message = QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                                "Manifest update failed after writing '%1'; output was removed to keep batch state consistent.")
+                                      .arg(fileName);
+            setOutputStatus(manifest, int(index), OUTPUT_STATUS_FAILED, message);
+            persistManifest(manifestPath, manifest);
             finishProgressIfActive(activeProgress(job));
             result.manifest = manifest;
-            result.writtenFiles << fileName;
-            return createExportError(QCoreApplication::translate("pdf::PDFPageMasterExport",
-                                                                 "Could not update batch manifest at %1.").arg(manifestPath),
-                                     std::move(result.writtenFiles),
-                                     manifestPath,
-                                     manifest);
+            return createExportError(message, std::move(result.writtenFiles), manifestPath, manifest);
         }
         result.writtenFiles << fileName;
 

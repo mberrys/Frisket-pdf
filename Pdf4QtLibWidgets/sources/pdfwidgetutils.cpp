@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfwidgetutils.h"
+#include "pdfuitheme.h"
 #include "pdfcolorconvertor.h"
 
 #include <map>
@@ -39,6 +40,8 @@
 #include <QStyleHints>
 #include <QStyleFactory>
 #include <QOperatingSystemVersion>
+#include <QSettings>
+#include <QCoreApplication>
 
 #include "pdfdbgheap.h"
 
@@ -155,13 +158,13 @@ QSize PDFWidgetUtils::scaleDPI(const QPaintDevice* widget, QSize unscaledSize)
 
 void PDFWidgetUtils::style(QWidget* widget)
 {
-    const int dialogMarginX = scaleDPI_x(widget, 12);
-    const int dialogMarginY = scaleDPI_y(widget, 12);
-    const int dialogSpacing = scaleDPI_y(widget, 12);
+    const int dialogMarginX = scaleDPI_x(widget, PDFUITheme::kDialogMarginPx);
+    const int dialogMarginY = scaleDPI_y(widget, PDFUITheme::kDialogMarginPx);
+    const int dialogSpacing = scaleDPI_y(widget, PDFUITheme::kDialogMarginPx);
 
-    const int groupBoxMarginX = scaleDPI_x(widget, 20);
-    const int groupBoxMarginY = scaleDPI_y(widget, 20);
-    const int groupBoxSpacing = scaleDPI_y(widget, 12);
+    const int groupBoxMarginX = scaleDPI_x(widget, PDFUITheme::kGroupBoxMarginPx);
+    const int groupBoxMarginY = scaleDPI_y(widget, PDFUITheme::kGroupBoxMarginPx);
+    const int groupBoxSpacing = scaleDPI_y(widget, PDFUITheme::kGroupBoxSpacingPx);
 
     QList<QWidget*> childWidgets = widget->findChildren<QWidget*>();
     childWidgets.append(widget);
@@ -179,6 +182,50 @@ void PDFWidgetUtils::style(QWidget* widget)
             childWidget->layout()->setSpacing(dialogSpacing);
         }
     }
+}
+
+void PDFWidgetUtils::initApplicationColorScheme(bool cliLightTheme, bool cliDarkTheme)
+{
+    enum class SavedColorScheme
+    {
+        Auto = 0,
+        Light = 1,
+        Dark = 2
+    };
+
+    QSettings settings(QSettings::IniFormat,
+                       QSettings::UserScope,
+                       QStringLiteral("MelkaJ"),
+                       QStringLiteral("PDF4QT Editor"));
+    settings.beginGroup(QStringLiteral("ColorScheme"));
+    const SavedColorScheme savedScheme = static_cast<SavedColorScheme>(settings.value(QStringLiteral("colorScheme"), int(SavedColorScheme::Auto)).toInt());
+    settings.endGroup();
+
+    bool isLightGui = false;
+    bool isDarkGui = false;
+
+    switch (savedScheme)
+    {
+        case SavedColorScheme::Auto:
+            isLightGui = cliLightTheme;
+            isDarkGui = cliDarkTheme;
+            break;
+
+        case SavedColorScheme::Light:
+            isLightGui = true;
+            break;
+
+        case SavedColorScheme::Dark:
+            isDarkGui = true;
+            break;
+
+        default:
+            isLightGui = cliLightTheme;
+            isDarkGui = cliDarkTheme;
+            break;
+    }
+
+    setDarkTheme(isLightGui, isDarkGui);
 }
 
 void PDFWidgetUtils::setDarkTheme(bool isLightTheme, bool isDarkTheme)
@@ -382,6 +429,105 @@ void PDFWidgetUtils::checkMenuAccessibility(QMenu* menu)
     {
         QMessageBox::warning(nullptr, "Accesibility Check", errors.join("<br>"));
     }
+}
+
+QColor PDFUITheme::severityErrorColor()
+{
+    return QColor(220, 38, 38);
+}
+
+QColor PDFUITheme::severityWarningColor()
+{
+    return QColor(234, 88, 12);
+}
+
+QColor PDFUITheme::severityInfoColor()
+{
+    return QColor(37, 99, 235);
+}
+
+QColor PDFUITheme::severityTextColor(const QString& severity)
+{
+    if (severity == QStringLiteral("error"))
+    {
+        return severityErrorColor();
+    }
+    if (severity == QStringLiteral("warning"))
+    {
+        return severityWarningColor();
+    }
+    return severityInfoColor();
+}
+
+QColor PDFUITheme::errorTextColor(const QPalette& palette)
+{
+    if (PDFWidgetUtils::isDarkTheme())
+    {
+        return QColor(248, 113, 113);
+    }
+
+    return QColor(176, 0, 32);
+}
+
+QColor PDFUITheme::mutedTextColor(const QPalette& palette)
+{
+    return palette.color(QPalette::PlaceholderText);
+}
+
+QColor PDFUITheme::canvasSurroundColor()
+{
+    if (PDFWidgetUtils::isDarkTheme())
+    {
+        return QColor(1, 4, 9);
+    }
+
+    return QColor(Qt::lightGray);
+}
+
+QColor PDFUITheme::findHighlightColor(const QPalette& palette, bool selected)
+{
+    if (selected)
+    {
+        return palette.color(QPalette::Highlight);
+    }
+
+    return palette.color(QPalette::Link);
+}
+
+QColor PDFUITheme::bookmarkAutoColor(const QPalette& palette)
+{
+    return palette.color(QPalette::Link);
+}
+
+QColor PDFUITheme::bookmarkManualColor(const QPalette& palette)
+{
+    if (PDFWidgetUtils::isDarkTheme())
+    {
+        return QColor(251, 191, 36);
+    }
+
+    return QColor(255, 159, 0);
+}
+
+QColor PDFUITheme::bookmarkSelectedColor(const QPalette& palette)
+{
+    return palette.color(QPalette::Highlight);
+}
+
+QString PDFUITheme::overlayLabelStyleSheet(const QPalette& palette)
+{
+    const QColor background = palette.color(QPalette::ToolTipBase);
+    const QColor foreground = palette.color(QPalette::ToolTipText);
+    return QStringLiteral("QLabel { background: rgba(%1, %2, %3, 220); color: %4; border-radius: 4px; padding: 6px 10px; }")
+        .arg(background.red())
+        .arg(background.green())
+        .arg(background.blue())
+        .arg(foreground.name(QColor::HexRgb));
+}
+
+QString PDFUITheme::errorLabelStyleSheet(const QPalette& palette)
+{
+    return QStringLiteral("color: %1;").arg(errorTextColor(palette).name(QColor::HexRgb));
 }
 
 } // namespace pdf

@@ -35,7 +35,7 @@
 #include <QTemporaryFile>
 
 #ifndef FRISKET_PREFLIGHT_SCHEMA_VERSION
-#define FRISKET_PREFLIGHT_SCHEMA_VERSION 2
+#define FRISKET_PREFLIGHT_SCHEMA_VERSION 3
 #endif
 
 namespace pdfplugin::preflight
@@ -583,10 +583,16 @@ inline bool validateNormalizedReport(const QJsonObject& report, QString* errorMe
         }
     }
 
-    const bool expectedPass = report.value(QStringLiteral("errors")).toArray().isEmpty();
+    const bool errorsEmpty = report.value(QStringLiteral("errors")).toArray().isEmpty();
+    bool expectedPass = errorsEmpty;
+    if (schemaVersionValue >= 3)
+    {
+        expectedPass = errorsEmpty && report.value(QStringLiteral("inspection_complete")).toBool();
+    }
+
     if (report.value(QStringLiteral("pass")).toBool() != expectedPass)
     {
-        return setValidationError(errorMessage, QStringLiteral("pass must be true exactly when errors is empty."));
+        return setValidationError(errorMessage, QStringLiteral("pass must be true exactly when errors is empty and inspection is complete."));
     }
 
     return true;

@@ -144,6 +144,10 @@ PDFSentrySession::PDFSentrySession(const QString& applicationId)
 
     configureCrashpadHandler(options);
 
+    // Note: sentry_options_set_send_default_pii exists only under
+    // SENTRY_PLATFORM_NX in sentry-native 0.15.x (our vcpkg pin). Desktop
+    // builds already default to not sending PII; do not call the NX-only API.
+
     const double tracesSampleRateValue = tracesSampleRate();
     if (tracesSampleRateValue > 0.0)
     {

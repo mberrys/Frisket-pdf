@@ -114,7 +114,7 @@ PDFOcrPageGate::PageOcrNeed PDFOcrPageGate::classifyPage(PDFDocumentSession* ses
         return PageOcrNeed::NeedsOcr;
     }
 
-    return PageOcrNeed::SkipHasText;
+    return PageOcrNeed::SkipEmpty;
 }
 
 }   // namespace pdf

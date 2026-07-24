@@ -229,6 +229,15 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeFast(const PDFPage* page,
         const PDFReal depthPt = sideBleedPt(settings.bleedMM, side);
         if (!(depthPt > 0.0))
         {
+            PDFBleedMarginProbeEdgeResult edgeResult;
+            edgeResult.hasContent = true;
+            switch (side)
+            {
+                case PDFBleedFixupSide::Left: result.left = edgeResult; break;
+                case PDFBleedFixupSide::Right: result.right = edgeResult; break;
+                case PDFBleedFixupSide::Top: result.top = edgeResult; break;
+                case PDFBleedFixupSide::Bottom: result.bottom = edgeResult; break;
+            }
             continue;
         }
 
@@ -314,6 +323,15 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeRaster(const PDFPage* page,
         const PDFReal depthPt = sideBleedPt(settings.bleedMM, side);
         if (!(depthPt > 0.0))
         {
+            PDFBleedMarginProbeEdgeResult edgeResult;
+            edgeResult.hasContent = true;
+            switch (side)
+            {
+                case PDFBleedFixupSide::Left: result.left = edgeResult; break;
+                case PDFBleedFixupSide::Right: result.right = edgeResult; break;
+                case PDFBleedFixupSide::Top: result.top = edgeResult; break;
+                case PDFBleedFixupSide::Bottom: result.bottom = edgeResult; break;
+            }
             continue;
         }
 

@@ -23,6 +23,7 @@
 #include "preflightreportmodel.h"
 
 #include "preflightsidecarutils.h"
+#include "pdfuitheme.h"
 
 namespace pdfplugin
 {
@@ -84,6 +85,11 @@ QVariant PreflightReportModel::data(const QModelIndex& index, int role) const
             default:
                 break;
         }
+    }
+
+    if (role == Qt::ForegroundRole && (index.column() == Severity || index.column() == Message))
+    {
+        return pdf::PDFUITheme::severityTextColor(finding.severity);
     }
 
     return QVariant();

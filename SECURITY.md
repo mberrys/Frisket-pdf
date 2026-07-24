@@ -38,4 +38,6 @@ Highest-risk surfaces for this project:
 - Attachment / launch / URI handlers
 - Atomic write / export paths (PageMaster, PdfTool)
 
-Fuzz harnesses live under `Fuzz/` and `.github/workflows/fuzz.yml`. Crash reporting may be sent via Sentry when `SENTRY_DSN` / `PDF4QT_ENABLE_SENTRY` is configured — treat that as operational telemetry, not a substitute for private disclosure.
+Fuzz harnesses live under `Fuzz/` and `.github/workflows/fuzz.yml`. Crash reporting may be sent via Sentry when `SENTRY_DSN` / `PDF4QT_ENABLE_SENTRY` is configured — treat that as operational telemetry, not a substitute for private disclosure. Sentry is configured with `send_default_pii` disabled; see `docs/PRODUCTION_RUNBOOK.md` for opt-in guidance.
+
+For V1 launch readiness and operational procedures, see `docs/V1_RELEASE_READINESS.md` and `docs/PRODUCTION_RUNBOOK.md`.
