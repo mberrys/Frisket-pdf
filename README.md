@@ -68,6 +68,6 @@ Contributions, testing, feedback, and bug reports are welcome. Please read [AGEN
 
 ## License and acknowledgements
 
-Frisket-PDF is based on [PDF4QT](https://github.com/JakubMelka/PDF4QT) and is distributed under the MIT License. It includes third-party components with their own license obligations, including Qt, FreeType, OpenJPEG, OpenSSL, Little CMS, zlib, libjpeg, and Blend2D. Review the [packaging and licensing guide](docs/PACKAGING_LICENSING.md) before distributing a build.
+Frisket-PDF is based on [PDF4QT](https://github.com/JakubMelka/PDF4QT) and is currently distributed under the MIT License. **The license is subject to change at any time.** It includes third-party components with their own license obligations, including Qt, FreeType, OpenJPEG, OpenSSL, Little CMS, zlib, libjpeg, and Blend2D. Review the [packaging and licensing guide](docs/PACKAGING_LICENSING.md) before distributing a build.
 
 Copyright © 2026 Michael Berry. Portions are copyright © 2019 The FreeType Project.
