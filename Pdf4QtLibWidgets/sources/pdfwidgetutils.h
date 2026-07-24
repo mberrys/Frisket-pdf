@@ -25,6 +25,7 @@
 
 #include "pdfwidgetsglobal.h"
 #include "pdfglobal.h"
+#include "pdfuitheme.h"
 
 #include <QIcon>
 #include <QWidget>
@@ -64,6 +65,9 @@ public:
 
     /// Apply style to the widget
     static void style(QWidget* widget);
+
+    /// Resolve saved color-scheme preference (from Editor settings) and apply CLI overrides.
+    static void initApplicationColorScheme(bool cliLightTheme, bool cliDarkTheme);
 
     /// Overrides automatically detected dark theme / light theme settings
     static void setDarkTheme(bool isLightTheme, bool isDarkTheme);

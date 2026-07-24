@@ -27,6 +27,7 @@ add_library(Pdf4QtLibWidgets SHARED
     sources/pdfwidgetutils.cpp
     sources/pdfwidgettool.h
     sources/pdfwidgetutils.h
+    sources/pdfuitheme.h
     sources/pdfcertificatemanagerdialog.cpp
     sources/pdfcertificatemanagerdialog.h
     sources/pdfcertificatemanagerdialog.ui

@@ -4,9 +4,9 @@
 
 (c) Michael Berry 2026 Frisket PDF
 
-*Software works on Microsoft Windows, Linux, and macOS.*
+*Software works on Microsoft Windows and Linux.*
 
-Supported platforms and the packaging compatibility pass are documented in [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) ([MIC-336](https://linear.app/mbx2/issue/MIC-336)).
+Supported platforms and the packaging compatibility pass are documented in [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md).
 
 Software is provided without any license or warranty of any kind. This software also uses several third-party libraries, and users must comply with the licenses of those third-party components.
 
@@ -80,7 +80,7 @@ You are encouraged to contribute by testing, offering feedback, providing advice
 
 ## 6. INSTALLING
 
-Frisket V1 supports **Windows**, **Linux**, and **macOS**. Prefer Frisket GitHub
+Frisket V1 supports **Windows** and **Linux**. Prefer Frisket GitHub
 [Releases](https://github.com/mberrys/Frisket-pdf/releases) over upstream PDF4QT
 binaries. Layout and smoke-test expectations: [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md).
 
@@ -103,19 +103,20 @@ Upstream AUR / Flathub packages for PDF4QT are not Frisket release artifacts.
 
 ### macOS
 
-Official DMG/pkg packaging and notarization are in progress under MIC-336.
-Until release assets are published, build from source (below) or use CI artifacts
-once the macOS job is green.
+**Not supported for V1.** There is no macOS CI job, no official DMG/pkg, and no
+notarization, so no release assets are published for macOS. The sources are
+expected to build with a recent Xcode / Apple Clang, but that path is
+best-effort and unverified — see [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md).
 
 ## 7. COMPILING
 
-This software can be compiled on Windows, Linux, and macOS. A compiler supporting the C++20 standard is needed.
+This software can be compiled on Windows and Linux. A compiler supporting the C++20 standard is needed. macOS builds are best-effort and not covered by CI.
 
 On Windows, you can use Visual Studio 2022 or MinGW.
 
 On Linux, a GCC version >= 8 should work, although we tested it with GCC 11.
 
-On macOS, use a recent Xcode / Apple Clang with Qt 6.9 and vcpkg (see MIC-336 for the CI recipe).
+On macOS, a recent Xcode / Apple Clang with Qt 6.9 and vcpkg is expected to work, but this configuration is not built or tested in CI.
 
 ### Compiling from sources
 
@@ -127,12 +128,12 @@ On macOS, use a recent Xcode / Apple Clang with Qt 6.9 and vcpkg (see MIC-336 fo
 
     Check that vcpkg path is correct: `$VCPKG_ROOT/vcpkg --version`.
 
-2. Build PDF4QT
+2. Build Frisket-PDF
 
     2.1 Clone repo
 
-        git clone https://github.com/JakubMelka/PDF4QT
-        cd PDF4QT
+        git clone https://github.com/mberrys/Frisket-pdf
+        cd Frisket-pdf
 
     2.2 Configure
 

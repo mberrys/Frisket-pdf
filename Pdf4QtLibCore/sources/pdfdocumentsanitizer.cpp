@@ -738,6 +738,10 @@ void PDFDocumentSanitizer::performSanitizeFileAttachments()
     {
         PDFObject namesObject = builder.getObject(catalogDictionary->get("Names"));
         const PDFDictionary* namesDictionary = builder.getDictionaryFromObject(namesObject);
+        if (!namesDictionary)
+        {
+            return;
+        }
         if (namesDictionary->hasKey("EmbeddedFiles"))
         {
             PDFDictionary dictionaryCopy = *namesDictionary;
@@ -770,6 +774,10 @@ void PDFDocumentSanitizer::performSanitizeEmbeddedSearchIndex()
     {
         PDFObject pieceInfoObject = builder.getObject(catalogDictionary->get("PieceInfo"));
         const PDFDictionary* pieceInfoDictionary = builder.getDictionaryFromObject(pieceInfoObject);
+        if (!pieceInfoDictionary)
+        {
+            return;
+        }
         if (pieceInfoDictionary->hasKey("SearchIndex"))
         {
             PDFDictionary dictionaryCopy = *pieceInfoDictionary;

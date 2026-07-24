@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "pdfadvancedfindwidget.h"
+#include "pdfuitheme.h"
 #include "ui_pdfadvancedfindwidget.h"
 
 #include "pdfcms.h"
@@ -331,10 +332,10 @@ pdf::PDFTextSelection PDFAdvancedFindWidget::getTextSelectionImpl() const
     {
         const pdf::PDFFindResult& findResult = m_findResults[i];
 
-        QColor color(Qt::blue);
+        QColor color = pdf::PDFUITheme::findHighlightColor(ui->resultsTableWidget->palette(), false);
         if (std::binary_search(selectedRowIndices.cbegin(), selectedRowIndices.cend(), i))
         {
-            color = QColor(Qt::yellow);
+            color = pdf::PDFUITheme::findHighlightColor(ui->resultsTableWidget->palette(), true);
         }
 
         result.addItems(findResult.textSelectionItems, color);

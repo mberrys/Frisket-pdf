@@ -22,6 +22,9 @@
 
 #include "preflightreportdockwidget.h"
 
+#include "pdfuitheme.h"
+#include "pdfwidgetutils.h"
+
 #include <QHeaderView>
 #include <QLabel>
 #include <QListWidget>
@@ -39,6 +42,11 @@ PreflightReportDockWidget::PreflightReportDockWidget(QWidget* parent) :
 {
     QWidget* container = new QWidget(this);
     QVBoxLayout* layout = new QVBoxLayout(container);
+    layout->setContentsMargins(pdf::PDFUITheme::kDialogMarginPx,
+                                 pdf::PDFUITheme::kDialogMarginPx,
+                                 pdf::PDFUITheme::kDialogMarginPx,
+                                 pdf::PDFUITheme::kDialogMarginPx);
+    layout->setSpacing(pdf::PDFUITheme::kDialogMarginPx);
 
     m_headerLabel = new QLabel(tr("No preflight report loaded."), container);
     m_headerLabel->setWordWrap(true);
@@ -53,6 +61,11 @@ PreflightReportDockWidget::PreflightReportDockWidget(QWidget* parent) :
     m_emptyLabel = new QLabel(tr("Run preflight or load an example report to see findings here."), container);
     m_emptyLabel->setWordWrap(true);
     m_emptyLabel->setAlignment(Qt::AlignCenter);
+    {
+        QPalette emptyPalette = m_emptyLabel->palette();
+        emptyPalette.setColor(QPalette::WindowText, emptyPalette.color(QPalette::PlaceholderText));
+        m_emptyLabel->setPalette(emptyPalette);
+    }
     m_contentStack->addWidget(m_emptyLabel);
 
     QWidget* reportPage = new QWidget(container);
@@ -64,6 +77,8 @@ PreflightReportDockWidget::PreflightReportDockWidget(QWidget* parent) :
     m_findingsView->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_findingsView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_findingsView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_findingsView->setAlternatingRowColors(true);
+    m_findingsView->setShowGrid(false);
     m_findingsView->horizontalHeader()->setStretchLastSection(true);
     m_findingsView->verticalHeader()->setVisible(false);
     reportLayout->addWidget(m_findingsView, 1);
@@ -88,6 +103,7 @@ PreflightReportDockWidget::PreflightReportDockWidget(QWidget* parent) :
     layout->addWidget(m_contentStack, 1);
 
     setWidget(container);
+    pdf::PDFWidgetUtils::style(container);
     refreshEmptyState();
 }
 
@@ -132,6 +148,7 @@ void PreflightReportDockWidget::refreshHeader()
     }
 
     const QString statusText = m_model.pass() ? tr("Pass") : tr("Fail");
+    const QColor statusColor = m_model.pass() ? QColor(34, 197, 94) : pdf::PDFUITheme::severityErrorColor();
     if (m_reportSourceLabel.isEmpty())
     {
         m_headerLabel->setText(tr("%1 — profile: %2").arg(statusText, m_model.profileName()));
@@ -140,9 +157,31 @@ void PreflightReportDockWidget::refreshHeader()
     {
         m_headerLabel->setText(tr("%1 — profile: %2 — %3").arg(statusText, m_model.profileName(), m_reportSourceLabel));
     }
-    m_summaryLabel->setText(tr("%1 error(s), %2 warning(s).")
-                                .arg(m_model.errorCount())
-                                .arg(m_model.warningCount()));
+    {
+        QPalette headerPalette = m_headerLabel->palette();
+        headerPalette.setColor(QPalette::WindowText, statusColor);
+        m_headerLabel->setPalette(headerPalette);
+    }
+    QString summaryText = tr("%1 error(s), %2 warning(s).")
+                              .arg(m_model.errorCount())
+                              .arg(m_model.warningCount());
+
+    // Standard page rendering does not simulate overprint (MIC-320); overprint-accurate
+    // compositing exists only in the transparency renderer behind Output Preview. Say so
+    // where the operator sees the finding, rather than only in the release notes.
+    if (m_model.hasWhiteOverprintFinding())
+    {
+        summaryText += QStringLiteral(" ");
+        summaryText += tr("This document uses overprint. Page view does not simulate "
+                          "overprint — use Output Preview to proof it accurately.");
+    }
+
+    m_summaryLabel->setText(summaryText);
+    {
+        QPalette summaryPalette = m_summaryLabel->palette();
+        summaryPalette.setColor(QPalette::WindowText, pdf::PDFUITheme::mutedTextColor(summaryPalette));
+        m_summaryLabel->setPalette(summaryPalette);
+    }
 }
 
 void PreflightReportDockWidget::refreshFixups()

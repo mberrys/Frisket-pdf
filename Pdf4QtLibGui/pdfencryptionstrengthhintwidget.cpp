@@ -77,7 +77,7 @@ void PDFEncryptionStrengthHintWidget::paintEvent(QPaintEvent* event)
     const bool isEnabled = this->isEnabled();
 
     QRect rect = this->rect();
-    painter.fillRect(rect, Qt::lightGray);
+    painter.fillRect(rect, palette().color(QPalette::Mid));
 
     painter.translate(markSpacing, 0);
 

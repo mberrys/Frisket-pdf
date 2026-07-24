@@ -401,7 +401,6 @@ QVariant PDFOutlineTreeItemModel::data(const QModelIndex& index, int role) const
         case Qt::FontRole:
         {
             QFont font = QApplication::font();
-            font.setPointSize(10);
             font.setBold(outlineItem->isFontBold());
             font.setItalic(outlineItem->isFontItalics());
             return font;

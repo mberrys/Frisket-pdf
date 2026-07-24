@@ -24,6 +24,7 @@
 #include "ui_pdfpageimportdialog.h"
 
 #include "pdfwidgetutils.h"
+#include "pdfuitheme.h"
 
 #include <QCheckBox>
 #include <QFileInfo>
@@ -191,7 +192,7 @@ void PDFPageImportDialog::updateState()
     const bool isValid = !m_pages.empty();
     m_okButton->setEnabled(isValid);
     ui->errorLabel->setText(isValid ? QString() : errorMessage);
-    ui->errorLabel->setStyleSheet(isValid ? QString() : QStringLiteral("color: #B00020;"));
+    ui->errorLabel->setStyleSheet(isValid ? QString() : pdf::PDFUITheme::errorLabelStyleSheet(palette()));
 
     if (isValid)
     {

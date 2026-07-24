@@ -34,7 +34,7 @@ add_executable(Pdf4QtLaunchPad
     launchdialog.ui
 )
 
-target_link_libraries(Pdf4QtLaunchPad PRIVATE Pdf4QtLibCore Qt6::Core Qt6::Gui Qt6::Widgets)
+target_link_libraries(Pdf4QtLaunchPad PRIVATE Pdf4QtLibCore Pdf4QtLibWidgets Qt6::Core Qt6::Gui Qt6::Widgets)
 
 set_target_properties(Pdf4QtLaunchPad PROPERTIES
     WIN32_EXECUTABLE ON

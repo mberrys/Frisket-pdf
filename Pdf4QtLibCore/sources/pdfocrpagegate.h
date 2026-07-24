@@ -37,6 +37,7 @@ public:
     enum class PageOcrNeed
     {
         SkipHasText,
+        SkipEmpty,
         NeedsOcr,
         Failed
     };

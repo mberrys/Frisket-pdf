@@ -17,9 +17,9 @@ Frisket-PDF is a fork of PDF4QT — a Qt6 / C++20 PDF toolkit (core library, wid
 
 - **Windows:** `<install-prefix>/pdfplugins` (relative to `bin`: `../pdfplugins`)
 - **Linux:** `<install-prefix>/pdf4qt` (under the install lib dir)
-- **macOS:** same CMake branch as non-Linux today (`pdfplugins`); confirm final `.app` / Resources layout in [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) (MIC-336)
+- **macOS:** not a V1 platform. Uses the same CMake branch as non-Linux today (`pdfplugins`); the final `.app` / Resources layout is an open post-V1 question — see [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md)
 
-Supported platforms: **Windows**, **Linux**, **macOS** — see [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md).
+Supported platforms: **Windows**, **Linux** (macOS is post-V1, best-effort) — see [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md).
 
 Plugins are built from `Pdf4QtEditorPlugins/` (AudioBook, Dimensions, Editor, ObjectInspector, OutputPreview, Redact, Scanner, Signature, SoftProofing).
 

@@ -3,6 +3,11 @@ name: Windows_MSI
 on:
   workflow_dispatch:
 
+# Least privilege for GITHUB_TOKEN: checkout reads the repo, artifacts are uploaded
+# via the job token, and signing uses the DigiCert SM_* secrets rather than this token.
+permissions:
+  contents: read
+
 jobs:
   build_windows:
     runs-on: windows-2022
@@ -167,6 +172,26 @@ jobs:
           VSCMD_ARG_TGT_ARCH: ${{ env.VSCMD_ARG_TGT_ARCH }}
           MSVC_TOOLSET_VERSION: ${{ env.MSVC_TOOLSET_VERSION }}
           MSVC_REDISTRIBUTABLES_PATH: ${{ env.MSVC_REDISTRIBUTABLES_PATH }}
+
+      - name: Validate staged install tree
+        shell: pwsh
+        run: |
+          # Verifies layout, profile/schema resolution and a real PdfTool preflight run
+          # against the staged tree before it is packaged, and enforces the
+          # docs/PACKAGING_LICENSING.md prohibition on Ghostscript / JRE / Python
+          # payloads -- previously a manual checklist item with nothing checking it.
+          # Editor launch is skipped: no interactive desktop on the runner.
+          .\pdf4qt\scripts\smoke-test-install.ps1 `
+            -InstallDir "${env:GITHUB_WORKSPACE}\pdf4qt\build\install\usr\bin" `
+            -SkipEditorLaunch
+
+      - name: Generate third-party notices
+        shell: pwsh
+        env:
+          VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg\installed
+        run: |
+          .\pdf4qt\scripts\generate-third-party-notices.ps1 `
+            -OutputPath "${env:GITHUB_WORKSPACE}\pdf4qt\build\install\THIRD_PARTY_NOTICES.txt"
 
       - name: Read version
         id: get_version

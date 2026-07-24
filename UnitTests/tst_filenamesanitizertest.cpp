@@ -24,6 +24,7 @@
 #include "pdffilenamesanitizer.h"
 
 #include <QDir>
+#include <QFile>
 #include <QTemporaryDir>
 
 class FilenameSanitizerTest : public QObject
@@ -46,6 +47,7 @@ private slots:
     void test_leading_trailing_dots();
     void test_isPathContained_safe();
     void test_isPathContained_traversal();
+    void test_isPathContained_symlinkParent();
     void test_attachmentOpenPath_contained();
 };
 
@@ -161,6 +163,21 @@ void FilenameSanitizerTest::test_isPathContained_traversal()
 
     QVERIFY(!pdf::PDFFilenameSanitizer::isPathContained(escaped, target));
     QVERIFY(!pdf::PDFFilenameSanitizer::isPathContained(target, target));
+}
+
+void FilenameSanitizerTest::test_isPathContained_symlinkParent()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString realTarget = tempDir.filePath(QStringLiteral("real-target"));
+    QVERIFY(QDir().mkpath(realTarget));
+
+    const QString linkParent = tempDir.filePath(QStringLiteral("link-parent"));
+    QVERIFY(QFile::link(realTarget, linkParent));
+
+    const QString escaped = QDir(linkParent).filePath(QStringLiteral("escape.txt"));
+    QVERIFY(!pdf::PDFFilenameSanitizer::isPathContained(escaped, realTarget));
 }
 
 void FilenameSanitizerTest::test_attachmentOpenPath_contained()

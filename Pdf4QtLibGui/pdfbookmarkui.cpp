@@ -22,6 +22,7 @@
 
 #include "pdfbookmarkui.h"
 #include "pdfwidgetutils.h"
+#include "pdfuitheme.h"
 #include "pdfpainterutils.h"
 
 #include <QPainter>
@@ -109,11 +110,12 @@ void PDFBookmarkItemDelegate::paint(QPainter* painter,
     QRect rect = options.rect;
     rect.marginsRemoved(QMargins(margin, margin, margin, margin));
 
-    QColor color = bookmark.isAuto ? QColor(0, 123, 255) : QColor(255, 159, 0);
+    QColor color = bookmark.isAuto ? pdf::PDFUITheme::bookmarkAutoColor(options.palette)
+                                   : pdf::PDFUITheme::bookmarkManualColor(options.palette);
 
     if (options.state.testFlag(QStyle::State_Selected))
     {
-        color = Qt::yellow;
+        color = pdf::PDFUITheme::bookmarkSelectedColor(options.palette);
     }
 
     QRect iconRect = rect;
