@@ -4,7 +4,9 @@
 
 (c) Michael Berry 2026 Frisket PDF
 
-*Software works on Microsoft Windows / Linux.*
+*Software works on Microsoft Windows, Linux, and macOS.*
+
+Supported platforms and the packaging compatibility pass are documented in [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) ([MIC-336](https://linear.app/mbx2/issue/MIC-336)).
 
 Software is provided without any license or warranty of any kind. This software also uses several third-party libraries, and users must comply with the licenses of those third-party components.
 
@@ -78,28 +80,42 @@ You are encouraged to contribute by testing, offering feedback, providing advice
 
 ## 6. INSTALLING
 
+Frisket V1 supports **Windows**, **Linux**, and **macOS**. Prefer Frisket GitHub
+[Releases](https://github.com/mberrys/Frisket-pdf/releases) over upstream PDF4QT
+binaries. Layout and smoke-test expectations: [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md).
+
+Executable names: Pdf4QtEditor, Pdf4QtDiff, Pdf4QtLaunchPad, Pdf4QtPageMaster,
+Pdf4QtViewer, and PdfTool.
+
 ### Windows
 
-The [Release page](https://github.com/JakubMelka/PDF4QT/releases) lists binaries for Windows, both with and without an installer.
+CI produces a portable zip; MSI packaging is built via `WindowsInstall.yml`
+(`WixInstaller/`). Clean-machine validation is tracked in MIC-301.
 
-### Arch Linux
+### Linux
 
-A [pdf4qt-git](https://aur.archlinux.org/packages/pdf4qt-git) package is available in the AUR.
+- **`.deb`:** produced from the Ubuntu CI job (`make-package.sh`).
+- **AppImage:** `LinuxInstall.yml` (manual dispatch).
+- **Flatpak:** `LinuxFlatpak.yml` / `Flatpak/io.github.mberrys.Frisket-pdf.json`
+  (note: current Flatpak grants `--filesystem=host` — see MIC-328).
 
-### Linux - Flatpak/AppImage
+Upstream AUR / Flathub packages for PDF4QT are not Frisket release artifacts.
 
-For other Linux distributions, there are two options available. A Flatpak package can be accessed at [Flathub](https://flathub.org/apps/io.github.JakubMelka.Pdf4qt).
-Alternatively, an AppImage is available in the Releases section. The AppImage format is designed to work on nearly all Linux systems.
-Historically, a .deb package was also offered, but it has been discontinued due to compatibility issues with some Linux distributions.
-The executable names are: Pdf4QtEditor, Pdf4QtDiff, Pdf4QtLaunchPad, Pdf4QtPageMaster, Pdf4QtViewer, and PdfTool.
+### macOS
+
+Official DMG/pkg packaging and notarization are in progress under MIC-336.
+Until release assets are published, build from source (below) or use CI artifacts
+once the macOS job is green.
 
 ## 7. COMPILING
 
-This software can be compiled on both Windows and Linux. A compiler supporting the C++20 standard is needed.
+This software can be compiled on Windows, Linux, and macOS. A compiler supporting the C++20 standard is needed.
 
 On Windows, you can use Visual Studio 2022 or MinGW.
 
-On Linux, a GCC version >= 8 should work, altough we tested it with GCC 11.
+On Linux, a GCC version >= 8 should work, although we tested it with GCC 11.
+
+On macOS, use a recent Xcode / Apple Clang with Qt 6.9 and vcpkg (see MIC-336 for the CI recipe).
 
 ### Compiling from sources
 
@@ -140,7 +156,7 @@ On Linux, a GCC version >= 8 should work, altough we tested it with GCC 11.
 
     To uninstall, run `sudo xargs rm < ./build/install_manifest.txt`.
 
-### Using Qt Creator (both Windows/Linux)
+### Using Qt Creator (Windows / Linux / macOS)
 1. Download Qt 6.9 or higher, and VCPKG package manager (https://vcpkg.io/en/index.html)
 2. Open Qt Creator and configure the project
 3. Build

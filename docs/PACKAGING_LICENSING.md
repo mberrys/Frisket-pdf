@@ -63,7 +63,10 @@ Frisket/
 └─ VERSION.json
 ```
 
-User profiles (overrides): `%APPDATA%/Frisket` (Windows) or `~/.config/frisket` (Linux), plus bundled defaults under `profiles/`.
+User profiles (overrides): `%APPDATA%/Frisket` or MelkaJ org settings (Windows),
+`~/.config/frisket` / MelkaJ (Linux), and the macOS equivalent under
+`~/Library/` (confirm exact org path during MIC-336), plus bundled defaults under
+`profiles/`. See [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md).
 
 ### Optional validator pack
 
@@ -157,7 +160,7 @@ Sources: [QPDF license](https://qpdf.readthedocs.io/en/stable/license.html), [PD
 
 ## Acceptance criteria (MIC-140)
 
-- [ ] Default package definition is C++/Qt only and documented for Windows and Linux (macOS when supported)
+- [ ] Default package definition is C++/Qt only and documented for Windows, Linux, and macOS ([PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md) / MIC-336)
 - [ ] Plugin, PdfTool engine, schemas, and profiles share one compatibility/version contract
 - [ ] Qt licensing route selected with compliance evidence stored with the release
 - [ ] Ghostscript exclusion enforced by automated artifact scan

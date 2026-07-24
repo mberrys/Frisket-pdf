@@ -33,7 +33,7 @@ Additional stress fixtures (`ai-art-*.pdf`) are exercised by `UnitTestsBleedStre
 
 ## Manual operator checklist (Editor)
 
-Run on a supported Windows machine with a release or dev build that bundles `PdfTool`, `FrisketPreflightPlugin`, and `share/frisket/profiles/frisket-default.json`.
+Run on a supported Windows, Linux, or macOS machine with a release or dev build that bundles `PdfTool`, `FrisketPreflightPlugin`, and `share/frisket/profiles/frisket-default.json` (see [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md)).
 
 ### Open and preflight
 
