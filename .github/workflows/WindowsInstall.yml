@@ -3,6 +3,11 @@ name: Windows_MSI
 on:
   workflow_dispatch:
 
+# Least privilege for GITHUB_TOKEN: checkout reads the repo, artifacts are uploaded
+# via the job token, and signing uses the DigiCert SM_* secrets rather than this token.
+permissions:
+  contents: read
+
 jobs:
   build_windows:
     runs-on: windows-2022

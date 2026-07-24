@@ -17,6 +17,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Least privilege for GITHUB_TOKEN. `contents: read` is what actions/checkout needs;
+# nothing here writes back to the repository. actions/upload-artifact@v4 uses the job
+# token against the artifact service and needs no additional scope.
+permissions:
+  contents: read
+
 jobs:
   build_ubuntu:
     runs-on: ubuntu-latest
@@ -202,6 +208,8 @@ jobs:
     if: always()
     needs: [build_ubuntu, build_windows]
     runs-on: ubuntu-latest
+    # Reads only the `needs` context; no repository access required.
+    permissions: {}
     steps:
       - name: Check build job results
         run: |
