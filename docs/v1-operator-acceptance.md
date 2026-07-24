@@ -71,6 +71,7 @@ Run on a supported Windows or Linux machine with a release or dev build that bun
 - Only **add-bleed** is implemented in the plugin; other advertised fixups are filtered out.
 - Post-fix preflight uses the bundled default profile, not a custom profile path.
 - Mirror bleed can show seams on high-contrast corners (see `docs/bleed-stress-test-results.md`).
+- **Overprint is not simulated in standard page rendering** (MIC-320). Overprint-accurate compositing exists only in the transparency renderer behind **Output Preview**. Preflight still *detects* white/near-white overprint and the report panel says so, but the page view will not show it. Do not use the page view to proof overprint-bearing prepress work.
 - Malformed PDF handling depends on the core reader; some corrupt files may parse partially before failing a check.
 - OCR, Notion, database, and network services are not required and are out of scope for this acceptance pass.
 - Redaction verification (`MIC-305`) is a separate workflow; not part of this operator loop.

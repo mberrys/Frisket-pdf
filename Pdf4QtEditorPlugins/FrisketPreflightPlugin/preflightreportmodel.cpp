@@ -191,6 +191,19 @@ const PreflightFixupEntry* PreflightReportModel::addBleedFixup() const
     return nullptr;
 }
 
+bool PreflightReportModel::hasWhiteOverprintFinding() const
+{
+    for (const PreflightFindingEntry& finding : m_findings)
+    {
+        if (finding.type == QStringLiteral("white-overprint"))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void PreflightReportModel::appendFindings(const QJsonArray& findings)
 {
     for (const QJsonValue& findingValue : findings)

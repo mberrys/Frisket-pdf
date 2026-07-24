@@ -96,7 +96,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A10 | Sentry privacy | No default PII | **Pass** (this audit) | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used |
 | A11 | CI build | Ubuntu + Windows compile + test | **Pass** | `.github/workflows/ci.yml` |
 | A12 | Windows installer | Clean-machine install | **Fail / open** | MIC-301 In Review |
-| A13 | Overprint rendering | Correct overprint compositing | **Fail / deferred** | MIC-320 Todo |
+| A13 | Overprint rendering | Correct overprint compositing in standard page view | **Deferred — mitigated** | MIC-320 deferred post-V1; detection (MIC-319) ships, plus in-app disclosure in the report panel and a documented limitation |
 | A14 | Packaging SBOM / license evidence | MIC-140 checklist complete | **Partial** | `docs/PACKAGING_LICENSING.md` unchecked items |
 | A15 | macOS build | Supported platform | **N/A** | Not in CI |
 | A16 | Authentication / payments | Secure flows | **N/A** | Offline desktop; PDF password only |
@@ -116,7 +116,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
 | **R-001** | Cannot ship Windows installer confidently | All Windows users | Fresh VM without MSVC/Qt; install MSI | Installer pipeline not fully signed off (MIC-301) | Complete MSI smoke test; code-sign if `SIGN_MSI` enabled | Install → launch Editor → run preflight on sample PDF | Release |
-| **R-002** | Incorrect color in overprint jobs | Print/prepress shops using overprint preview | Output preview on overprint fixture | `pdftransparencyrenderer` simplification (MIC-320) | Ship with documented limitation; schedule MIC-320 | Manual Output Preview on corpus | Product |
+| **R-002** | Page view does not simulate overprint | Print/prepress shops proofing overprint work | Open an overprint fixture; compare page view against Output Preview | Overprint is implemented in `pdftransparencyrenderer.cpp` (Output Preview) but absent from the standard QPainter path in `pdfpainter.cpp`; that renderer is RGB and overprint is a subtractive CMYK model, so correct handling there is an XL change (MIC-320) | **Accepted for V1:** documented limitation + in-app disclosure — the preflight report panel now tells the operator to use Output Preview whenever a `white-overprint` finding is present. No "overprint-safe output" claim in marketing | Run preflight on `white-overprint-form.pdf`; confirm the panel note appears; proof via Output Preview | Product |
 
 ### High
 

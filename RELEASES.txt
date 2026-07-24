@@ -1,4 +1,11 @@
 CURRENT:
+ - Known limitation (MIC-320): standard page rendering does not simulate overprint.
+   Overprint-accurate proofing requires Output Preview. Preflight detects white or
+   near-white overprint and the preflight report panel now says so explicitly.
+   Frisket V1 does not claim overprint-safe output for CMYK/prepress workflows.
+ - Known limitation: changing the color scheme requires an application restart (R-009).
+ - Frisket V1 supports Windows and Linux. macOS is not a supported platform for this
+   release; no macOS release assets are published.
  - Issue #398: Enhancing Speech Support: Locale Addons and System Voice Detection
  - Issue #395: [idea] white crosshair easier to see in dark mode
  - Issue #299: PDF element display error
