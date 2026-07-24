@@ -70,22 +70,33 @@ QString devOcrSidecarPath(const QString& applicationDirectory)
     return QDir::cleanPath(QDir(applicationDirectory).filePath(relativePath));
 }
 
+bool sidecarIsScript(const QFileInfo& info)
+{
+    const QString suffix = info.suffix();
+#ifdef Q_OS_WIN
+    return suffix.compare(QStringLiteral("cmd"), Qt::CaseInsensitive) == 0
+        || suffix.compare(QStringLiteral("bat"), Qt::CaseInsensitive) == 0
+        || suffix.compare(QStringLiteral("py"), Qt::CaseInsensitive) == 0;
+#else
+    return suffix.compare(QStringLiteral("sh"), Qt::CaseInsensitive) == 0
+        || suffix.compare(QStringLiteral("py"), Qt::CaseInsensitive) == 0;
+#endif
+}
+
 bool sidecarIsRunnable(const QString& path)
 {
     const QFileInfo info(path);
-    if (!info.exists())
+    if (!info.exists() || !info.isFile())
     {
         return false;
     }
 #ifdef Q_OS_WIN
-    if (info.isFile())
-    {
-        return true;
-    }
-    return info.suffix().compare(QStringLiteral("cmd"), Qt::CaseInsensitive) == 0
-        || info.suffix().compare(QStringLiteral("bat"), Qt::CaseInsensitive) == 0;
+    return true;
 #else
-    return info.isExecutable();
+    // Repo checkout often lacks +x on scripts, and .gitattributes forces CRLF
+    // which breaks shebang exec. Treat .sh/.py as runnable and launch via an
+    // interpreter in OcrSidecarClient::start.
+    return info.isExecutable() || sidecarIsScript(info);
 #endif
 }
 
@@ -148,8 +159,37 @@ public:
             return false;
         }
 
-        m_process.setProgram(sidecarPath);
-        m_process.setArguments({});
+        const QFileInfo info(sidecarPath);
+        const QString suffix = info.suffix();
+#ifndef Q_OS_WIN
+        // Prefer an interpreter so CRLF scripts and non-executable bits still work on CI.
+        if (suffix.compare(QStringLiteral("py"), Qt::CaseInsensitive) == 0)
+        {
+            m_process.setProgram(QStringLiteral("python3"));
+            m_process.setArguments({ sidecarPath });
+        }
+        else if (suffix.compare(QStringLiteral("sh"), Qt::CaseInsensitive) == 0)
+        {
+            m_process.setProgram(QStringLiteral("bash"));
+            m_process.setArguments({ sidecarPath });
+        }
+        else
+        {
+            m_process.setProgram(sidecarPath);
+            m_process.setArguments({});
+        }
+#else
+        if (suffix.compare(QStringLiteral("py"), Qt::CaseInsensitive) == 0)
+        {
+            m_process.setProgram(QStringLiteral("python"));
+            m_process.setArguments({ sidecarPath });
+        }
+        else
+        {
+            m_process.setProgram(sidecarPath);
+            m_process.setArguments({});
+        }
+#endif
         m_process.setProcessChannelMode(QProcess::SeparateChannels);
         m_process.start();
         if (!m_process.waitForStarted(30000))

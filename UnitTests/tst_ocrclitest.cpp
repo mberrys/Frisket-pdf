@@ -24,6 +24,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
@@ -57,12 +58,10 @@ QString OcrCliTest::pdfToolPath() const
 
 QString OcrCliTest::mockSidecarPath() const
 {
-    const QString sourceDir = QStringLiteral(FRISKET_OCR_SOURCE_DIR);
-#ifdef Q_OS_WIN
-    return QDir(sourceDir).filePath(QStringLiteral("tools/mock_ocr_sidecar.cmd"));
-#else
-    return QDir(sourceDir).filePath(QStringLiteral("tools/mock_ocr_sidecar.sh"));
-#endif
+    // Drive the Python mock directly so CI does not depend on +x bits or
+    // shebang/CRLF behavior of the thin .sh/.cmd wrappers.
+    return QDir(QStringLiteral(FRISKET_OCR_SOURCE_DIR))
+        .filePath(QStringLiteral("tools/mock_ocr_sidecar.py"));
 }
 
 QString OcrCliTest::fixturePdfPath() const
@@ -91,10 +90,17 @@ void OcrCliTest::pdftoolOcr_withMockSidecar_emitsReport()
     process.start();
     QVERIFY(process.waitForFinished(120000));
     QCOMPARE(process.exitStatus(), QProcess::NormalExit);
-    QVERIFY(process.exitCode() == 0 || process.exitCode() == 1);
+
+    const QByteArray stdOut = process.readAllStandardOutput();
+    const QByteArray stdErr = process.readAllStandardError();
+    QVERIFY2(process.exitCode() == 0 || process.exitCode() == 1,
+             qPrintable(QStringLiteral("unexpected exit %1\nstdout: %2\nstderr: %3")
+                            .arg(process.exitCode())
+                            .arg(QString::fromUtf8(stdOut))
+                            .arg(QString::fromUtf8(stdErr))));
 
     QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(process.readAllStandardOutput(), &parseError);
+    const QJsonDocument document = QJsonDocument::fromJson(stdOut, &parseError);
     QVERIFY2(parseError.error == QJsonParseError::NoError, qPrintable(parseError.errorString()));
     QVERIFY(document.isObject());
 

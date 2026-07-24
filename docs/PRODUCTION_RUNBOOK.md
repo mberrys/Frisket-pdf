@@ -100,7 +100,7 @@ Publish draft only after smoke tests pass.
 | `SENTRY_TRACES_SAMPLE_RATE` | 0.0–1.0 (default 0.2) |
 | `SENTRY_DEBUG` | Verbose sentry-native logs (dev only) |
 
-**Privacy:** `send_default_pii` is disabled. Crashes may still include OS-level paths in minidumps — do not enable Sentry in high-classification environments without review.
+**Privacy:** Desktop sentry-native 0.15.x does not send default PII (`send_default_pii` is NX-only in that pin). Crashes may still include OS-level paths in minidumps — do not enable Sentry in high-classification environments without review.
 
 **Verify:**
 

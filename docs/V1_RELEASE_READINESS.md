@@ -93,7 +93,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A7 | Preflight sidecar | Bounded stdout/stderr; process kill on cancel | **Pass** | `preflightsidecarutils.h` limits; plugin `cancelPreflightRun` |
 | A8 | PageMaster export | Atomic writes + manifest + cancel | **Pass** | `tst_pagemasterexporttest.cpp` |
 | A9 | Manifest/PDF consistency | Roll back output if manifest persist fails | **Pass** (this audit) | `pdfpagemasterexport.cpp` fix |
-| A10 | Sentry privacy | No default PII | **Pass** (this audit) | `sentry_options_set_send_default_pii(0)` |
+| A10 | Sentry privacy | No default PII | **Pass** (this audit) | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used |
 | A11 | CI build | Ubuntu + Windows compile + test | **Pass** | `.github/workflows/ci.yml` |
 | A12 | Windows installer | Clean-machine install | **Fail / open** | MIC-301 In Review |
 | A13 | Overprint rendering | Correct overprint compositing | **Fail / deferred** | MIC-320 Todo |
@@ -132,7 +132,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
 | **R-007** | Resume batch after manifest failure | PageMaster power users | Disk full during manifest write | Was: PDF written, manifest stale | **Fixed:** remove PDF on manifest failure | `tst_pagemasterexporttest` (existing manifest tests) | Core |
-| **R-008** | Sentry receives file paths in crashes | Opt-in telemetry users | Crash with `SENTRY_DSN` set | Crashpad minidumps may include paths | `send_default_pii(0)`; document `SENTRY_DSN` opt-in | `PdfTool sentry-verify` | Release |
+| **R-008** | Sentry receives file paths in crashes | Opt-in telemetry users | Crash with `SENTRY_DSN` set | Crashpad minidumps may include paths | Document `SENTRY_DSN` opt-in; desktop SDK defaults omit PII | `PdfTool sentry-verify` | Release |
 | **R-009** | Theme/scheme requires restart | All GUI users | Change color scheme in settings | Settings read only at startup | Document in release notes | Manual | UX |
 | **R-010** | OCR sidecar supply chain | OCR users | Point `FRISKET_OCR_SIDECAR` at unknown binary | External Python/PyInstaller bundle | Ship only signed/bundled sidecar; document env var | OCR README | Release |
 | **R-011** | README links upstream releases | New users | Read install section | Fork branding drift | Update README install URLs to Frisket releases | README review | Docs |
@@ -152,7 +152,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 | Change | File | Rationale |
 |--------|------|-----------|
 | Roll back written PDF when batch manifest persist fails | `pdfpagemasterexport.cpp` | Prevents resume/state inconsistency (R-007) |
-| Disable Sentry default PII | `pdfsentry.cpp` | Privacy hardening (R-008) |
+| Disable Sentry default PII | `pdfsentry.cpp` / docs | Confirmed desktop 0.15.x has no PII setter (NX-only); default remains off (R-008) |
 | Set preflight `QProcess` working directory to app bundle dir | `frisketpreflightplugin.cpp` | Predictable sidecar resolution |
 
 Prior commits on `Pre-P3-sanitize` also addressed bug sanitization and visual polish (see PR #54).
