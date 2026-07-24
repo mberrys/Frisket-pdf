@@ -1,7 +1,10 @@
 # CI and diagnostic artifacts
 
-Pull requests to `master` run the Linux and Windows build-and-test jobs. Packaging
-artifacts are produced only for `master` pushes and manual workflow runs.
+Pull requests to `master` currently run the **Linux** and **Windows**
+build-and-test jobs. **macOS** CI (build + `ctest`) is required for V1 platform
+parity and is tracked in [MIC-336](https://linear.app/mbx2/issue/MIC-336) /
+[docs/PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md). Packaging artifacts are produced
+only for `master` pushes and manual workflow runs.
 
 When a Windows test run fails, GitHub Actions uploads its CTest logs as the
 `windows-test-logs` artifact. Store any intentional, long-lived diagnostic
