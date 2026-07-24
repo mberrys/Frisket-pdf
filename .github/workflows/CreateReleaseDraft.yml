@@ -115,6 +115,19 @@ jobs:
           echo "Listing all files in artifacts:"
           find artifacts -type f -print
 
+      - name: Generate SHA-256 checksums
+        run: |
+          # docs/PACKAGING_LICENSING.md: "Sign artifacts and publish checksums."
+          # Checksums are published here; Authenticode signing of the MSI is gated on
+          # vars.SIGN_MSI in WindowsInstall.yml and requires the code-signing cert.
+          cd artifacts
+          # Exclude the output file: the redirection creates it before find runs, so an
+          # unfiltered glob hashes an empty SHA256SUMS.txt into its own listing.
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%P\0' \
+            | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          echo "Published checksums:"
+          cat SHA256SUMS.txt
+
       - name: Create Release Draft
         id: create_release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2

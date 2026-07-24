@@ -162,9 +162,21 @@ void PreflightReportDockWidget::refreshHeader()
         headerPalette.setColor(QPalette::WindowText, statusColor);
         m_headerLabel->setPalette(headerPalette);
     }
-    m_summaryLabel->setText(tr("%1 error(s), %2 warning(s).")
-                                .arg(m_model.errorCount())
-                                .arg(m_model.warningCount()));
+    QString summaryText = tr("%1 error(s), %2 warning(s).")
+                              .arg(m_model.errorCount())
+                              .arg(m_model.warningCount());
+
+    // Standard page rendering does not simulate overprint (MIC-320); overprint-accurate
+    // compositing exists only in the transparency renderer behind Output Preview. Say so
+    // where the operator sees the finding, rather than only in the release notes.
+    if (m_model.hasWhiteOverprintFinding())
+    {
+        summaryText += QStringLiteral(" ");
+        summaryText += tr("This document uses overprint. Page view does not simulate "
+                          "overprint — use Output Preview to proof it accurately.");
+    }
+
+    m_summaryLabel->setText(summaryText);
     {
         QPalette summaryPalette = m_summaryLabel->palette();
         summaryPalette.setColor(QPalette::WindowText, pdf::PDFUITheme::mutedTextColor(summaryPalette));

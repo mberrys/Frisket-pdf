@@ -219,12 +219,33 @@ Frisket is a **local document processor**, not an upload service. Treat all PDFs
 
 ---
 
-## 9. Pre-launch checklist (maintainer)
+## 9. Known limitations to expect in support
 
-- [ ] `ci.yml` green on release SHA
-- [ ] MIC-301 Windows smoke test completed
-- [ ] MIC-320 documented as known limitation OR fixed
-- [ ] `PACKAGING_LICENSING.md` critical items reviewed
+State these up front; each is a documented V1 behaviour, not a regression.
+
+| Ref | Symptom a user will report | Answer |
+|-----|----------------------------|--------|
+| R-002 | "Overprint looks wrong in the page view" | Standard page rendering does not simulate overprint (MIC-320). Use **Output Preview** for overprint-accurate proofing. Preflight still flags white/near-white overprint and the report panel says so. Frisket V1 makes no overprint-safe output claim |
+| R-016 | "Windows warns the installer is untrusted" | The V1 MSI is unsigned — no code-signing certificate is held yet. Expected SmartScreen behaviour; verify the download against `SHA256SUMS.txt` on the release |
+| R-009 | "Changing the color scheme did nothing" | Settings are read at startup; restart the application |
+| R-004 | "A `PdfTool` process is still running" | Only after the Editor is force-killed (Task Manager) mid-preflight. In-app cancel terminates the child cleanly. End the orphan manually |
+| R-006 | "Why does the Flatpak want access to my whole home directory?" | The Flatpak grants `--filesystem=host` (MIC-328). Tightening to XDG portals is scheduled post-V1 |
+| R-012 | "Mirror bleed shows seams" | Known limitation on high-contrast corner artwork — see `docs/bleed-stress-test-results.md` |
+| — | "Is macOS supported?" | Not for V1. No macOS release assets are published; source builds are best-effort (`docs/PLATFORM_SUPPORT.md`) |
+
+---
+
+## 10. Pre-launch checklist (maintainer)
+
+- [ ] **PR #54 merged** — the preflight schema contract (engine v3 / validator v2) is broken on `master` without it; the operator loop does not work
+- [ ] `ci.yml` green on release SHA (`ci_ok` job passing)
+- [ ] Branch protection requires the `ci_ok` status check on `master`
+- [ ] MIC-301 clean-VM MSI smoke test completed via `scripts/Invoke-MsiSmokeTest.ps1`; transcript attached to the issue
+- [ ] MSI install architecture confirmed 64-bit (see the `candle -arch x86` note in `docs/PLATFORM_SUPPORT.md`)
+- [ ] MIC-320 documented as known limitation and disclosed in the report panel
+- [ ] `PACKAGING_LICENSING.md` critical items reviewed (full checklist gates *paid* distribution)
+- [ ] `THIRD_PARTY_NOTICES.txt` generated for the release artifact
 - [ ] README points to Frisket release artifacts (not upstream PDF4QT)
-- [ ] Draft release artifacts attached and checksums noted
+- [ ] Draft release artifacts attached with `SHA256SUMS.txt`
+- [ ] Release notes state: unsigned installer, no overprint simulation in page view, Windows + Linux only
 - [ ] `docs/V1_RELEASE_READINESS.md` recommendation reviewed by product owner

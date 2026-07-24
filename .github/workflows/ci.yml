@@ -17,6 +17,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Least privilege for GITHUB_TOKEN. `contents: read` is what actions/checkout needs;
+# nothing here writes back to the repository. actions/upload-artifact@v4 uses the job
+# token against the artifact service and needs no additional scope.
+permissions:
+  contents: read
+
 jobs:
   build_ubuntu:
     runs-on: ubuntu-latest
@@ -187,3 +193,36 @@ jobs:
           name: 'pdf4qt-${{ runner.os }}.zip'
           path: .\pdf4qt\build\install\usr\bin
           retention-days: 30
+
+  # Single always-running status check for branch protection.
+  #
+  # The pull_request trigger sets paths-ignore for docs/** and **/*.md, so the build
+  # jobs are skipped entirely on documentation-only pull requests. Requiring them
+  # directly in branch protection would leave those pull requests pending forever, so
+  # require this job instead: it fails if either build job failed or was cancelled, and
+  # passes when they succeeded or were legitimately skipped.
+  #
+  # This gap is how a broken master went unnoticed: a docs-only pull request merged with
+  # no CI signal, and the pre-existing failure only surfaced on the push run.
+  ci_ok:
+    # Not `always()`: that also fires when concurrency cancel-in-progress supersedes the
+    # run, reporting a red check against a commit nobody is waiting on. `!cancelled()`
+    # still runs when a build job *failed* (unlike success()) and when both were skipped
+    # by paths-ignore, but skips cleanly on cancellation.
+    if: ${{ !cancelled() }}
+    needs: [build_ubuntu, build_windows]
+    runs-on: ubuntu-latest
+    # Reads only the `needs` context; no repository access required.
+    permissions: {}
+    steps:
+      - name: Check build job results
+        run: |
+          echo "build_ubuntu:  ${{ needs.build_ubuntu.result }}"
+          echo "build_windows: ${{ needs.build_windows.result }}"
+          for result in "${{ needs.build_ubuntu.result }}" "${{ needs.build_windows.result }}"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::A required build job did not succeed."; exit 1 ;;
+            esac
+          done
+          echo "All required build jobs succeeded or were skipped."

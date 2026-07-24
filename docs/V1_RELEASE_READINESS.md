@@ -1,23 +1,43 @@
 # V1 release readiness audit
 
-Audit date: **2026-07-23**  
-Product: **Frisket PDF 1.6.0.0** (Qt6 desktop PDF toolkit)  
+Audit date: **2026-07-23**, revised **2026-07-24**
+Product: **Frisket PDF 1.6.0.0** (Qt6 desktop PDF toolkit)
 Scope: operational, security, reliability, data-integrity, compatibility, and release-readiness for first public launch.
+Platforms: **Windows and Linux** (macOS is not a V1 platform — see `docs/PLATFORM_SUPPORT.md`).
 
 ## Executive recommendation
 
-**Ready with explicit risks.**
+**Not ready — one launch-blocking defect on `master`, plus one open gate.**
 
-The V1 operator loop (Editor → preflight → findings → add-bleed → re-preflight) is automated in `UnitTestsOperatorAcceptance` and documented in `docs/v1-operator-acceptance.md`. CI builds Ubuntu + Windows, runs `ctest`, and gates on the preflight corpus. Attachment path traversal and batch export atomicity have been hardened.
+The 2026-07-23 revision of this document concluded "ready with explicit risks." That
+assessment was wrong in both directions and is superseded by the table below.
 
-**Blockers before marketing a general-audience V1:**
+**The V1 operator loop does not work on `master` as of 2026-07-24.**
+`Pdf4QtLibCore/sources/preflightengine.h:42` emits `schema_version: 3`, while the Editor
+plugin validator caps at `2`
+(`Pdf4QtEditorPlugins/FrisketPreflightPlugin/preflightsidecarutils.h:38`). Every report the
+engine produces is therefore rejected by `validateNormalizedReport`. This is a product
+defect, not merely red CI: it breaks the primary sellable loop end-to-end. The fix exists
+on the `Pre-P3-sanitize` branch (PR #54) and is unmerged.
 
-| ID | Risk | Mitigation required |
-|----|------|---------------------|
-| **R-001** | MIC-301 — Windows installer / clean-machine validation still In Review | Complete signed MSI smoke test on a VM without dev tools |
-| **R-002** | MIC-320 — Overprint-correct rendering not implemented | Document as known limitation for print-shop CMYK/overprint workflows; do not claim overprint-safe output |
+**Launch gates:**
+
+| ID | Risk | Status | Mitigation required |
+|----|------|--------|---------------------|
+| **R-000** | Preflight report schema contract broken on `master` (engine v3 / validator v2) | **Blocking** | Merge PR #54. CI on `master` is red on `UnitTestsOcrCli`, `UnitTestsPreflightCorpus`, `UnitTestsOperatorAcceptance` for this reason |
+| **R-001** | MIC-301 — Windows installer / clean-machine validation still In Review | **Open** | Run `scripts/Invoke-MsiSmokeTest.ps1` on a clean VM against an MSI from `WindowsInstall.yml`. Code signing is a **separate track**: no certificate is held, so V1 ships unsigned and users will see SmartScreen on first install |
+| **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted** | Documented limitation + in-app disclosure in the preflight report panel. No overprint-safe claim in marketing |
+| ~~R-015~~ | ~~macOS declared supported without CI, packaging or notarization (MIC-336)~~ | **Resolved** | macOS restated as post-V1; V1 ships Windows + Linux |
+
+Two audit items previously listed as gaps were already built and only needed correcting:
+`scripts/smoke-test-install.ps1` (most of MIC-301's functional checks) and
+`scripts/generate-third-party-notices.ps1`.
 
 No web SaaS, accounts, or payments exist — many classic launch checklist items are **N/A** (see §Not applicable).
+
+**Commercial status:** V1 is a **free public release**. The MIC-140 / MIC-329 licensing
+checklist (artifact SBOM, Qt LGPL relink evidence, counsel sign-off) therefore gates the
+first *paid* distribution, not this launch. See §5 and `docs/PACKAGING_LICENSING.md`.
 
 ---
 
@@ -94,11 +114,14 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A8 | PageMaster export | Atomic writes + manifest + cancel | **Pass** | `tst_pagemasterexporttest.cpp` |
 | A9 | Manifest/PDF consistency | Roll back output if manifest persist fails | **Pass** (this audit) | `pdfpagemasterexport.cpp` fix |
 | A10 | Sentry privacy | No default PII | **Pass** (this audit) | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used |
-| A11 | CI build | Ubuntu + Windows compile + test | **Pass** | `.github/workflows/ci.yml` |
-| A12 | Windows installer | Clean-machine install | **Fail / open** | MIC-301 In Review |
-| A13 | Overprint rendering | Correct overprint compositing | **Fail / deferred** | MIC-320 Todo |
-| A14 | Packaging SBOM / license evidence | MIC-140 checklist complete | **Partial** | `docs/PACKAGING_LICENSING.md` unchecked items |
-| A15 | macOS build | Supported platform | **N/A** | Not in CI |
+| A0 | Preflight report contract | Engine schema version accepted by plugin validator | **Fail / blocking on `master`** | Engine v3 (`preflightengine.h:42`) vs validator v2 (`preflightsidecarutils.h:38`); fixed in PR #54 |
+| A11 | CI build | Ubuntu + Windows compile + test | **Fail on `master`** | Red on `UnitTestsOcrCli`, `UnitTestsPreflightCorpus`, `UnitTestsOperatorAcceptance` — all downstream of A0 |
+| A12 | Windows installer | Clean-machine install | **Fail / open** | MIC-301 In Review; harness now at `scripts/Invoke-MsiSmokeTest.ps1`, clean-VM run outstanding |
+| A13 | Overprint rendering | Correct overprint compositing in standard page view | **Deferred — mitigated** | MIC-320 deferred post-V1; detection (MIC-319) ships, plus in-app disclosure in the report panel and a documented limitation |
+| A14 | Packaging SBOM / license evidence | MIC-140 checklist complete | **Partial — gates paid distribution, not V1** | Notices generator now resolves versions + license text; artifact SBOM and counsel sign-off outstanding |
+| A15 | macOS build | Supported platform | **N/A** | Not a V1 platform; no CI, no package, no notarization |
+| A21 | Bundle policy enforcement | No Ghostscript / JRE / Python in default bundle | **Pass** (this revision) | Enforced by `scripts/smoke-test-install.ps1`, wired into `WindowsInstall.yml` |
+| A22 | Artifact checksums | SHA-256 published with release | **Pass** (this revision) | `CreateReleaseDraft.yml` emits `SHA256SUMS.txt` |
 | A16 | Authentication / payments | Secure flows | **N/A** | Offline desktop; PDF password only |
 | A17 | CSP / CORS / cookies | Web security headers | **N/A** | No web app |
 | A18 | Browser compatibility | Supported browsers | **N/A** | No embedded browser |
@@ -116,7 +139,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
 | **R-001** | Cannot ship Windows installer confidently | All Windows users | Fresh VM without MSVC/Qt; install MSI | Installer pipeline not fully signed off (MIC-301) | Complete MSI smoke test; code-sign if `SIGN_MSI` enabled | Install → launch Editor → run preflight on sample PDF | Release |
-| **R-002** | Incorrect color in overprint jobs | Print/prepress shops using overprint preview | Output preview on overprint fixture | `pdftransparencyrenderer` simplification (MIC-320) | Ship with documented limitation; schedule MIC-320 | Manual Output Preview on corpus | Product |
+| **R-002** | Page view does not simulate overprint | Print/prepress shops proofing overprint work | Open an overprint fixture; compare page view against Output Preview | Overprint is implemented in `pdftransparencyrenderer.cpp` (Output Preview) but absent from the standard QPainter path in `pdfpainter.cpp`; that renderer is RGB and overprint is a subtractive CMYK model, so correct handling there is an XL change (MIC-320) | **Accepted for V1:** documented limitation + in-app disclosure — the preflight report panel now tells the operator to use Output Preview whenever a `white-overprint` finding is present. No "overprint-safe output" claim in marketing | Run preflight on `white-overprint-form.pdf`; confirm the panel note appears; proof via Output Preview | Product |
 
 ### High
 
@@ -143,7 +166,8 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 |----|--------|-------|
 | **R-012** | Mirror bleed seams on high-contrast art | Known V1 limitation (`docs/bleed-stress-test-results.md`) |
 | **R-013** | Only `add-bleed` fixup in plugin UI | Other fixups filtered by design |
-| **R-014** | No macOS CI | Best-effort community builds only |
+| **R-014** | No macOS CI | macOS is not a V1 platform; source builds are best-effort (`docs/PLATFORM_SUPPORT.md`) |
+| **R-016** | V1 MSI ships unsigned | No code-signing certificate held. Windows users see a SmartScreen warning on first install. Documented in `docs/PRODUCTION_RUNBOOK.md` and release notes; DigiCert procurement is a parallel track with 1–3 week lead time |
 
 ---
 
