@@ -91,7 +91,37 @@ bundling** and **installer packaging** for modules that are already complete.
 4. Open a sample PDF; run Frisket Preflight; confirm findings JSON.
 5. Confirm PdfTool exists beside the app and profiles resolve.
 
-Windows automation for steps 2–5 lives in `scripts/smoke-test-install.ps1`.
+Windows automation for steps 2–5 lives in `scripts/smoke-test-install.ps1`; the full
+MSI lifecycle wrapper is `scripts/Invoke-MsiSmokeTest.ps1`.
+
+### Windows MSI clean-machine run (MIC-301)
+
+Prerequisites: a fresh Windows VM with **no** MSVC, Qt, or Python, and an elevated
+PowerShell. Build the MSI first via the `Windows_MSI` workflow (`workflow_dispatch`).
+
+```powershell
+# Fresh install -> smoke -> uninstall
+.\scripts\Invoke-MsiSmokeTest.ps1 -MsiPath .\mberrys.Frisket-pdf_<version>.msi
+
+# Add upgrade coverage when a previous MSI is available
+.\scripts\Invoke-MsiSmokeTest.ps1 `
+    -MsiPath .\mberrys.Frisket-pdf_<new>.msi `
+    -PreviousMsiPath .\mberrys.Frisket-pdf_<old>.msi
+```
+
+The wrapper asserts install, layout resolution, preflight execution, Editor launch,
+forbidden-payload absence, upgrade, and clean uninstall. Attach the transcript to
+MIC-301.
+
+**Two things to confirm on the first run**, both currently unverified:
+
+1. **Install architecture.** `WindowsInstall.yml` runs `candle ... -arch x86` while the
+   payload is x64 (`--triplet x64-windows`, `win64_msvc2022_64`). If the MSI installs
+   under `Program Files (x86)`, fix the WiX arch to `x64` before sign-off — the smoke
+   test will fail on the expected `InstallDir`, which is the intended signal.
+2. **Profiles path.** `smoke-test-install.ps1` probes several layouts because
+   `PDF4QT_INSTALL_TO_USR=ON` shifts the share tree. Record which candidate resolved and
+   make the layout table above match what actually ships.
 
 ## macOS (post-V1)
 
