@@ -1,37 +1,60 @@
 # V1 release readiness audit
 
-Audit date: **2026-07-23**, revised **2026-07-24**
+Audit date: **2026-07-23**, revised **2026-07-24**, corrected **2026-07-25**
 Product: **Frisket PDF 1.6.0.0** (Qt6 desktop PDF toolkit)
 Scope: operational, security, reliability, data-integrity, compatibility, and release-readiness for first public launch.
 Platforms: **Windows and Linux** (macOS is not a V1 platform — see `docs/PLATFORM_SUPPORT.md`).
 
 ## Executive recommendation
 
-**Not ready — one launch-blocking defect on `master`, plus one open gate.**
+**Not ready — three open gates, one of them a broken security control. The previously
+reported launch-blocking defect (R-000) is resolved.**
 
-The 2026-07-23 revision of this document concluded "ready with explicit risks." That
-assessment was wrong in both directions and is superseded by the table below.
+The 2026-07-23 revision concluded "ready with explicit risks." The 2026-07-24 revision
+concluded "not ready — one launch-blocking defect." **Both were wrong.** This revision
+supersedes them.
 
-**The V1 operator loop does not work on `master` as of 2026-07-24.**
-`Pdf4QtLibCore/sources/preflightengine.h:42` emits `schema_version: 3`, while the Editor
-plugin validator caps at `2`
-(`Pdf4QtEditorPlugins/FrisketPreflightPlugin/preflightsidecarutils.h:38`). Every report the
-engine produces is therefore rejected by `validateNormalizedReport`. This is a product
-defect, not merely red CI: it breaks the primary sellable loop end-to-end. The fix exists
-on the `Pre-P3-sanitize` branch (PR #54) and is unmerged.
+### R-000 was already fixed when it was reported
 
-**Launch gates:**
+The 2026-07-24 revision stated that the V1 operator loop did not work on `master` because
+the engine emitted `schema_version: 3` while the plugin validator capped at `2`, and that
+*"the fix exists on the `Pre-P3-sanitize` branch (PR #54) and is unmerged."*
 
-| ID | Risk | Status | Mitigation required |
-|----|------|--------|---------------------|
-| **R-000** | Preflight report schema contract broken on `master` (engine v3 / validator v2) | **Blocking** | Merge PR #54. CI on `master` is red on `UnitTestsOcrCli`, `UnitTestsPreflightCorpus`, `UnitTestsOperatorAcceptance` for this reason |
-| **R-001** | MIC-301 — Windows installer / clean-machine validation still In Review | **Open** | Run `scripts/Invoke-MsiSmokeTest.ps1` on a clean VM against an MSI from `WindowsInstall.yml`. Code signing is a **separate track**: no certificate is held, so V1 ships unsigned and users will see SmartScreen on first install |
-| **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted** | Documented limitation + in-app disclosure in the preflight report panel. No overprint-safe claim in marketing |
-| ~~R-015~~ | ~~macOS declared supported without CI, packaging or notarization (MIC-336)~~ | **Resolved** | macOS restated as post-V1; V1 ships Windows + Linux |
+That was not true at the time of writing, and is not true now:
+
+- `Pdf4QtLibCore/sources/preflightengine.h:42` → `PREFLIGHT_REPORT_SCHEMA_VERSION = 3`
+- `Pdf4QtEditorPlugins/FrisketPreflightPlugin/preflightsidecarutils.h:38` →
+  `FRISKET_PREFLIGHT_SCHEMA_VERSION 3`, with `isSupportedSchemaVersion` accepting 1–3
+- The fix is commit `c515bfa3`, merged to `master` via `ba428f1b` (PR #54) at
+  2026-07-24 10:58 PDT
+- The revision asserting it was unmerged is commit `d43a70ec` (PR #56) at 11:59 PDT —
+  **one hour later**, with `c515bfa3` already in its own history
+  (`git merge-base --is-ancestor c515bfa3 d43a70ec` succeeds)
+
+R-000 is struck. Because checklist item A11 attributed all CI redness to R-000, current CI
+status must be re-derived rather than inherited from this document.
+
+### Launch gates
+
+| ID | Risk | Status | Linear | Mitigation required |
+|----|------|--------|--------|---------------------|
+| ~~R-000~~ | ~~Preflight report schema contract broken on `master`~~ | **Struck 2026-07-25** | — | Not a defect. Engine and validator are both at schema 3 on `master` |
+| **R-003** | Fuzz CI has not run since `fuzz.yml` broke | **Blocking** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Duplicate top-level `permissions:` key made the workflow invalid; every run failed at 0s. Fixed in this change — **requires one green run as evidence** |
+| **R-001** | MIC-301 — installer / clean-machine validation still In Review | **Open** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Run `scripts/Invoke-MsiSmokeTest.ps1` on a clean VM against an MSI from `WindowsInstall.yml`. **Now also covers Linux** `.deb`/AppImage clean-machine smoke, which had no gate at all |
+| **R-016** | V1 MSI ships unsigned; no certificate held | **Open — decision required** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) | Was the only risk in this register with no Linear issue. Ship unsigned or start procurement (1–3 week lead time). Likely the true schedule driver for Aug 8 |
+| **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted — mitigation incomplete** | [MIC-330](https://linear.app/mbx2/issue/MIC-330) | Documented limitation + in-app disclosure. **The disclosure fires only on `white-overprint` findings while the limitation is general** — see §3. Deferral of MIC-320 is now recorded in Linear (project description + MIC-306), not only here |
+| ~~R-015~~ | ~~macOS declared supported without CI, packaging or notarization~~ | **Resolved** | [MIC-336](https://linear.app/mbx2/issue/MIC-336) | macOS restated as post-V1; V1 ships Windows + Linux. MIC-336 reopened — it had been closed Done with its acceptance unmet |
 
 Two audit items previously listed as gaps were already built and only needed correcting:
 `scripts/smoke-test-install.ps1` (most of MIC-301's functional checks) and
 `scripts/generate-third-party-notices.ps1`.
+
+> **Authority note (added 2026-07-25).** This document does **not** set the V1 gate list.
+> The Linear project description does. The 2026-07-24 revision reclassified MIC-320 from
+> launch gate to "Accepted" while the project description, roadmap, product brief, and
+> MIC-306 all still called it a hard gate — leaving two live, contradictory definitions of
+> V1 for two days. Both now agree that MIC-320 is deferred. Any future change to a gate
+> must amend the project description in the same change.
 
 No web SaaS, accounts, or payments exist — many classic launch checklist items are **N/A** (see §Not applicable).
 
@@ -114,10 +137,10 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A8 | PageMaster export | Atomic writes + manifest + cancel | **Pass** | `tst_pagemasterexporttest.cpp` |
 | A9 | Manifest/PDF consistency | Roll back output if manifest persist fails | **Pass** (this audit) | `pdfpagemasterexport.cpp` fix |
 | A10 | Sentry privacy | No default PII | **Pass** (this audit) | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used |
-| A0 | Preflight report contract | Engine schema version accepted by plugin validator | **Fail / blocking on `master`** | Engine v3 (`preflightengine.h:42`) vs validator v2 (`preflightsidecarutils.h:38`); fixed in PR #54 |
-| A11 | CI build | Ubuntu + Windows compile + test | **Fail on `master`** | Red on `UnitTestsOcrCli`, `UnitTestsPreflightCorpus`, `UnitTestsOperatorAcceptance` — all downstream of A0 |
-| A12 | Windows installer | Clean-machine install | **Fail / open** | MIC-301 In Review; harness now at `scripts/Invoke-MsiSmokeTest.ps1`, clean-VM run outstanding |
-| A13 | Overprint rendering | Correct overprint compositing in standard page view | **Deferred — mitigated** | MIC-320 deferred post-V1; detection (MIC-319) ships, plus in-app disclosure in the report panel and a documented limitation |
+| A0 | Preflight report contract | Engine schema version accepted by plugin validator | **Pass** (corrected 2026-07-25) | Both at 3: `preflightengine.h:42`, `preflightsidecarutils.h:38` (`isSupportedSchemaVersion` accepts 1–3). Fix `c515bfa3` merged in `ba428f1b` |
+| A11 | CI build | Ubuntu + Windows compile + test | **Re-derive** | Previously "Fail — all downstream of A0." A0 is not a defect, so that attribution is void. Read current status from Actions on `master`; do not inherit this row |
+| A12 | Installer | Clean-machine install (**Windows + Linux**) | **Fail / open** | MIC-301 In Review; harness at `scripts/Invoke-MsiSmokeTest.ps1`, clean-VM run outstanding. Linux `.deb`/AppImage smoke added to MIC-301 on 2026-07-25 — previously ungated despite shipping in `CreateReleaseDraft.yml` |
+| A13 | Overprint rendering | Correct overprint compositing in standard page view | **Deferred — mitigation incomplete** | MIC-320 deferred post-V1; detection (MIC-319) ships. In-app disclosure exists but triggers only on `white-overprint` findings (`preflightreportdockwidget.cpp:172`) while the limitation covers all overprint — MIC-330. README limitation text still missing |
 | A14 | Packaging SBOM / license evidence | MIC-140 checklist complete | **Partial — gates paid distribution, not V1** | Notices generator now resolves versions + license text; artifact SBOM and counsel sign-off outstanding |
 | A15 | macOS build | Supported platform | **N/A** | Not a V1 platform; no CI, no package, no notarization |
 | A21 | Bundle policy enforcement | No Ghostscript / JRE / Python in default bundle | **Pass** (this revision) | Enforced by `scripts/smoke-test-install.ps1`, wired into `WindowsInstall.yml` |
@@ -125,8 +148,9 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A16 | Authentication / payments | Secure flows | **N/A** | Offline desktop; PDF password only |
 | A17 | CSP / CORS / cookies | Web security headers | **N/A** | No web app |
 | A18 | Browser compatibility | Supported browsers | **N/A** | No embedded browser |
-| A19 | OCR product gate | Required for V1 | **N/A** | Explicitly out of MIC-300 scope |
-| A20 | Fuzz regression | Weekly fuzz CI | **Pass** | `.github/workflows/fuzz.yml` |
+| A19 | OCR product gate | Required for V1 | **N/A — but surface undefined** | Out of MIC-300 scope. However OCR *is* merged to `master` (sidecar, `PdfTool ocr`, Core page gate, `OcrPlugin`, `UnitTestsOcrCli`), and `WixInstaller/Product.wxs.in` conditionally ships the OCR **service** while omitting `OcrPlugin.dll`. What V1 ships is not written down anywhere — MIC-343 |
+| A20 | Fuzz regression | Weekly fuzz CI | **Fail — fixed here, unproven** | `fuzz.yml` had two top-level `permissions:` keys (lines 3 and 18, from CodeQL autofix `31a4444d`), making the workflow invalid. Every run failed at 0s. Previously recorded as "Pass" while nothing ran. Duplicate removed in this change; **flip to Pass only after one green run** — MIC-326 |
+| A23 | Manifest rollback coverage | Failure path is tested, not just implemented | **Fail** (this revision) | `pdfpagemasterexport.cpp:590-592` removes the PDF when manifest persist fails, but no test forces that failure. R-007's stated verification cites success-path tests only — MIC-335 |
 
 ---
 
@@ -145,7 +169,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
-| **R-003** | Malicious PDF crash / DoS | Anyone opening untrusted PDFs | Crafted PDF via fuzz corpus | Parser/codec attack surface | Continue fuzz CI; private disclosure via `SECURITY.md` | Fuzz workflow green; no open critical CVEs | Security |
+| **R-003** | Malicious PDF crash / DoS | Anyone opening untrusted PDFs | Crafted PDF via fuzz corpus | Parser/codec attack surface | **Escalated to Blocking 2026-07-25:** fuzz CI was not running at all — `fuzz.yml` invalid since CodeQL autofix `31a4444d` added a second top-level `permissions:` key. Harnesses (MIC-304) were fine; the workflow that runs them was dead, and A20 reported "Pass" throughout. Duplicate key removed in this change | Fuzz workflow **green** (not merely present); no open critical CVEs — MIC-326 | Security |
 | **R-004** | Orphan `PdfTool` if Editor killed hard | Operators canceling preflight | Kill Editor from Task Manager during preflight | OS-level process termination | Document: use in-app cancel; plugin kills child on normal close | Manual checklist item 12 in v1-operator-acceptance | Support |
 | **R-005** | Packaging license gaps (Qt LGPL evidence) | Legal/compliance | Audit installer contents | MIC-140 checklist incomplete | Complete `PACKAGING_LICENSING.md` gate before enterprise sales | Checklist sign-off | Legal/Release |
 | **R-006** | Flatpak broad filesystem access | Linux Flatpak users | Install Flatpak; inspect permissions | `--filesystem=host` in manifest | Document risk; consider tightening to `home` post-V1 | Flatpak manifest review | Release |
@@ -154,7 +178,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
-| **R-007** | Resume batch after manifest failure | PageMaster power users | Disk full during manifest write | Was: PDF written, manifest stale | **Fixed:** remove PDF on manifest failure | `tst_pagemasterexporttest` (existing manifest tests) | Core |
+| **R-007** | Resume batch after manifest failure | PageMaster power users | Disk full during manifest write | Was: PDF written, manifest stale | **Fixed:** remove PDF on manifest failure (`Pdf4QtLibCore/sources/pdfpagemasterexport.cpp:590-592`) | **Untested.** The cited "existing manifest tests" (`manifest_persistedWithWrittenStatuses`, `resume_skipsAlreadyWrittenOutputs`, `resume_mismatchedManifestStartsFreshBatch`) are all success-path; nothing forces a manifest-persist failure. Test tracked in MIC-335 | Core |
 | **R-008** | Sentry receives file paths in crashes | Opt-in telemetry users | Crash with `SENTRY_DSN` set | Crashpad minidumps may include paths | Document `SENTRY_DSN` opt-in; desktop SDK defaults omit PII | `PdfTool sentry-verify` | Release |
 | **R-009** | Theme/scheme requires restart | All GUI users | Change color scheme in settings | Settings read only at startup | Document in release notes | Manual | UX |
 | **R-010** | OCR sidecar supply chain | OCR users | Point `FRISKET_OCR_SIDECAR` at unknown binary | External Python/PyInstaller bundle | Ship only signed/bundled sidecar; document env var | OCR README | Release |
@@ -162,20 +186,36 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 ### Low
 
-| ID | Impact | Notes |
-|----|--------|-------|
-| **R-012** | Mirror bleed seams on high-contrast art | Known V1 limitation (`docs/bleed-stress-test-results.md`) |
-| **R-013** | Only `add-bleed` fixup in plugin UI | Other fixups filtered by design |
-| **R-014** | No macOS CI | macOS is not a V1 platform; source builds are best-effort (`docs/PLATFORM_SUPPORT.md`) |
-| **R-016** | V1 MSI ships unsigned | No code-signing certificate held. Windows users see a SmartScreen warning on first install. Documented in `docs/PRODUCTION_RUNBOOK.md` and release notes; DigiCert procurement is a parallel track with 1–3 week lead time |
+| ID | Impact | Linear | Notes |
+|----|--------|--------|-------|
+| **R-012** | Mirror bleed seams on high-contrast art | MIC-339 (Done) | Known V1 limitation (`docs/bleed-stress-test-results.md`, `PRODUCTION_RUNBOOK.md:233`). Operators can switch to pixel-repeat/stretch (MIC-122) |
+| **R-013** | Only `add-bleed` fixup in plugin UI | MIC-338 | Other fixups filtered by design. Not yet stated in user-facing docs |
+| **R-014** | No macOS CI | MIC-336 | macOS is not a V1 platform; source builds are best-effort (`docs/PLATFORM_SUPPORT.md`). **ID note:** MIC-336 previously reused R-014 to mean "add macOS support, High" — the inverse of this row. R-IDs are now immutable; that override has been removed |
+| **R-016** | V1 MSI ships unsigned | **MIC-342** | **Escalated to a launch gate 2026-07-25 — see §Executive recommendation.** No code-signing certificate held; Windows users see SmartScreen on first install. DigiCert procurement is a parallel track with 1–3 week lead time, which likely makes this the schedule-determining item for an Aug 8 target. Had no Linear issue until 2026-07-25 — the 2026-07-23 risk wave filed R-001…R-014 and skipped it |
+
+> **Register hygiene (added 2026-07-25).** Risk IDs are immutable once assigned: a given
+> R-number means one thing permanently. Every row above must carry its Linear issue ID, and
+> every risk must have one. Both rules were broken — R-014 was reused with an inverted
+> meaning, and R-016 was never filed.
 
 ---
 
 ## 4. Implemented changes (this audit)
 
+### 2026-07-25 corrections
+
 | Change | File | Rationale |
 |--------|------|-----------|
-| Roll back written PDF when batch manifest persist fails | `pdfpagemasterexport.cpp` | Prevents resume/state inconsistency (R-007) |
+| Remove duplicate top-level `permissions:` key | `.github/workflows/fuzz.yml` | Workflow was invalid; every fuzz run failed at 0s while A20 reported "Pass" (R-003) |
+| Strike R-000; restate executive recommendation | this file | The reported blocker was already fixed on `master` before the revision that reported it |
+| Correct A0, A11, A13, A19, A20; add A23 | this file | Several rows asserted verification that did not exist |
+| Add Linear IDs and immutability rule to the register | this file | R-014 was reused with an inverted meaning; R-016 had no issue |
+
+### 2026-07-24 changes
+
+| Change | File | Rationale |
+|--------|------|-----------|
+| Roll back written PDF when batch manifest persist fails | `Pdf4QtLibCore/sources/pdfpagemasterexport.cpp` | Prevents resume/state inconsistency (R-007) — **untested, see A23** |
 | Disable Sentry default PII | `pdfsentry.cpp` / docs | Confirmed desktop 0.15.x has no PII setter (NX-only); default remains off (R-008) |
 | Set preflight `QProcess` working directory to app bundle dir | `frisketpreflightplugin.cpp` | Predictable sidecar resolution |
 
