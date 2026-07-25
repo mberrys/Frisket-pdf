@@ -635,8 +635,11 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         {
             options.ocrLanguages = parser->value("languages");
         }
+        // Reject 0: the gate tests 'characters >= threshold', so a threshold of 0
+        // is always satisfied and would skip every page as "has text" -- the exact
+        // opposite of what asking for a zero threshold means.
         const int minTextChars = parser->value("min-text-chars").toInt(&ok);
-        if (ok && minTextChars >= 0)
+        if (ok && minTextChars >= 1)
         {
             options.ocrMinTextChars = minTextChars;
         }

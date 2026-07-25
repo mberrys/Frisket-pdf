@@ -31,6 +31,7 @@
 
 #include <QByteArray>
 
+#include <deque>
 #include <map>
 #include <memory>
 
@@ -91,6 +92,18 @@ public:
     /// Clears all caches. Call this when the underlying document is mutated.
     void invalidate();
 
+    /// Cache bounds. Both caches evict in insertion order once full, so a
+    /// document-wide sequential pass costs a fixed amount of memory instead of
+    /// retaining one compiled page (and every decoded stream) for the lifetime
+    /// of the session.
+    ///
+    /// Eviction happens before insertion, so the pointer returned by
+    /// compilePage() is never the entry evicted by that same call. It may be
+    /// invalidated by a later compilePage() call — use it before compiling
+    /// another page.
+    static constexpr size_t CompileCacheLimit = 8;
+    static constexpr size_t StreamCacheLimit = 256;
+
     /// Low-level access to the renderer and its dependencies. Prefer the
     /// compilePage() helper; these accessors are exposed for tools that need
     /// direct rasterization control.
@@ -112,7 +125,9 @@ private:
     std::unique_ptr<PDFRenderer> m_renderer;
 
     std::map<size_t, PDFPrecompiledPage> m_compileCache;
+    std::deque<size_t> m_compileCacheOrder;
     std::map<PDFObjectReference, QByteArray> m_streamCache;
+    std::deque<PDFObjectReference> m_streamCacheOrder;
 };
 
 } // namespace pdf

@@ -3,6 +3,11 @@ name: Linux_AppImage
 on:
   workflow_dispatch:
 
+# Least privilege for GITHUB_TOKEN: checkout reads the repo and artifacts are
+# uploaded via the job token.
+permissions:
+  contents: read
+
 jobs:
   build_ubuntu:
     runs-on: ubuntu-22.04

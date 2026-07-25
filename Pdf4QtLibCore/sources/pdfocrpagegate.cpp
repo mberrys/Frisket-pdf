@@ -35,14 +35,29 @@ namespace pdf
 namespace
 {
 
-int countNonWhitespaceCharacters(const QString& text)
+/// Counts non-whitespace characters of real page text.
+///
+/// PDFDocumentTextFlowFactory prepends a synthetic PageStart item whose text is
+/// "Page N", and PDFDocumentTextFlow::getText() joins every item including that
+/// marker. Counting it would credit an image-only page with ~5 characters of
+/// "text", so an aggressive threshold would skip exactly the scanned pages OCR
+/// exists to handle. Count Text items only.
+int countNonWhitespaceCharacters(const PDFDocumentTextFlow& textFlow)
 {
     int count = 0;
-    for (const QChar& character : text)
+    for (const PDFDocumentTextFlow::Item& item : textFlow.getItems())
     {
-        if (!character.isSpace())
+        if (!item.isText())
         {
-            ++count;
+            continue;
+        }
+
+        for (const QChar& character : item.text)
+        {
+            if (!character.isSpace())
+            {
+                ++count;
+            }
         }
     }
     return count;
@@ -97,7 +112,7 @@ PDFOcrPageGate::PageOcrNeed PDFOcrPageGate::classifyPage(PDFDocumentSession* ses
     const PDFDocumentTextFlow textFlow =
         factory.create(document, pageIndices, PDFDocumentTextFlowFactory::Algorithm::Layout);
 
-    if (countNonWhitespaceCharacters(textFlow.getText()) >= settings.minTextCharacters)
+    if (countNonWhitespaceCharacters(textFlow) >= settings.minTextCharacters)
     {
         return PageOcrNeed::SkipHasText;
     }

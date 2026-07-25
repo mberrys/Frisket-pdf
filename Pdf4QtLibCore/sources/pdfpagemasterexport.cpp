@@ -585,12 +585,27 @@ PDFPageMasterExportResult PDFPageMasterExport::run(PDFPageMasterExportJob job)
         }
 
         setOutputStatus(manifest, int(index), OUTPUT_STATUS_WRITTEN);
-        if (!persistManifest(manifestPath, manifest))
+        if (manifestPath.isEmpty() || !persistManifest(manifestPath, manifest))
         {
-            QFile::remove(fileName);
-            const QString message = QCoreApplication::translate("pdf::PDFPageMasterExport",
-                                                                "Manifest update failed after writing '%1'; output was removed to keep batch state consistent.")
-                                      .arg(fileName);
+            // Roll back only an output this run created. When the write replaced a
+            // pre-existing file, the original is already gone, so removing the new
+            // one would destroy user data and leave nothing in its place. In that
+            // case keep the (valid) output and report the inconsistency instead.
+            QString message;
+            if (isDocumentFileAlreadyExisting)
+            {
+                message = QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                      "Manifest update failed after overwriting '%1'. The new output was kept because the previous file had already been replaced; batch state may be stale, so verify before resuming.")
+                              .arg(fileName);
+            }
+            else
+            {
+                QFile::remove(fileName);
+                message = QCoreApplication::translate("pdf::PDFPageMasterExport",
+                                                      "Manifest update failed after writing '%1'; output was removed to keep batch state consistent.")
+                              .arg(fileName);
+            }
+
             setOutputStatus(manifest, int(index), OUTPUT_STATUS_FAILED, message);
             persistManifest(manifestPath, manifest);
             finishProgressIfActive(activeProgress(job));

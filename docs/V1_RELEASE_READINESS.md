@@ -135,7 +135,9 @@ Open/import (local file) → in-memory PDFDocument → process (render, prefligh
   → export/save-as (atomic QSaveFile) → user filesystem
 Temp: QTemporaryDir for preflight snapshots, OCR page PNGs, attachment extract
 Deletion: user deletes files; temp dirs removed on scope exit; sanitize strips metadata/attachments on request
-Retention: none server-side; Sentry may retain crash minidumps if enabled (no PDF content by design)
+Retention: none server-side; Sentry may retain crash minidumps if enabled. Minidumps are
+  captured by crashpad and include thread stacks and referenced heap memory, so they CAN
+  contain PDF content and file paths. Nothing in the SDK can scrub them — see R-008.
 Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 ```
 
@@ -154,7 +156,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A7 | Preflight sidecar | Bounded stdout/stderr; process kill on cancel | **Pass** | `preflightsidecarutils.h` limits; plugin `cancelPreflightRun` |
 | A8 | PageMaster export | Atomic writes + manifest + cancel | **Pass** | `tst_pagemasterexporttest.cpp` |
 | A9 | Manifest/PDF consistency | Roll back output if manifest persist fails | **Pass** (this audit) | `pdfpagemasterexport.cpp` fix |
-| A10 | Sentry privacy | No default PII | **Pass** (this audit) | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used |
+| A10 | Sentry privacy | No default PII | **Pass, scope corrected** | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used. That covers SDK-attached identifiers **only** — crashpad minidumps can still contain PDF content and paths, and no SDK hook can scrub them. The former "no PDF content by design" claim was unenforced by any code; it is now stated as a disclosed property of opting in (R-008) |
 | A0 | Preflight report contract | Engine schema version accepted by plugin validator | **Pass** (corrected 2026-07-25) | Both at 3: `preflightengine.h:42`, `preflightsidecarutils.h:38` (`isSupportedSchemaVersion` accepts 1–3). Fix `c515bfa3` merged in `ba428f1b` |
 | A11 | CI build | Ubuntu + Windows compile + test | **Re-derive** | Previously "Fail — all downstream of A0." A0 is not a defect, so that attribution is void. Read current status from Actions on `master`; do not inherit this row |
 | A12 | Installer | Clean-machine install (**Windows + Linux**) | **Fail / open** | MIC-301 In Review; harness at `scripts/Invoke-MsiSmokeTest.ps1`, clean-VM run outstanding. Linux `.deb`/AppImage smoke added to MIC-301 on 2026-07-25 — previously ungated despite shipping in `CreateReleaseDraft.yml` |
@@ -197,7 +199,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
 | **R-007** | Resume batch after manifest failure | PageMaster power users | Disk full during manifest write | Was: PDF written, manifest stale | **Fixed:** remove PDF on manifest failure (`Pdf4QtLibCore/sources/pdfpagemasterexport.cpp:590-592`) | **Untested.** The cited "existing manifest tests" (`manifest_persistedWithWrittenStatuses`, `resume_skipsAlreadyWrittenOutputs`, `resume_mismatchedManifestStartsFreshBatch`) are all success-path; nothing forces a manifest-persist failure. Test tracked in MIC-335 | Core |
-| **R-008** | Sentry receives file paths in crashes | Opt-in telemetry users | Crash with `SENTRY_DSN` set | Crashpad minidumps may include paths | Document `SENTRY_DSN` opt-in; desktop SDK defaults omit PII | `PdfTool sentry-verify` | Release |
+| **R-008** | Sentry crash minidumps can contain PDF content and file paths | Opt-in telemetry users | Crash with `SENTRY_DSN` set | Crashpad captures thread stacks and referenced heap memory out-of-process. A crash in the parser or content processor therefore has document bytes live in the dump. `before_send` cannot filter this — it applies to events, not the minidump upload | **Disclosure, not enforcement.** `SENTRY_DSN` is unset by default and must stay unset when handling confidential documents. Do not restate "no PDF content by design" — nothing implements it | `PdfTool sentry-verify`; confirm `SENTRY_DSN` unset in shipped configs | Release |
 | **R-009** | Theme/scheme requires restart | All GUI users | Change color scheme in settings | Settings read only at startup | Document in release notes | Manual | UX |
 | **R-010** | OCR sidecar supply chain | OCR users | Point `FRISKET_OCR_SIDECAR` at unknown binary | External Python/PyInstaller bundle | Ship only signed/bundled sidecar; document env var | OCR README | Release |
 | **R-011** | README links upstream releases | New users | Read install section | Fork branding drift | Update README install URLs to Frisket releases | README review | Docs |

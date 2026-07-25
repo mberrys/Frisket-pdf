@@ -60,6 +60,14 @@ QString bundledOcrSidecarPath(const QString& applicationDirectory)
 #endif
 }
 
+#ifndef NDEBUG
+/// Developer convenience for running out of a build tree. Deliberately excluded
+/// from release builds: in an installed layout the four parent steps escape the
+/// install prefix and clamp at the filesystem root (for example
+/// C:/frisket-ocr/tools/dev_ocr_sidecar.cmd), a location an unprivileged user can
+/// create. Consulting it there would let a local attacker plant a script that
+/// PdfTool executes with the privileges of whoever runs `PdfTool ocr`. Release
+/// builds must use --sidecar or FRISKET_OCR_SIDECAR instead.
 QString devOcrSidecarPath(const QString& applicationDirectory)
 {
 #ifdef Q_OS_WIN
@@ -69,6 +77,7 @@ QString devOcrSidecarPath(const QString& applicationDirectory)
 #endif
     return QDir::cleanPath(QDir(applicationDirectory).filePath(relativePath));
 }
+#endif
 
 bool sidecarIsScript(const QFileInfo& info)
 {
@@ -104,14 +113,13 @@ QString resolveOcrSidecarPath()
 {
     const QString applicationDirectory = QCoreApplication::applicationDirPath();
 
+    // An explicitly configured sidecar is authoritative. Return it even when it is
+    // not runnable so the caller reports that exact path, rather than silently
+    // falling through and launching a different binary than the operator asked for.
     const QByteArray envSidecar = qgetenv("FRISKET_OCR_SIDECAR");
     if (!envSidecar.isEmpty())
     {
-        const QString path = QString::fromUtf8(envSidecar);
-        if (sidecarIsRunnable(path))
-        {
-            return path;
-        }
+        return QString::fromUtf8(envSidecar);
     }
 
     const QString bundledPath = bundledOcrSidecarPath(applicationDirectory);
@@ -120,11 +128,13 @@ QString resolveOcrSidecarPath()
         return bundledPath;
     }
 
+#ifndef NDEBUG
     const QString devPath = devOcrSidecarPath(applicationDirectory);
     if (sidecarIsRunnable(devPath))
     {
         return devPath;
     }
+#endif
 
     return bundledPath;
 }

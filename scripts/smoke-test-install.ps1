@@ -84,7 +84,7 @@ function Test-ForbiddenPayload {
         docs/PACKAGING_LICENSING.md: the default bundle is C++/Qt only -- no Ghostscript,
         no JRE/JDK, no Python. This was a manual checklist item with nothing enforcing it.
     #>
-    param([string]$Root, [switch]$AllowOcr)
+    param([string[]]$Roots, [switch]$AllowOcr)
 
     $rules = @(
         @{ Label = "Ghostscript"; Patterns = @("gswin*.exe", "gsdll*.dll", "gs.exe") },
@@ -92,18 +92,42 @@ function Test-ForbiddenPayload {
         @{ Label = "Python runtime"; Patterns = @("python*.exe", "python3*.dll", "*.whl") }
     )
 
+    # The installer lays files down in more than one place: binaries under
+    # INSTALLFOLDER and the profile/schema tree under a sibling share\ directory.
+    # Scanning only INSTALLFOLDER leaves a payload in share\ completely unchecked.
+    $scanned = @()
     $violations = @()
-    foreach ($rule in $rules) {
-        foreach ($pattern in $rule.Patterns) {
-            $hits = @(Get-ChildItem -LiteralPath $Root -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue)
-            foreach ($hit in $hits) {
-                $isOcrSidecar = $hit.FullName -like "*\FrisketOcrService\*"
-                if ($isOcrSidecar -and $AllowOcr) {
-                    continue
-                }
-                $violations += "$($rule.Label): $($hit.FullName)"
+    foreach ($root in $Roots) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        if (-not (Test-Path -LiteralPath $root)) { continue }
+        $resolved = (Resolve-Path -LiteralPath $root).Path
+        # Skip a root already covered by (or nested inside) one we scanned.
+        $alreadyCovered = $false
+        foreach ($seen in $scanned) {
+            if ($resolved -eq $seen -or $resolved.StartsWith($seen + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+                $alreadyCovered = $true
+                break
             }
         }
+        if ($alreadyCovered) { continue }
+        $scanned += $resolved
+
+        foreach ($rule in $rules) {
+            foreach ($pattern in $rule.Patterns) {
+                $hits = @(Get-ChildItem -LiteralPath $resolved -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue)
+                foreach ($hit in $hits) {
+                    $isOcrSidecar = $hit.FullName -like "*\FrisketOcrService\*"
+                    if ($isOcrSidecar -and $AllowOcr) {
+                        continue
+                    }
+                    $violations += "$($rule.Label): $($hit.FullName)"
+                }
+            }
+        }
+    }
+
+    if ($scanned.Count -eq 0) {
+        throw "Bundle policy scan found no directories to scan. Checked: $($Roots -join ', ')"
     }
 
     if ($violations.Count -gt 0) {
@@ -115,7 +139,7 @@ function Test-ForbiddenPayload {
         throw $message
     }
 
-    Write-Host "OK: no Ghostscript / JRE / Python payload in the default bundle"
+    Write-Host "OK: no Ghostscript / JRE / Python payload in the default bundle (scanned: $($scanned -join ', '))"
 }
 
 $pluginsDir = Join-Path $InstallDir "pdfplugins"
@@ -186,6 +210,18 @@ if (Test-Path -LiteralPath $ocrSidecar) {
     Write-Host "OK: FrisketOcrService bundle present"
 }
 
+# Run the bundle-policy gate before the editor launch: it is a packaging
+# assertion that does not depend on the GUI, and running it last meant any
+# earlier failure silently skipped it entirely.
+# Scan the binaries and the sibling share\ tree the installer also writes.
+$shareRoot = $ProfilesDir
+for ($i = 0; $i -lt 2; $i++) {
+    $parentCandidate = Split-Path -Parent $shareRoot
+    if ([string]::IsNullOrWhiteSpace($parentCandidate)) { break }
+    $shareRoot = $parentCandidate
+}
+Test-ForbiddenPayload -Roots @($InstallDir, $shareRoot) -AllowOcr:$AllowOcrSidecar
+
 if (-not $SkipEditorLaunch) {
     $editor = Join-Path $InstallDir "Pdf4QtEditor.exe"
     $editorProcess = Start-Process -FilePath $editor -ArgumentList @($TestPdf) -PassThru
@@ -196,7 +232,5 @@ if (-not $SkipEditorLaunch) {
     Stop-Process -Id $editorProcess.Id -Force
     Write-Host "OK: Pdf4QtEditor launched without immediate crash"
 }
-
-Test-ForbiddenPayload -Root $InstallDir -AllowOcr:$AllowOcrSidecar
 
 Write-Host "Smoke test passed."

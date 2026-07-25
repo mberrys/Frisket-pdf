@@ -161,6 +161,11 @@ int PDFToolAddBleed::execute(const PDFToolOptions& options)
     }
 
     pdf::PDFBleedFixupSettings settings = options.addBleedSettings;
+
+    // A dry run reports geometry only; skip the page raster it would otherwise
+    // build for edge sampling.
+    settings.analyzeOnly = options.addBleedDryRun;
+
     if (!options.pageSelectorSelection.isEmpty())
     {
         settings.pageRange = options.pageSelectorSelection;
