@@ -738,11 +738,16 @@ BIO* PDFPublicKeySignatureHandler::getSignedDataBuffer(pdf::PDFSignatureVerifica
             return nullptr;
         }
 
-        if (firstByteIndex > 0 && sourceData[firstByteIndex - 1] == '<')
+        // Index through qsizetype explicitly. PDFInteger is 'long' while qsizetype
+        // is 'long long', so clang sees QByteArray::operator[](qsizetype) and the
+        // built-in operator[](const char*, long) as equally viable and rejects the
+        // call as ambiguous. GCC and MSVC accept it, so this only breaks the
+        // clang-based fuzz build.
+        if (firstByteIndex > 0 && sourceData[qsizetype(firstByteIndex - 1)] == '<')
         {
             --firstByteIndex;
         }
-        if (lastByteIndex + 1 < sourceData.size() && sourceData[lastByteIndex + 1] == '>')
+        if (lastByteIndex + 1 < sourceData.size() && sourceData[qsizetype(lastByteIndex + 1)] == '>')
         {
             ++lastByteIndex;
         }
