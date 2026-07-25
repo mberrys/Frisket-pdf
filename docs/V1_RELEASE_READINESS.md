@@ -41,13 +41,31 @@ status must be re-derived rather than inherited from this document.
 | ~~R-000~~ | ~~Preflight report schema contract broken on `master`~~ | **Struck 2026-07-25** | — | Not a defect. Engine and validator are both at schema 3 on `master` |
 | **R-003** | Fuzz CI has not run since `fuzz.yml` broke | **Blocking** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Duplicate top-level `permissions:` key made the workflow invalid; every run failed at 0s. Fixed in this change — **requires one green run as evidence** |
 | **R-001** | MIC-301 — installer / clean-machine validation still In Review | **Open** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Run `scripts/Invoke-MsiSmokeTest.ps1` on a clean VM against an MSI from `WindowsInstall.yml`. **Now also covers Linux** `.deb`/AppImage clean-machine smoke, which had no gate at all |
-| **R-016** | V1 MSI ships unsigned; no certificate held | **Open — decision required** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) | Was the only risk in this register with no Linear issue. Ship unsigned or start procurement (1–3 week lead time). Likely the true schedule driver for Aug 8 |
+| **R-016** | V1 MSI ships unsigned; no certificate held | **Decided 2026-07-25 — ship unsigned** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) disclosure · [MIC-345](https://linear.app/mbx2/issue/MIC-345) procurement | Was the only risk in this register with no Linear issue. Blocking on a 1–3 week procurement would have slipped Aug 8. **Remaining obligation:** disclose the SmartScreen prompt in README, release notes, and runbook, and point users at `SHA256SUMS.txt` for integrity |
 | **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted — mitigation incomplete** | [MIC-330](https://linear.app/mbx2/issue/MIC-330) | Documented limitation + in-app disclosure. **The disclosure fires only on `white-overprint` findings while the limitation is general** — see §3. Deferral of MIC-320 is now recorded in Linear (project description + MIC-306), not only here |
 | ~~R-015~~ | ~~macOS declared supported without CI, packaging or notarization~~ | **Resolved** | [MIC-336](https://linear.app/mbx2/issue/MIC-336) | macOS restated as post-V1; V1 ships Windows + Linux. MIC-336 reopened — it had been closed Done with its acceptance unmet |
 
 Two audit items previously listed as gaps were already built and only needed correcting:
 `scripts/smoke-test-install.ps1` (most of MIC-301's functional checks) and
 `scripts/generate-third-party-notices.ps1`.
+
+### Product decisions — 2026-07-25
+
+Recorded in the Linear project description, which is the authority. Reproduced here so this
+document cannot drift from it again.
+
+| Question | Decision |
+|----------|----------|
+| Overprint-correct rendering a V1 gate? | **No** — deferred post-V1 (MIC-320). V1 ships detection + disclosure, no overprint-safe claim |
+| Sign the Windows installer? | **No** — V1 ships unsigned; procurement in parallel (MIC-345) |
+| Linux a V1 platform? | **Yes** — Windows and Linux both ship V1. macOS post-V1 |
+| OCR in V1? | **CLI-only** — `PdfTool ocr` only; no `OcrPlugin`, no bundled sidecar service (MIC-343) |
+| V1 free or paid? | **Free public release** — licensing checklist gates first paid distribution |
+
+The CLI-only OCR decision has a packaging consequence worth stating plainly: `PdfTool ocr`
+ships but is **inert without a sidecar**, and no sidecar is bundled. OCR in V1 is
+bring-your-own and unsupported. This keeps the "no OCR service required" property in the
+product brief true, and keeps a Python/PyInstaller bundle out of the V1 attack surface.
 
 > **Authority note (added 2026-07-25).** This document does **not** set the V1 gate list.
 > The Linear project description does. The 2026-07-24 revision reclassified MIC-320 from
@@ -148,7 +166,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A16 | Authentication / payments | Secure flows | **N/A** | Offline desktop; PDF password only |
 | A17 | CSP / CORS / cookies | Web security headers | **N/A** | No web app |
 | A18 | Browser compatibility | Supported browsers | **N/A** | No embedded browser |
-| A19 | OCR product gate | Required for V1 | **N/A — but surface undefined** | Out of MIC-300 scope. However OCR *is* merged to `master` (sidecar, `PdfTool ocr`, Core page gate, `OcrPlugin`, `UnitTestsOcrCli`), and `WixInstaller/Product.wxs.in` conditionally ships the OCR **service** while omitting `OcrPlugin.dll`. What V1 ships is not written down anywhere — MIC-343 |
+| A19 | OCR product gate | Required for V1 | **N/A — CLI-only** (decided 2026-07-25) | OCR is merged to `master` but V1 ships **CLI-only**: `PdfTool ocr` present; `OcrPlugin.dll` and the bundled sidecar service excluded. `PdfTool ocr` is inert without a user-supplied sidecar. Enforcement (all package formats + a build/bundle drift assertion) — MIC-343 |
 | A20 | Fuzz regression | Weekly fuzz CI | **Fail — fixed here, unproven** | `fuzz.yml` had two top-level `permissions:` keys (lines 3 and 18, from CodeQL autofix `31a4444d`), making the workflow invalid. Every run failed at 0s. Previously recorded as "Pass" while nothing ran. Duplicate removed in this change; **flip to Pass only after one green run** — MIC-326 |
 | A23 | Manifest rollback coverage | Failure path is tested, not just implemented | **Fail** (this revision) | `pdfpagemasterexport.cpp:590-592` removes the PDF when manifest persist fails, but no test forces that failure. R-007's stated verification cites success-path tests only — MIC-335 |
 
