@@ -30,6 +30,8 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
+#include <atomic>
+
 #ifdef PDF4QT_ENABLE_SENTRY_IMPL
 #include <sentry.h>
 #endif
@@ -41,7 +43,10 @@ namespace
 {
 
 #ifdef PDF4QT_ENABLE_SENTRY_IMPL
-int g_activeSentrySessions = 0;
+// Read by PDFSentryTransaction, which can be constructed from worker threads
+// (for example the PageMaster export future), while sessions start and stop on
+// the main thread.
+std::atomic<int> g_activeSentrySessions{ 0 };
 #endif
 
 #ifdef PDF4QT_ENABLE_SENTRY_IMPL
@@ -147,6 +152,16 @@ PDFSentrySession::PDFSentrySession(const QString& applicationId)
     // Note: sentry_options_set_send_default_pii exists only under
     // SENTRY_PLATFORM_NX in sentry-native 0.15.x (our vcpkg pin). Desktop
     // builds already default to not sending PII; do not call the NX-only API.
+    //
+    // Scope of that guarantee: it covers SDK-attached identifiers only. Crash
+    // minidumps are captured out-of-process by crashpad and contain thread stacks
+    // and referenced heap memory, so a crash inside the parser or content
+    // processor can carry PDF content and file paths off the machine. The SDK
+    // offers no hook that can scrub minidump memory (before_send applies to
+    // events, not to the crashpad upload), so this is a disclosed property of
+    // enabling SENTRY_DSN rather than something enforced here. See R-008 in
+    // docs/V1_RELEASE_READINESS.md. Do not claim "no PDF content" without
+    // changing how minidumps are captured.
 
     const double tracesSampleRateValue = tracesSampleRate();
     if (tracesSampleRateValue > 0.0)

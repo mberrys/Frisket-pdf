@@ -58,6 +58,7 @@ void PDFDocumentSession::setRendererFeatures(PDFRenderer::Features features)
 
     m_features = features;
     m_compileCache.clear();
+    m_compileCacheOrder.clear();
 
     if (m_renderer)
     {
@@ -98,6 +99,15 @@ const PDFPrecompiledPage* PDFDocumentSession::compilePage(size_t pageIndex)
     PDFPrecompiledPage compiledPage;
     m_renderer->compile(&compiledPage, pageIndex);
 
+    // Evict before inserting, so the pointer returned below is never the entry
+    // this call dropped.
+    while (!m_compileCacheOrder.empty() && m_compileCacheOrder.size() >= CompileCacheLimit)
+    {
+        m_compileCache.erase(m_compileCacheOrder.front());
+        m_compileCacheOrder.pop_front();
+    }
+
+    m_compileCacheOrder.push_back(pageIndex);
     auto result = m_compileCache.emplace(pageIndex, std::move(compiledPage));
     return &result.first->second;
 }
@@ -122,14 +132,24 @@ QByteArray PDFDocumentSession::getDecodedStream(PDFObjectReference reference)
     }
 
     QByteArray decoded = m_document->getStorage().getDecodedStream(object.getStream());
-    auto result = m_streamCache.emplace(reference, decoded);
+
+    while (!m_streamCacheOrder.empty() && m_streamCacheOrder.size() >= StreamCacheLimit)
+    {
+        m_streamCache.erase(m_streamCacheOrder.front());
+        m_streamCacheOrder.pop_front();
+    }
+
+    m_streamCacheOrder.push_back(reference);
+    auto result = m_streamCache.emplace(reference, std::move(decoded));
     return result.first->second;
 }
 
 void PDFDocumentSession::invalidate()
 {
     m_compileCache.clear();
+    m_compileCacheOrder.clear();
     m_streamCache.clear();
+    m_streamCacheOrder.clear();
 }
 
 PDFRenderer* PDFDocumentSession::getRenderer() const

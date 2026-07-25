@@ -199,8 +199,18 @@ int PDFToolAttachmentsApplication::execute(const PDFToolOptions& options)
                 QFile file(outputFile);
                 if (file.open(QFile::WriteOnly | QFile::Truncate))
                 {
-                    file.write(data);
+                    // A short write (disk full, quota) must not be reported as a
+                    // saved attachment -- that leaves a silently truncated file.
+                    const qint64 written = file.write(data);
+                    const bool flushed = file.flush();
                     file.close();
+
+                    if (written != data.size() || !flushed || file.error() != QFile::NoError)
+                    {
+                        PDFConsole::writeError(PDFToolTranslationContext::tr("Failed to save attachment to file '%1'. %2")
+                                                   .arg(outputFile, file.errorString()), options.outputCodec);
+                        return ErrorFailedWriteToFile;
+                    }
                 }
                 else
                 {

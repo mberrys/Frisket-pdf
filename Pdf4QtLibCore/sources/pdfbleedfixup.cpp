@@ -32,6 +32,7 @@
 #include <QPainter>
 #include <QtMath>
 
+#include <cmath>
 #include <set>
 
 namespace pdf
@@ -584,17 +585,42 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
             return QRectF(rect.left() + translateX, rect.top() + translateY, rect.width(), rect.height());
         };
 
+        // Edge sampling needs a page raster whose cost grows with page area x dpi^2.
+        // A dry run reports box geometry only, so it must not pay that cost.
+        const bool needsRaster = !sidesToApply.empty() && !settings.analyzeOnly;
+
         QImage pageImage;
         QTransform pageToDevice;
-        if (!sidesToApply.empty())
+        if (needsRaster)
         {
+            const QSizeF mediaSize = page->getRotatedMediaBox().size();
+            const double widthPxReal = std::ceil(mediaSize.width() * PDF_POINT_TO_INCH * settings.dpi);
+            const double heightPxReal = std::ceil(mediaSize.height() * PDF_POINT_TO_INCH * settings.dpi);
+
+            if (!std::isfinite(widthPxReal) || !std::isfinite(heightPxReal))
+            {
+                return PDFTranslationContext::tr("Page %1 has an invalid media box size.").arg(pageIndex + 1);
+            }
+
+            // Compare in double before narrowing: the pixel count for a crafted or
+            // very large media box overflows int.
+            const double pixelCount = qMax(1.0, widthPxReal) * qMax(1.0, heightPxReal);
+            if (settings.maxRasterPixels > 0 && pixelCount > double(settings.maxRasterPixels))
+            {
+                return PDFTranslationContext::tr(
+                           "Page %1 requires a %2 x %3 px raster at %4 DPI for edge sampling, which exceeds the limit of %5 megapixels. Lower --dpi or raise the raster limit.")
+                        .arg(pageIndex + 1)
+                        .arg(qint64(widthPxReal))
+                        .arg(qint64(heightPxReal))
+                        .arg(settings.dpi)
+                        .arg(settings.maxRasterPixels / 1000000);
+            }
+
+            const QSize imageSize(qMax(1, int(widthPxReal)), qMax(1, int(heightPxReal)));
+
             PDFPrecompiledPage compiledPage;
             renderer.compile(&compiledPage, static_cast<size_t>(pageIndex));
 
-            const QSizeF mediaSize = page->getRotatedMediaBox().size();
-            const int widthPx = qMax(1, qCeil(mediaSize.width() * PDF_POINT_TO_INCH * settings.dpi));
-            const int heightPx = qMax(1, qCeil(mediaSize.height() * PDF_POINT_TO_INCH * settings.dpi));
-            const QSize imageSize(widthPx, heightPx);
             pageToDevice = PDFRenderer::createPagePointToDevicePointMatrix(page, QRect(QPoint(0, 0), imageSize));
             pageImage = rasterizer.render(pageIndex, page, &compiledPage, imageSize, features, nullptr, cms.get(), PageRotation::None);
             if (pageImage.isNull())
@@ -629,7 +655,15 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
         pageReport.newBleedBox = shiftRect(newBleed);
         pageReport.newTrimBox = shiftRect(settings.expandTrimBox ? newTrim : page->getTrimBox());
 
-        if (!sidesToApply.empty())
+        if (settings.analyzeOnly)
+        {
+            // No artwork is painted, so report the sides the run would fill.
+            for (const SideWork& work : sidesToApply)
+            {
+                pageReport.sidesApplied.append(work.side);
+            }
+        }
+        else if (!sidesToApply.empty())
         {
             PDFPageContentStreamBuilder pageContentStreamBuilder(builder,
                                                                  PDFContentStreamBuilder::CoordinateSystem::PDF,

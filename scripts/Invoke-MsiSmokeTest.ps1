@@ -104,6 +104,18 @@ if (-not [string]::IsNullOrWhiteSpace($PreviousMsiPath)) {
 Write-Host "=== Uninstalling ==="
 Invoke-Msi -Arguments "/x `"$MsiPath`"" -LogName "uninstall"
 
+# The installer also writes a sibling share\frisket tree under ProgramFilesFolder;
+# checking only $InstallDir would miss profile/schema files left behind.
+$shareLeftoverRoot = Join-Path (Split-Path -Parent $InstallDir) "share\frisket"
+if (Test-Path -LiteralPath $shareLeftoverRoot) {
+    $shareLeftovers = @(Get-ChildItem -LiteralPath $shareLeftoverRoot -Recurse -File -ErrorAction SilentlyContinue)
+    if ($shareLeftovers.Count -gt 0) {
+        throw ("Uninstall left $($shareLeftovers.Count) file(s) behind in $shareLeftoverRoot`:`n  " +
+               (($shareLeftovers | Select-Object -First 20 | ForEach-Object { $_.FullName }) -join "`n  "))
+    }
+    Write-Host "INFO: $shareLeftoverRoot remains as an empty directory after uninstall"
+}
+
 if (Test-Path -LiteralPath $InstallDir) {
     $leftovers = @(Get-ChildItem -LiteralPath $InstallDir -Recurse -File -ErrorAction SilentlyContinue)
     if ($leftovers.Count -gt 0) {

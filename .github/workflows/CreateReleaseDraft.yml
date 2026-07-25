@@ -9,6 +9,11 @@ on:
         type: boolean
         default: false
 
+# Least privilege for GITHUB_TOKEN: checkout reads the repo; release creation and
+# all gh calls use the MY_GITHUB_TOKEN PAT explicitly.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,31 +50,49 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
       
+      # Both installer workflows are workflow_dispatch-only and can be run on any
+      # branch. Without a branch filter and a head-SHA check this job would happily
+      # attach binaries built from unrelated code to the release tag -- and then
+      # publish SHA256SUMS.txt for them.
       - name: Get latest run ID for Linux_AppImage
         id: get_linux_run_id
         run: |
-          latest_run=$(gh run list --workflow=Linux_AppImage --json databaseId,conclusion --jq '.[0]')
-          linux_run_id=$(echo $latest_run | jq -r .databaseId)
-          echo "linux_run_id=$linux_run_id" >> $GITHUB_ENV
-          conclusion=$(echo $latest_run | jq -r .conclusion)
-          if [ "$conclusion" != "success" ]; then
-            echo "Latest Linux_AppImage workflow run failed."
+          set -euo pipefail
+          latest_run=$(gh run list --workflow=Linux_AppImage \
+            --branch "${GITHUB_REF_NAME}" --status success \
+            --json databaseId,headSha --jq '.[0] // empty')
+          if [ -z "$latest_run" ]; then
+            echo "::error::No successful Linux_AppImage run found on branch ${GITHUB_REF_NAME}."
             exit 1
           fi
+          run_sha=$(echo "$latest_run" | jq -r .headSha)
+          if [ "$run_sha" != "${GITHUB_SHA}" ]; then
+            echo "::error::Linux_AppImage artifacts were built from ${run_sha}, but this release is being cut from ${GITHUB_SHA}."
+            echo "::error::Re-run Linux_AppImage on this exact commit before creating the release draft."
+            exit 1
+          fi
+          echo "linux_run_id=$(echo "$latest_run" | jq -r .databaseId)" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-      
+
       - name: Get latest run ID for Windows_MSI
         id: get_windows_run_id
         run: |
-          latest_run=$(gh run list --workflow=Windows_MSI --json databaseId,conclusion --jq '.[0]')
-          windows_run_id=$(echo $latest_run | jq -r .databaseId)
-          echo "windows_run_id=$windows_run_id" >> $GITHUB_ENV
-          conclusion=$(echo $latest_run | jq -r .conclusion)
-          if [ "$conclusion" != "success" ]; then
-            echo "Latest Windows_MSI workflow run failed."
+          set -euo pipefail
+          latest_run=$(gh run list --workflow=Windows_MSI \
+            --branch "${GITHUB_REF_NAME}" --status success \
+            --json databaseId,headSha --jq '.[0] // empty')
+          if [ -z "$latest_run" ]; then
+            echo "::error::No successful Windows_MSI run found on branch ${GITHUB_REF_NAME}."
             exit 1
           fi
+          run_sha=$(echo "$latest_run" | jq -r .headSha)
+          if [ "$run_sha" != "${GITHUB_SHA}" ]; then
+            echo "::error::Windows_MSI artifacts were built from ${run_sha}, but this release is being cut from ${GITHUB_SHA}."
+            echo "::error::Re-run Windows_MSI on this exact commit before creating the release draft."
+            exit 1
+          fi
+          echo "windows_run_id=$(echo "$latest_run" | jq -r .databaseId)" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
       
@@ -104,11 +127,19 @@ jobs:
           
       - name: Correct file paths
         run: |
-          find artifacts -mindepth 2 -type f -exec sh -c 'mv "$1" "artifacts/$(basename "$1")_moved"' _ {} \;
-          find artifacts -type d -empty -delete     
-          for f in artifacts/*_moved; do
-            mv "$f" "${f/_moved/}"
-          done
+          set -euo pipefail
+          # Flatten artifact subdirectories. Fail loudly on a name collision:
+          # silently overwriting means a release asset is dropped, and
+          # fail_on_unmatched_files cannot detect that because the glob still matches.
+          while IFS= read -r -d '' src; do
+            dest="artifacts/$(basename "$src")"
+            if [ -e "$dest" ]; then
+              echo "::error::Artifact file name collision while flattening: $src -> $dest"
+              exit 1
+            fi
+            mv "$src" "$dest"
+          done < <(find artifacts -mindepth 2 -type f -print0)
+          find artifacts -type d -empty -delete
 
       - name: List all files recursively
         run: |

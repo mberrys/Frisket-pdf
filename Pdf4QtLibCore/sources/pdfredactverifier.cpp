@@ -26,6 +26,7 @@
 #include "pdfconstants.h"
 #include "pdfcms.h"
 #include "pdffont.h"
+#include "pdftextlayout.h"
 #include "pdftextlayoutgenerator.h"
 
 #include <QFile>
@@ -94,8 +95,25 @@ QVector<RedactRegion> collectRedactRegions(const PDFDocument* document)
     return regions;
 }
 
+/// Returns the text still recoverable inside \p regionPath on \p pageIndex.
+///
+/// Two things this must get right, both of which were previously wrong:
+///
+///  - processContents() has to run. createTextLayout() only calls perform() and
+///    optimize() on the layout that performOutputCharacter() fills in while the
+///    content stream is processed. Without it the layout is empty, so the region
+///    always looks clean no matter how it is queried.
+///  - Characters are tested individually against the region. Deriving a text
+///    selection from the region's two corner points does not work: the corners of
+///    a region that encloses text fall outside every text line, so a strict
+///    selection over them matches nothing.
 QString extractTextInRegion(const PDFDocument* document, PDFInteger pageIndex, const QPainterPath& regionPath)
 {
+    if (regionPath.isEmpty())
+    {
+        return QString();
+    }
+
     const PDFCatalog* catalog = document->getCatalog();
     const PDFPage* page = catalog->getPage(pageIndex);
     if (!page)
@@ -121,20 +139,35 @@ QString extractTextInRegion(const PDFDocument* document, PDFInteger pageIndex, c
                                      &optionalContentActivity,
                                      QTransform(),
                                      meshQualitySettings);
+    generator.processContents();
     PDFTextLayout layout = generator.createTextLayout();
 
-    const QRectF bounds = regionPath.boundingRect();
-    if (bounds.isEmpty())
+    QString recoveredText;
+    for (const PDFTextBlock& block : layout.getTextBlocks())
     {
-        return QString();
+        for (const PDFTextLine& line : block.getLines())
+        {
+            for (const TextCharacter& character : line.getCharacters())
+            {
+                if (character.character.isSpace())
+                {
+                    continue;
+                }
+
+                // Centre-point containment: precise per glyph, and it does not
+                // fire on a neighbouring glyph that merely touches the region
+                // boundary.
+                const QRectF characterRect = character.boundingBox.boundingRect();
+                const QPointF probe = characterRect.isEmpty() ? character.position : characterRect.center();
+                if (regionPath.contains(probe))
+                {
+                    recoveredText.append(character.character);
+                }
+            }
+        }
     }
 
-    const PDFTextSelection selection = layout.createTextSelection(pageIndex,
-                                                                  bounds.bottomLeft(),
-                                                                  bounds.topRight(),
-                                                                  Qt::black,
-                                                                  true);
-    return layout.getTextFromSelection(selection, pageIndex).trimmed();
+    return recoveredText;
 }
 
 bool hasRedactAnnotations(const PDFDocument* document)
@@ -208,15 +241,19 @@ PDFRedactVerification PDFRedactVerifier::verify(const PDFDocument* originalDocum
 
     for (const RedactRegion& region : regions)
     {
-        const QString originalText = extractTextInRegion(originalDocument, region.pageIndex, region.region);
+        // Any text left in a redacted region is residue. Comparing against the
+        // original would only catch a region where redaction changed nothing at
+        // all, and would silently accept a partial failure that strips a label
+        // but leaves the sensitive value behind.
         const QString redactedText = extractTextInRegion(redactedDocument, region.pageIndex, region.region);
 
-        if (!originalText.isEmpty() && redactedText == originalText)
+        if (!redactedText.isEmpty())
         {
             addIssue(&verification,
                      QStringLiteral("text-residue"),
-                     QStringLiteral("Page %1 still contains recoverable text in a redacted region.")
-                         .arg(region.pageIndex + 1));
+                     QStringLiteral("Page %1 still contains %2 recoverable character(s) in a redacted region.")
+                         .arg(region.pageIndex + 1)
+                         .arg(redactedText.size()));
         }
     }
 

@@ -47,6 +47,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <functional>
 #include <limits>
 #include <set>
@@ -277,24 +278,21 @@ void collectColorSpacesFromResources(const PDFDocument* document,
         }
         else if (subtype == "Form")
         {
-            PDFObjectReference formRef;
-            if (entry.isReference())
+            // Only an indirect form can take part in a reference cycle, so that is
+            // the only case worth de-duplicating. Do not call getReference() on
+            // 'xobject': it is already dereferenced, and getReference() on a
+            // non-reference throws std::bad_variant_access. Direct streams are
+            // still bounded by PREFLIGHT_MAX_FORM_DEPTH.
+            if (entry.isReference() && !visitedForms.insert(entry.getReference()).second)
             {
-                formRef = entry.getReference();
-            }
-            else if (xobject.getReference().isValid())
-            {
-                formRef = xobject.getReference();
+                continue;
             }
 
-            if (formRef.isValid() && visitedForms.insert(formRef).second)
-            {
-                collectColorSpacesFromResources(document,
-                                                streamDict->get("Resources"),
-                                                paintedSpaces,
-                                                visitedForms,
-                                                depth + 1);
-            }
+            collectColorSpacesFromResources(document,
+                                            streamDict->get("Resources"),
+                                            paintedSpaces,
+                                            visitedForms,
+                                            depth + 1);
         }
     }
 }
@@ -316,10 +314,13 @@ QRectF imageBoundsFromCtm(const QTransform& ctm, int pixelWidth, int pixelHeight
     return bounds.normalized();
 }
 
+/// Walks the /AP appearance streams of every annotation on \p page. The visitor
+/// receives the resolved stream: PDFDocument::getObject() dereferences, so the
+/// appearance object is never a reference and getReference() on it would throw.
 void processAnnotationAppearanceStreams(PDFDocument* document,
                                         const PDFPage* page,
                                         int pageNumber,
-                                        const std::function<void(const PDFPage*, PDFObjectReference)>& processForm)
+                                        const std::function<void(const PDFPage*, const PDFStream*)>& processForm)
 {
     if (!document || !page)
     {
@@ -353,13 +354,13 @@ void processAnnotationAppearanceStreams(PDFDocument* document,
                     PDFObject nested = document->getObject(stateDict->getValue(j));
                     if (nested.isStream())
                     {
-                        processForm(page, nested.getReference());
+                        processForm(page, nested.getStream());
                     }
                 }
             }
             else if (appearanceStream.isStream())
             {
-                processForm(page, appearanceStream.getReference());
+                processForm(page, appearanceStream.getStream());
             }
         }
     }
@@ -720,6 +721,29 @@ void runContentBleedCheck(PDFDocumentSession* session,
     }
 }
 
+/// Records a check that aborted before completing. The run continues with the
+/// remaining checks, but the report is marked incomplete so pass can never be
+/// true on a partial inspection.
+void recordCheckFailure(PreflightResult& result,
+                        PreflightCheckStatus& status,
+                        const PreflightCheckConfig& check,
+                        const QString& reason)
+{
+    status.status = QStringLiteral("failed");
+    status.reason = reason;
+    result.checkStatuses.push_back(status);
+    result.inspectionComplete = false;
+
+    PreflightFinding finding;
+    finding.scope = QString::fromLatin1(PREFLIGHT_FINDING_SCOPE_DOCUMENT);
+    finding.type = QStringLiteral("check-error");
+    finding.severity = QStringLiteral("error");
+    finding.checkId = check.id;
+    finding.bbox = QRectF();
+    finding.message = PDFTranslationContext::tr("Check '%1' failed to run: %2").arg(check.id, reason);
+    result.errors.push_back(finding);
+}
+
 bool hasBleedGapFinding(const QList<PreflightFinding>& findings)
 {
     for (const PreflightFinding& finding : findings)
@@ -944,12 +968,8 @@ void runColorModeCheck(PDFDocumentSession* session,
         ColorModeProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &paintedSpaces);
         processor.processContents();
 
-        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, PDFObjectReference formRef) {
-            PDFObject formObject = document->getObjectByReference(formRef);
-            if (formObject.isStream())
-            {
-                processor.processFormStream(formObject.getStream());
-            }
+        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, const PDFStream* formStream) {
+            processor.processFormStream(formStream);
         });
 
         QStringList disallowed;
@@ -960,6 +980,10 @@ void runColorModeCheck(PDFDocumentSession* session,
                 disallowed.append(cs);
             }
         }
+
+        // paintedSpaces is a QSet: iteration order is unspecified and varies per
+        // process. Sort so identical input always yields an identical report.
+        disallowed.sort();
 
         if (!disallowed.isEmpty())
         {
@@ -1127,12 +1151,8 @@ void runWhiteOverprintCheck(PDFDocumentSession* session,
         WhiteOverprintProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &foundWhiteOverprint);
         processor.processContents();
 
-        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, PDFObjectReference formRef) {
-            PDFObject formObject = document->getObjectByReference(formRef);
-            if (formObject.isStream())
-            {
-                processor.processFormStream(formObject.getStream());
-            }
+        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, const PDFStream* formStream) {
+            processor.processFormStream(formStream);
         });
 
         if (!foundWhiteOverprint)
@@ -1284,6 +1304,7 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
             return;
         }
 
+        PDFDocumentDataLoaderDecorator loader(document);
         for (size_t i = 0; i < xobjectDict->getCount(); ++i)
         {
             PDFObject xobject = document->getObject(xobjectDict->getValue(i));
@@ -1298,8 +1319,9 @@ void runEmbeddedFontsCheck(PDFDocumentSession* session,
                 continue;
             }
 
-            const PDFObject subtype = document->getObject(streamDict->get("Subtype"));
-            if (subtype.getString() != "Form")
+            // Read /Subtype through the loader: PDFObject::getString() throws
+            // std::bad_variant_access when the key is absent.
+            if (loader.readNameFromDictionary(streamDict, "Subtype") != "Form")
             {
                 continue;
             }
@@ -1501,12 +1523,8 @@ void runImageResolutionCheck(PDFDocumentSession* session,
         ImageDpiProcessor processor(page, document, &fontCache, cms.get(), &ocActivity, meshQuality, &images);
         processor.processContents();
 
-        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, PDFObjectReference formRef) {
-            PDFObject formObject = document->getObjectByReference(formRef);
-            if (formObject.isStream())
-            {
-                processor.processFormStream(formObject.getStream());
-            }
+        processAnnotationAppearanceStreams(document, page, int(pageIndex + 1), [&](const PDFPage* /*pageRef*/, const PDFStream* formStream) {
+            processor.processFormStream(formStream);
         });
 
         for (const auto& img : images)
@@ -1691,7 +1709,29 @@ PreflightResult PreflightEngine::run(const PreflightProfileData& profile)
 
         const int errorsBefore = result.errors.size();
         const int warningsBefore = result.warnings.size();
-        it->second(m_session, check, result.errors, result.warnings);
+
+        // A malformed document must not be able to take the whole run down: a
+        // check that throws is contained, reported, and the remaining checks
+        // still run.
+        try
+        {
+            it->second(m_session, check, result.errors, result.warnings);
+        }
+        catch (const PDFException& exception)
+        {
+            recordCheckFailure(result, status, check, exception.getMessage());
+            continue;
+        }
+        catch (const std::exception& exception)
+        {
+            recordCheckFailure(result, status, check, QString::fromUtf8(exception.what()));
+            continue;
+        }
+        catch (...)
+        {
+            recordCheckFailure(result, status, check, PDFTranslationContext::tr("Unknown error."));
+            continue;
+        }
 
         const bool checkFailed = result.errors.size() > errorsBefore;
         const bool checkWarned = result.warnings.size() > warningsBefore;

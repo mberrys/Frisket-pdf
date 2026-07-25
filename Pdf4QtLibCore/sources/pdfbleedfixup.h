@@ -73,6 +73,15 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFBleedFixupSettings
     int samplePixels = 1; ///< PixelRepeat / Stretch sample depth
     bool skipIfAlreadyBleeding = true;
     bool force = false;
+
+    /// Report box changes only; do not rasterize or paint bleed artwork. The page
+    /// raster is sized by page area x dpi^2, so a dry run must not pay for it.
+    bool analyzeOnly = false;
+
+    /// Upper bound on the page raster used for edge sampling. Large-format work
+    /// (signage, banners) at 300 dpi otherwise reaches multi-gigabyte
+    /// allocations; fail with an actionable message instead.
+    qint64 maxRasterPixels = 250LL * 1000 * 1000;
     PDFRenderer::Features renderFeatures = PDFRenderer::Features(PDFRenderer::Antialiasing | PDFRenderer::TextAntialiasing);
 };
 
