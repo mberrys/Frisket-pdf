@@ -3,6 +3,11 @@ name: Linux_Flatpak
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
 jobs:
   build_ubuntu:
     runs-on: ubuntu-latest
