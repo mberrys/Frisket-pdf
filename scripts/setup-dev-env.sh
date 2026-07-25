@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time (or idempotent) Frisket-PDF Linux dev environment bootstrap.
 #
-# Installs system packages, vcpkg, Qt 6.9.x, manifest dependencies, and
+# Installs system packages, vcpkg, Qt 6.11.1, manifest dependencies, and
 # configures the Ninja build directory at ./build.
 #
 # Usage:
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-QT_VERSION="${FRISKET_QT_VERSION:-6.9.1}"
+QT_VERSION="${FRISKET_QT_VERSION:-6.11.1}"
 QT_INSTALL_DIR="${FRISKET_QT_INSTALL_DIR:-/opt/Qt}"
 VCPKG_ROOT="${VCPKG_ROOT:-/opt/vcpkg}"
 VCPKG_INSTALLED_DIR="${VCPKG_INSTALLED_DIR:-/opt/vcpkg_installed}"

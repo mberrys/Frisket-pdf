@@ -24,7 +24,6 @@
 #include "pdfconstants.h"
 #include "pdfexception.h"
 
-#include <QFile>
 #include <QThread>
 #include <QMetaEnum>
 
@@ -35,6 +34,13 @@
 
 namespace pdf
 {
+
+namespace
+{
+
+constexpr int MAXIMUM_PDF_OBJECT_NESTING_DEPTH = 256;
+
+}   // namespace
 
 PDFLexicalAnalyzer::PDFLexicalAnalyzer(const char* begin, const char* end) :
     m_begin(begin),
@@ -670,10 +676,13 @@ void PDFParsingContext::beginParsingObject(PDFObjectReference reference)
     {
         throw PDFException(tr("Cyclical reference found while parsing object %1 %2.").arg(reference.objectNumber).arg(reference.generation));
     }
-    else
+
+    if (m_activeParsedObjectSet.size() >= MAXIMUM_PDF_OBJECT_NESTING_DEPTH)
     {
-        m_activeParsedObjectSet.insert(reference);
+        throw PDFException(tr("Maximum indirect object nesting depth of %1 exceeded.").arg(MAXIMUM_PDF_OBJECT_NESTING_DEPTH));
     }
+
+    m_activeParsedObjectSet.insert(reference);
 }
 
 void PDFParsingContext::endParsingObject(PDFObjectReference reference)
@@ -712,6 +721,16 @@ PDFParser::PDFParser(std::function<PDFLexicalAnalyzer::Token ()> tokenFetcher) :
 
 PDFObject PDFParser::getObject()
 {
+    return getObject(0);
+}
+
+PDFObject PDFParser::getObject(int nestingDepth)
+{
+    if (nestingDepth > MAXIMUM_PDF_OBJECT_NESTING_DEPTH)
+    {
+        error(tr("Maximum object nesting depth of %1 exceeded.").arg(MAXIMUM_PDF_OBJECT_NESTING_DEPTH));
+    }
+
     switch (m_lookAhead1.type)
     {
         case PDFLexicalAnalyzer::TokenType::Boolean:
@@ -785,7 +804,7 @@ PDFObject PDFParser::getObject()
             while (m_lookAhead1.type != PDFLexicalAnalyzer::TokenType::EndOfFile &&
                    m_lookAhead1.type != PDFLexicalAnalyzer::TokenType::ArrayEnd)
             {
-                array->appendItem(getObject());
+                array->appendItem(getObject(nestingDepth + 1));
             }
 
             // Now, we have either end of file, or array end. If former appears, then
@@ -824,7 +843,7 @@ PDFObject PDFParser::getObject()
                 shift();
 
                 // Second value should be a value
-                PDFObject object = getObject();
+                PDFObject object = getObject(nestingDepth + 1);
 
                 dictionary->addEntry(PDFInplaceOrMemoryString(std::move(key)), std::move(object));
             }
@@ -844,9 +863,8 @@ PDFObject PDFParser::getObject()
                     error(tr("Streams are not allowed in this context."));
                 }
 
-                // Read stream content. According to the PDF Reference 1.7, chapter 3.2.7, stream
-                // content can be placed in the file. If this is the case, then try to load file
-                // content in the memory. But even in this case, stream content should be skipped.
+                // Read embedded stream content. External file streams are deliberately rejected
+                // because document-controlled paths would cross the local filesystem boundary.
 
                 if (!dictionary->hasKey(PDF_STREAM_DICT_LENGTH))
                 {
@@ -865,33 +883,14 @@ PDFObject PDFParser::getObject()
                     error(tr("Length of the stream buffer is negative (%1). It must be a positive number.").arg(length));
                 }
 
+                if (dictionary->hasKey(PDF_STREAM_DICT_FILE_SPECIFICATION))
+                {
+                    error(tr("External stream data is not supported."));
+                }
+
                 // Skip the stream start, then fetch data of the stream
                 m_lexicalAnalyzer.skipStreamStart();
                 QByteArray buffer = m_lexicalAnalyzer.fetchByteArray(length);
-
-                // According to the PDF Reference 1.7, chapter 3.2.7, stream content can also be specified
-                // in the external file. If this is the case, then we must try to load the stream data
-                // from the external file.
-                if (dictionary->hasKey(PDF_STREAM_DICT_FILE_SPECIFICATION))
-                {
-                    PDFObject fileName = m_context ? m_context->getObject(dictionary->get(PDF_STREAM_DICT_FILE_SPECIFICATION)) : dictionary->get(PDF_STREAM_DICT_FILE_SPECIFICATION);
-
-                    if (!fileName.isString())
-                    {
-                        error(tr("Stream data should be in external file, but invalid file name is specified."));
-                    }
-
-                    QFile streamDataFile(fileName.getString());
-                    if (streamDataFile.open(QFile::ReadOnly))
-                    {
-                        buffer = streamDataFile.readAll();
-                        streamDataFile.close();
-                    }
-                    else
-                    {
-                        error(tr("Can't open stream data stored in external file '%1'.").arg(QString(fileName.getString())));
-                    }
-                }
 
                 // Refill lookahead tokens
                 m_lookAhead1 = fetch();

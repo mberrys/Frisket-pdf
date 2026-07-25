@@ -56,6 +56,7 @@ private slots:
     void test_ad();
     void test_command();
     void test_invalid_input();
+    void test_parser_security_limits();
     void test_header_regexp();
     void test_flat_map();
     void test_lzw_filter();
@@ -238,6 +239,46 @@ void LexicalAnalyzerTest::test_invalid_input()
     QVERIFY_THROWS_EXCEPTION(pdf::PDFException, scanWholeStream("<1FA"));
     QVERIFY_THROWS_EXCEPTION(pdf::PDFException, scanWholeStream("> albatros"));
     QVERIFY_THROWS_EXCEPTION(pdf::PDFException, scanWholeStream(")"));
+}
+
+void LexicalAnalyzerTest::test_parser_security_limits()
+{
+    QByteArray validNesting(32, '[');
+    validNesting.append('0');
+    validNesting.append(QByteArray(32, ']'));
+
+    pdf::PDFParser validParser(validNesting, nullptr, pdf::PDFParser::None);
+    QVERIFY(validParser.getObject().isArray());
+
+    QByteArray excessiveNesting(300, '[');
+    excessiveNesting.append('0');
+    excessiveNesting.append(QByteArray(300, ']'));
+
+    QVERIFY_THROWS_EXCEPTION(pdf::PDFException,
+    {
+        pdf::PDFParser parser(excessiveNesting, nullptr, pdf::PDFParser::None);
+        parser.getObject();
+    });
+
+    pdf::PDFParsingContext referenceContext([](pdf::PDFParsingContext* context, pdf::PDFObjectReference reference)
+    {
+        pdf::PDFParsingContext::PDFParsingContextGuard guard(context, reference);
+        if (reference.objectNumber >= 300)
+        {
+            return pdf::PDFObject::createNull();
+        }
+
+        return context->getObject(pdf::PDFObject::createReference(pdf::PDFObjectReference(reference.objectNumber + 1, 0)));
+    });
+    QVERIFY_THROWS_EXCEPTION(pdf::PDFException,
+                             referenceContext.getObject(pdf::PDFObject::createReference(pdf::PDFObjectReference(1, 0))));
+
+    const QByteArray externalStream = "<< /Length 1 /F (controlled-proof.txt) >> stream\nX endstream";
+    QVERIFY_THROWS_EXCEPTION(pdf::PDFException,
+    {
+        pdf::PDFParser parser(externalStream, nullptr, pdf::PDFParser::AllowStreams);
+        parser.getObject();
+    });
 }
 
 void LexicalAnalyzerTest::test_header_regexp()

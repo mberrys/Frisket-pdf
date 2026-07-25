@@ -32,26 +32,26 @@ ENV VCPKG_OVERLAY_PORTS=/root/PDF4QT/vcpkg/overlays
 
 RUN pip install aqtinstall
 
-RUN aqt list-qt linux desktop --arch 6.9.1 > /root/available_qt_versions.txt
+RUN aqt list-qt linux desktop --arch 6.11.1 > /root/available_qt_versions.txt
 
-RUN aqt install-qt linux desktop 6.9.1 linux_gcc_64 -O /opt/Qt -m qtmultimedia qtspeech
+RUN aqt install-qt linux desktop 6.11.1 linux_gcc_64 -O /opt/Qt -m qtmultimedia qtspeech
 
 # Set environment variables
-ENV PATH=/opt/Qt/6.9.1/gcc_64/bin:$PATH
-ENV CMAKE_PREFIX_PATH=/opt/Qt/6.9.1/gcc_64/lib/cmake
+ENV PATH=/opt/Qt/6.11.1/gcc_64/bin:$PATH
+ENV CMAKE_PREFIX_PATH=/opt/Qt/6.11.1/gcc_64/lib/cmake
 ENV VCPKG_ROOT=/opt/vcpkg
 ENV VCPKG_OVERLAY_PORTS=/root/PDF4QT/vcpkg/overlays
-ENV PDF4QT_QT_ROOT=/opt/Qt/6.9.1/gcc_64
-ENV LD_LIBRARY_PATH=/opt/Qt/6.9.1/gcc_64/lib:$LD_LIBRARY_PATH
+ENV PDF4QT_QT_ROOT=/opt/Qt/6.11.1/gcc_64
+ENV LD_LIBRARY_PATH=/opt/Qt/6.11.1/gcc_64/lib:$LD_LIBRARY_PATH
 ENV QT_QPA_PLATFORM=offscreen
 
 # Persist env variables to root shell
-RUN echo 'export PATH=/opt/Qt/6.9.1/gcc_64/bin:$PATH' >> /root/.bashrc && \
-    echo 'export CMAKE_PREFIX_PATH=/opt/Qt/6.9.1/gcc_64/lib/cmake' >> /root/.bashrc && \
+RUN echo 'export PATH=/opt/Qt/6.11.1/gcc_64/bin:$PATH' >> /root/.bashrc && \
+    echo 'export CMAKE_PREFIX_PATH=/opt/Qt/6.11.1/gcc_64/lib/cmake' >> /root/.bashrc && \
     echo 'export VCPKG_ROOT=/opt/vcpkg' >> /root/.bashrc && \
     echo 'export VCPKG_OVERLAY_PORTS=/root/PDF4QT/vcpkg/overlays' >> /root/.bashrc && \
-    echo 'export PDF4QT_QT_ROOT=/opt/Qt/6.9.1/gcc_64' >> /root/.bashrc && \
-    echo 'export LD_LIBRARY_PATH=/opt/Qt/6.9.1/gcc_64/lib:$LD_LIBRARY_PATH' >> /root/.bashrc && \
+    echo 'export PDF4QT_QT_ROOT=/opt/Qt/6.11.1/gcc_64' >> /root/.bashrc && \
+    echo 'export LD_LIBRARY_PATH=/opt/Qt/6.11.1/gcc_64/lib:$LD_LIBRARY_PATH' >> /root/.bashrc && \
     echo 'export QT_QPA_PLATFORM=offscreen' >> /root/.bashrc  
 
 # Reinstall essential tools (redundant but safe)
@@ -67,12 +67,12 @@ RUN cmake -B build -S . -DPDF4QT_INSTALL_QT_DEPENDENCIES=0 \
           -DVCPKG_OVERLAY_PORTS=vcpkg/overlays \
           -DPDF4QT_INSTALL_TO_USR=OFF \
           -DCMAKE_INSTALL_PREFIX="/" \
-          -DPDF4QT_QT_ROOT=/opt/Qt/6.9.1/gcc_64
+          -DPDF4QT_QT_ROOT=/opt/Qt/6.11.1/gcc_64
 RUN cmake --build build --target all release_translations -j$(nproc)
 RUN cmake --install build --prefix /install
 
 # Delete all static libraries (they are not needed in the final docker image)
-RUN find /opt/Qt/6.9.1/gcc_64/lib -type f -name "*.a" -delete
+RUN find /opt/Qt/6.11.1/gcc_64/lib -type f -name "*.a" -delete
     
 # Final working directory
 WORKDIR /root
@@ -106,8 +106,8 @@ COPY --from=builder_pdf4qt /opt/Qt /opt/Qt
 COPY --from=builder_pdf4qt /install /
 
 # Persist env variables to root shell
-RUN echo 'export PATH=/opt/Qt/6.9.1/gcc_64/bin:$PATH' >> /root/.bashrc && \
-    echo 'export LD_LIBRARY_PATH=/opt/Qt/6.9.1/gcc_64/lib:$LD_LIBRARY_PATH' >> /root/.bashrc && \
+RUN echo 'export PATH=/opt/Qt/6.11.1/gcc_64/bin:$PATH' >> /root/.bashrc && \
+    echo 'export LD_LIBRARY_PATH=/opt/Qt/6.11.1/gcc_64/lib:$LD_LIBRARY_PATH' >> /root/.bashrc && \
     echo 'export QT_QPA_PLATFORM=offscreen' >> /root/.bashrc  
 
 WORKDIR /root

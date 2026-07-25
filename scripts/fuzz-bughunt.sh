@@ -28,7 +28,7 @@ if [[ -d "${SEED_DIR}" ]]; then
     FUZZ_ARGS+=("${SEED_DIR}")
 fi
 
-export LD_LIBRARY_PATH="${PDF4QT_QT_ROOT:-/opt/Qt/6.9.1/gcc_64}/lib:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="${PDF4QT_QT_ROOT:-/opt/Qt/6.11.1/gcc_64}/lib:${LD_LIBRARY_PATH:-}"
 
 for target in "${TARGETS[@]}"; do
     bin="${BUILD_DIR}/usr/bin/${target}"

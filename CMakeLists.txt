@@ -115,16 +115,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(GNUInstallDirs)
 
-find_package(Qt6 REQUIRED COMPONENTS Core LinguistTools)
+find_package(Qt6 6.11.1 REQUIRED COMPONENTS Core LinguistTools)
 
 if(PDF4QT_BUILD_ONLY_CORE_LIBRARY)
-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Svg Xml)
+    find_package(Qt6 6.11.1 REQUIRED COMPONENTS Core Gui Svg Xml)
 else()
-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg Xml PrintSupport TextToSpeech Concurrent)
+    find_package(Qt6 6.11.1 REQUIRED COMPONENTS Core Gui Widgets Svg Xml PrintSupport TextToSpeech Concurrent)
 endif()
 
 if(PDF4QT_BUILD_TESTS)
-    find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(Qt6 6.11.1 REQUIRED COMPONENTS Test)
 endif()
 
 qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES en de cs es ko zh_CN zh_TW fr tr ru)

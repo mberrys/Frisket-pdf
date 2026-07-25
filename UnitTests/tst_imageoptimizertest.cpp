@@ -26,6 +26,8 @@
 #include "pdfimageconversion.h"
 #include "pdfimageoptimizer.h"
 #include "pdfconstants.h"
+#include "pdfexception.h"
+#include "pdfparser.h"
 
 #include <QtTest>
 #include <QColor>
@@ -33,6 +35,7 @@
 
 #include <memory>
 #include <random>
+#include <utility>
 
 class ImageOptimizerTest : public QObject
 {
@@ -47,6 +50,7 @@ private slots:
     void test_optimizer_preserve_keeps_bitonal_encoding();
     void test_optimizer_preserves_smask();
     void test_optimizer_reduces_size_for_photo();
+    void test_rejects_invalid_image_dimensions();
 
 private:
     static QImage createLineArtImage(int size);
@@ -471,6 +475,48 @@ void ImageOptimizerTest::test_optimizer_reduces_size_for_photo()
 
     const pdf::PDFObject& imageObject = optimized.getObjectByReference(infos[0].reference);
     QVERIFY(imageObject.isStream());
+}
+
+void ImageOptimizerTest::test_rejects_invalid_image_dimensions()
+{
+    auto createImageMask = [](pdf::PDFInteger width, pdf::PDFInteger height)
+    {
+        const QByteArray data = QString("<< /Type /XObject /Subtype /Image /Width %1 /Height %2 "
+                                        "/ImageMask true /BitsPerComponent 1 /Length 1 >> "
+                                        "stream\nX endstream")
+                                    .arg(width)
+                                    .arg(height)
+                                    .toLatin1();
+        pdf::PDFParser parser(data, nullptr, pdf::PDFParser::AllowStreams);
+        return parser.getObject();
+    };
+
+    pdf::PDFDocument document;
+    for (const auto [width, height] : { std::pair<pdf::PDFInteger, pdf::PDFInteger>(-1, 1),
+                                       std::pair<pdf::PDFInteger, pdf::PDFInteger>(1, -1),
+                                       std::pair<pdf::PDFInteger, pdf::PDFInteger>(0, 1),
+                                       std::pair<pdf::PDFInteger, pdf::PDFInteger>(16385, 1) })
+    {
+        pdf::PDFObject object = createImageMask(width, height);
+        QVERIFY(object.isStream());
+        QVERIFY_THROWS_EXCEPTION(pdf::PDFRendererException,
+                                 pdf::PDFImage::createImage(&document,
+                                                            object.getStream(),
+                                                            {},
+                                                            false,
+                                                            pdf::RenderingIntent::Perceptual,
+                                                            nullptr));
+    }
+
+    pdf::PDFObject validObject = createImageMask(1, 1);
+    pdf::PDFImage validImage = pdf::PDFImage::createImage(&document,
+                                                          validObject.getStream(),
+                                                          {},
+                                                          false,
+                                                          pdf::RenderingIntent::Perceptual,
+                                                          nullptr);
+    QCOMPARE(validImage.getImageData().getWidth(), 1u);
+    QCOMPARE(validImage.getImageData().getHeight(), 1u);
 }
 
 QTEST_APPLESS_MAIN(ImageOptimizerTest)

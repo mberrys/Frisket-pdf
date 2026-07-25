@@ -3,7 +3,7 @@
 #   source scripts/dev-env.sh
 #
 # Optional overrides before sourcing:
-#   export FRISKET_QT_VERSION=6.9.1
+#   export FRISKET_QT_VERSION=6.11.1
 #   export FRISKET_VCPKG_ROOT=/path/to/vcpkg
 #   export FRISKET_REPO_ROOT=/path/to/Frisket-pdf
 
@@ -16,7 +16,7 @@ fi
 _frisket_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export FRISKET_REPO_ROOT="${FRISKET_REPO_ROOT:-${_frisket_repo_root}}"
 
-export FRISKET_QT_VERSION="${FRISKET_QT_VERSION:-6.9.1}"
+export FRISKET_QT_VERSION="${FRISKET_QT_VERSION:-6.11.1}"
 export PDF4QT_QT_ROOT="${PDF4QT_QT_ROOT:-/opt/Qt/${FRISKET_QT_VERSION}/gcc_64}"
 export QT_ROOT_DIR="${QT_ROOT_DIR:-${PDF4QT_QT_ROOT}}"
 export CMAKE_PREFIX_PATH="${PDF4QT_QT_ROOT}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}"

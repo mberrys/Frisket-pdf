@@ -49,6 +49,9 @@ namespace pdf
 namespace
 {
 
+constexpr PDFInteger MAXIMUM_PDF_IMAGE_DIMENSION = 16384;
+constexpr PDFInteger MAXIMUM_PDF_IMAGE_PIXELS = MAXIMUM_PDF_IMAGE_DIMENSION * MAXIMUM_PDF_IMAGE_DIMENSION;
+
 struct PreparedImageData
 {
     QByteArray pixels;
@@ -64,6 +67,17 @@ struct PreparedImageData
 static int clampThreshold(int threshold)
 {
     return std::clamp(threshold, 0, 255);
+}
+
+static void validateImageDimensions(PDFInteger width, PDFInteger height)
+{
+    PDFInteger pixelCount = 0;
+    if (width <= 0 || height <= 0 ||
+        width > MAXIMUM_PDF_IMAGE_DIMENSION || height > MAXIMUM_PDF_IMAGE_DIMENSION ||
+        !pdfTryMultiply(width, height, pixelCount) || pixelCount > MAXIMUM_PDF_IMAGE_PIXELS)
+    {
+        throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid size of image (%1x%2)").arg(width).arg(height));
+    }
 }
 
 static Qt::TransformationMode getTransformationMode(PDFImage::ResampleFilter filter)
@@ -1410,17 +1424,15 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
         // We treat data as binary maybe compressed stream (for example by Flate/LZW method), but data can also be not compressed.
         const unsigned int components = static_cast<unsigned int>(colorSpace->getColorComponentCount());
         const unsigned int bitsPerComponent = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "BitsPerComponent", 8));
-        const unsigned int width = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "Width", 0));
-        const unsigned int height = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "Height", 0));
+        const PDFInteger widthValue = loader.readIntegerFromDictionary(dictionary, "Width", 0);
+        const PDFInteger heightValue = loader.readIntegerFromDictionary(dictionary, "Height", 0);
+        validateImageDimensions(widthValue, heightValue);
+        const unsigned int width = static_cast<unsigned int>(widthValue);
+        const unsigned int height = static_cast<unsigned int>(heightValue);
 
         if (bitsPerComponent < 1 || bitsPerComponent > 32)
         {
             throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid number of bits per component (%1).").arg(bitsPerComponent));
-        }
-
-        if (width == 0 || height == 0)
-        {
-            throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid size of image (%1x%2)").arg(width).arg(height));
         }
 
         // Calculate stride
@@ -1447,16 +1459,19 @@ PDFImage PDFImage::createImage(const PDFDocument* document,
             throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid number bits of image mask (should be 1 bit instead of %1 bits).").arg(bitsPerComponent));
         }
 
-        const unsigned int width = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "Width", 0));
-        const unsigned int height = static_cast<unsigned int>(loader.readIntegerFromDictionary(dictionary, "Height", 0));
+        const PDFInteger widthValue = loader.readIntegerFromDictionary(dictionary, "Width", 0);
+        const PDFInteger heightValue = loader.readIntegerFromDictionary(dictionary, "Height", 0);
+        validateImageDimensions(widthValue, heightValue);
+        const unsigned int width = static_cast<unsigned int>(widthValue);
+        const unsigned int height = static_cast<unsigned int>(heightValue);
 
-        if (width == 0 || height == 0)
+        // Calculate stride
+        unsigned int strideValue = 0;
+        if (!pdfTryAdd(width, 7u, strideValue))
         {
             throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid size of image (%1x%2)").arg(width).arg(height));
         }
-
-        // Calculate stride
-        const unsigned int stride = (width + 7) / 8;
+        const unsigned int stride = strideValue / 8;
 
         QByteArray imageDataBuffer = document->getDecodedStream(stream);
         image.m_imageData = PDFImageData(1, bitsPerComponent, width, height, stride, maskingType, qMove(imageDataBuffer), qMove(mask), qMove(decode), qMove(matte));
@@ -1590,7 +1605,9 @@ QImage PDFImage::getImage(const PDFCMS* cms,
             throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid number bits of image mask (should be 1 bit instead of %1 bits).").arg(m_imageData.getBitsPerComponent()));
         }
 
-        if (m_imageData.getWidth() == 0 || m_imageData.getHeight() == 0)
+        if (m_imageData.getWidth() == 0 || m_imageData.getHeight() == 0 ||
+            m_imageData.getWidth() > MAXIMUM_PDF_IMAGE_DIMENSION ||
+            m_imageData.getHeight() > MAXIMUM_PDF_IMAGE_DIMENSION)
         {
             throw PDFRendererException(RenderErrorType::Error, PDFTranslationContext::tr("Invalid size of image (%1x%2)").arg(m_imageData.getWidth()).arg(m_imageData.getHeight()));
         }

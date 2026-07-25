@@ -68,14 +68,14 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
         with:
-          version: "6.9.0"
+          version: "6.11.1"
           host: "linux"
           target: "desktop"
           dir: "${{ github.workspace }}/qt/"
           install-deps: "true"
           modules: "qtimageformats"
           cache: "true"
-          cache-key-prefix: ${{ runner.os }}-qt-690-fuzz
+          cache-key-prefix: ${{ runner.os }}-qt-6111-fuzz
 
       - name: Configure fuzz build
         env:
@@ -93,7 +93,7 @@ jobs:
             -DPDF4QT_ENABLE_SENTRY=OFF \
             -DPDF4QT_ENABLE_SANITIZERS=ON \
             -DPDF4QT_BUILD_FUZZERS=ON \
-            -DPDF4QT_QT_ROOT="${{ github.workspace }}/qt/Qt/6.9.0/gcc_64"
+            -DPDF4QT_QT_ROOT="${{ github.workspace }}/qt/Qt/6.11.1/gcc_64"
 
       - name: Build fuzz harnesses
         run: |

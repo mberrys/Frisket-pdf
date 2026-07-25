@@ -35,7 +35,7 @@ See [platform support](docs/PLATFORM_SUPPORT.md) for supported configurations, p
 
 ## Build from source
 
-Frisket-PDF requires a C++20 compiler, Qt 6.9 or newer, and vcpkg. Windows and Linux are the supported development targets.
+Frisket-PDF requires a C++20 compiler, Qt 6.11.1 or newer, and vcpkg. Windows and Linux are the supported development targets.
 
 ```bash
 git clone https://github.com/mberrys/Frisket-pdf.git

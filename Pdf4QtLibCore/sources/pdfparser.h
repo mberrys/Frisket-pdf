@@ -333,6 +333,8 @@ private:
 
     PDFLexicalAnalyzer::Token fetch();
 
+    PDFObject getObject(int nestingDepth);
+
     /// Functor for fetching tokens
     std::function<PDFLexicalAnalyzer::Token(void)> m_tokenFetcher;
 

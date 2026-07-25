@@ -122,9 +122,9 @@ jobs:
         working-directory: vcpkg
         
       - name: Install Qt
-        uses: jurplel/install-qt-action@b3ea5275e37b734d027040e2c7fe7a10ea2ef946  # v3.3.0
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730  # v4.3.1
         with:
-          version: '6.9.0'
+          version: '6.11.1'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
@@ -132,7 +132,7 @@ jobs:
           install-deps: 'true'
           modules: 'qtspeech qtmultimedia qtimageformats'
           cache: 'true'
-          cache-key-prefix: ${{ runner.os }}-qt-690
+          cache-key-prefix: ${{ runner.os }}-qt-6111
           
 
       - name: Find VC Redistributable Directories

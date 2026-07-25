@@ -122,7 +122,7 @@ No payment processors, identity providers, or document cloud APIs.
 
 | Dependency | SPOF? | Fallback |
 |------------|-------|----------|
-| Qt 6.9 runtime | Yes | User must install/bundle Qt (installers do) |
+| Qt 6.11.1 runtime | Yes | User must install/bundle Qt (installers do) |
 | Pdf4QtLibCore PDF engine | Yes | None — core product |
 | Bundled `PdfTool` + `frisket-default.json` | Yes for Editor preflight | Actionable error if missing from bundle |
 | vcpkg third-party libs (OpenJPEG, zlib, …) | Build-time | Static link in release builds |

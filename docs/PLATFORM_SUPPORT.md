@@ -60,7 +60,7 @@ bundling** and **installer packaging** for modules that are already complete.
 
 | Module / surface | Already complete? | Win | Linux | What to verify |
 |------------------|-------------------|:--:|:-----:|----------------|
-| Pdf4QtLibCore | Yes | ☐ | ☐ | Qt 6.9 + vcpkg build; codecs/fonts; no Widgets |
+| Pdf4QtLibCore | Yes | ☐ | ☐ | Qt 6.11.1 + vcpkg build; codecs/fonts; no Widgets |
 | Pdf4QtLibWidgets / Pdf4QtLibGui | Yes | ☐ | ☐ | Plugin relative path; settings paths |
 | PdfTool (`preflight`, `add-bleed`, …) | Yes | ☐ | ☐ | Bundled next to Editor; working directory; offscreen CI |
 | FrisketPreflightPlugin | Yes | ☐ | ☐ | Finds PdfTool + `frisket-default.json`; `.dll` / `.so` |
@@ -130,7 +130,7 @@ entry criteria for adding it in a later release, not as a V1 checklist.
 
 - Apps already set `MACOSX_BUNDLE ON` for Editor, Viewer, PageMaster, Diff, LaunchPad.
 - CMake today treats non-`PDF4QT_LINUX` like Windows for `PDF4QT_PLUGINS_DIR` (`pdfplugins`, `CMakeLists.txt:198-201`). That path must be confirmed inside a `.app` bundle or the install rules adjusted.
-- A `macos` job in `ci.yml` with Qt 6.9 + vcpkg, mirroring the Ubuntu/Windows `ctest` set, is the minimum bar before any macOS claim is restored.
+- A `macos` job in `ci.yml` with Qt 6.11.1 + vcpkg, mirroring the Ubuntu/Windows `ctest` set, is the minimum bar before any macOS claim is restored.
 - Notarization and staple steps belong in a dedicated `macOSInstall.yml` before attaching artifacts to the release draft. This requires an **Apple Developer Program** enrollment, which is not currently held.
 
 ## Documentation map

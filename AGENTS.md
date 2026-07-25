@@ -9,7 +9,7 @@ Frisket-PDF is a fork of PDF4QT — a Qt6 / C++20 PDF toolkit (core library, wid
 | **Fork** | [mberrys/Frisket-pdf](https://github.com/mberrys/Frisket-pdf) ← [JakubMelka/PDF4QT](https://github.com/JakubMelka/PDF4QT) |
 | **Version** | `1.6.0.0` (`PDF4QT_VERSION` in root `CMakeLists.txt`) |
 | **Language** | C++20 |
-| **Qt** | 6.9 (CI installs **6.9.0** via `jurplel/install-qt-action`) |
+| **Qt** | **6.11.1 minimum** (CI installs **6.11.1** via `jurplel/install-qt-action`; older versions are blocked because of Qt SVG security fixes) |
 | **Dependencies** | vcpkg manifest: `vcpkg.json`, `vcpkg-configuration.json`, overlays in `vcpkg/overlays/` |
 | **Upstream sync** | On-demand GitHub **Sync fork** only; do not merge upstream unless asked |
 
@@ -150,7 +150,7 @@ Environment is prebuilt into the VM snapshot; the startup update script only ref
 
 **Prebuilt locations (persisted in snapshot, outside `/workspace`):**
 
-- Qt **6.9.1** (gcc_64) at `/opt/Qt/6.9.1/gcc_64` (installed via `aqtinstall`).
+- Qt **6.11.1** (gcc_64) at `/opt/Qt/6.11.1/gcc_64` (installed via `aqtinstall`). Older snapshots containing Qt 6.9.1 must be refreshed before building.
 - vcpkg at `/opt/vcpkg`; installed deps at `/opt/vcpkg_installed` (`x64-linux`, static libs).
 - `~/.bashrc` exports: `PDF4QT_QT_ROOT`, `QT_ROOT_DIR`, `CMAKE_PREFIX_PATH`, `LD_LIBRARY_PATH` (Qt), `VCPKG_ROOT`, `VCPKG_INSTALLED_DIR=/opt/vcpkg_installed`, `VCPKG_OVERLAY_PORTS=/workspace/vcpkg/overlays/linux:/workspace/vcpkg/overlays/general`, `CC=gcc`, `CXX=g++`, and `QT_QPA_PLATFORM=offscreen`.
 
@@ -161,7 +161,7 @@ Environment is prebuilt into the VM snapshot; the startup update script only ref
 cmake -B build -S . -G Ninja -DPDF4QT_INSTALL_QT_DEPENDENCIES=0 \
   -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
   -DVCPKG_INSTALLED_DIR=/opt/vcpkg_installed -DVCPKG_MANIFEST_INSTALL=OFF \
-  -DCMAKE_BUILD_TYPE=Release -DPDF4QT_QT_ROOT=/opt/Qt/6.9.1/gcc_64
+  -DCMAKE_BUILD_TYPE=Release -DPDF4QT_QT_ROOT=/opt/Qt/6.11.1/gcc_64
 ```
 Build all: `cmake --build build --target all release_translations -j$(nproc)` (~5 min on 4 cores). Prefer single targets (e.g. `--target Pdf4QtLibCore`, `PdfTool`, `UnitTests`) per repo rules.
 
