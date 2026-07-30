@@ -184,8 +184,19 @@ jobs:
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_VCPKG_BUILD_TYPE=Release -DPDF4QT_INSTALL_QT_DEPENDENCIES=ON -DPDF4QT_INSTALL_DEPENDENCIES=ON -DCMAKE_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DPDF4QT_QT_ROOT="${env:Qt6_DIR}" -DPDF4QT_INSTALL_MSVC_REDISTRIBUTABLE=ON -DPDF4QT_INSTALL_PREPARE_WIX_INSTALLER=ON -DPDF4QT_INSTALL_TO_USR=ON
           cmake --build build --target release_translations --config Release -j6
           cmake --build build --config Release -j6
-          ctest --test-dir build -C Release --output-on-failure
           cmake --install build --config Release
+
+      - name: Run unit tests
+        working-directory: pdf4qt/build
+        shell: pwsh
+        run: |
+          ctest -C Release --output-on-failure
+
+      - name: Run preflight corpus gate
+        working-directory: pdf4qt/build
+        shell: pwsh
+        run: |
+          ctest -C Release -R UnitTestsPreflightCorpus --output-on-failure
 
       - name: Upload Windows package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
