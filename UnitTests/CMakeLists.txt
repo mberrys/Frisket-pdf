@@ -313,3 +313,12 @@ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
     )
     add_test(UnitTestsOperatorAcceptance  "${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/UnitTestsOperatorAcceptance")
 endif()
+
+# windeployqt copies Core/Gui/etc. but not Qt Test; all UnitTests* targets share one output dir.
+if(WIN32)
+    add_custom_command(TARGET UnitTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:Qt6::Test>
+            $<TARGET_FILE_DIR:UnitTests>
+        COMMENT "Copy Qt6Test runtime for unit tests")
+endif()
