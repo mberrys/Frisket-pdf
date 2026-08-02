@@ -38,6 +38,21 @@ namespace pdf
 constexpr int64_t JBIG2_MAX_BITMAP_DIMENSION = 16384;
 constexpr int64_t JBIG2_MAX_BITMAP_PIXELS = JBIG2_MAX_BITMAP_DIMENSION * JBIG2_MAX_BITMAP_DIMENSION;
 
+// The per-bitmap cap above bounds any single allocation, but a symbol
+// dictionary can legally contain thousands of individually-small-enough
+// symbol bitmaps. A stream that stays under the per-bitmap cap on every
+// single symbol can still sum to a multi-gigabyte decode. 512 MiB is
+// roughly double the largest single legal bitmap, which comfortably covers
+// a full scanned page plus a large, legitimate symbol dictionary, while
+// staying far below a DoS-sized cumulative allocation.
+constexpr int64_t JBIG2_MAX_TOTAL_BITMAP_PIXELS = 512LL * 1024 * 1024;
+
+// Custom Huffman code tables (7.4.3) store an 8-bit-derived range-length
+// field per entry with no inherent bound, and a real table has at most a
+// few dozen entries. Cap it generously to stop a crafted table with a
+// near-zero range length from looping toward htHigh billions of times.
+constexpr size_t JBIG2_MAX_HUFFMAN_TABLE_ENTRIES = 65536;
+
 namespace
 {
 
@@ -2832,14 +2847,34 @@ void PDFJBIG2Decoder::processCodeTables(const PDFJBIG2SegmentHeader& header)
     table.reserve(32);
 
     // Read standard values
-    int32_t currentRangeLow = htLow;
-    while (currentRangeLow < htHigh)
+    //
+    // entry.rangeBitLength comes straight from the stream (up to 255, from an
+    // 8-bit-derived field) with no inherent bound. `1 << rangeBitLength` in
+    // 32-bit int is undefined behavior for shifts >= 32, and even a valid
+    // shift can overflow the accumulation into currentRangeLow. Widen the
+    // accumulator to int64_t, reject an out-of-range shift outright, and cap
+    // the entry count so a rangeBitLength of 0 can't loop toward htHigh
+    // billions of times.
+    int64_t currentRangeLow = htLow;
+    const int64_t htHigh64 = htHigh;
+    while (currentRangeLow < htHigh64)
     {
+        if (table.size() >= JBIG2_MAX_HUFFMAN_TABLE_ENTRIES)
+        {
+            throw PDFException(PDFTranslationContext::tr("JBIG2 huffman table has too many entries."));
+        }
+
         PDFJBIG2HuffmanTableEntry entry;
         entry.prefixBitLength = m_reader.read(htps);
         entry.rangeBitLength = m_reader.read(htrs);
-        entry.value = currentRangeLow;
-        currentRangeLow += 1 << entry.rangeBitLength;
+
+        if (entry.rangeBitLength > 31)
+        {
+            throw PDFException(PDFTranslationContext::tr("JBIG2 invalid range bit length in huffman table."));
+        }
+
+        entry.value = static_cast<int32_t>(currentRangeLow);
+        currentRangeLow += int64_t(1) << entry.rangeBitLength;
         table.push_back(entry);
     }
 
@@ -2921,9 +2956,20 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::getBitmap(const uint32_t segmentIndex, bool remo
     throw PDFException(PDFTranslationContext::tr("JBIG2 bitmap segment %1 not found.").arg(segmentIndex));
 }
 
+void PDFJBIG2Decoder::accountBitmapPixels(int64_t width, int64_t height)
+{
+    m_totalBitmapPixelsDecoded += width * height;
+
+    if (m_totalBitmapPixelsDecoded > JBIG2_MAX_TOTAL_BITMAP_PIXELS)
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 stream exceeds the maximum total decoded bitmap size."));
+    }
+}
+
 PDFJBIG2Bitmap PDFJBIG2Decoder::readBitmap(PDFJBIG2BitmapDecodingParameters& parameters)
 {
     checkJBIG2BitmapDimensions(parameters.GBW, parameters.GBH);
+    accountBitmapPixels(parameters.GBW, parameters.GBH);
 
     if (parameters.MMR)
     {
@@ -3231,6 +3277,8 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::readBitmap(PDFJBIG2BitmapDecodingParameters& par
 PDFJBIG2Bitmap PDFJBIG2Decoder::readRefinementBitmap(PDFJBIG2BitmapRefinementDecodingParameters& parameters)
 {
     // Use algorithm described in 6.3.5.6
+    checkJBIG2BitmapDimensions(parameters.GRW, parameters.GRH);
+    accountBitmapPixels(parameters.GRW, parameters.GRH);
     PDFJBIG2Bitmap GRREG(parameters.GRW, parameters.GRH, 0x00);
 
     // Use arithmetic encoding. For templates, we fill bytes from right to left, from bottom to top bits,
