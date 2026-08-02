@@ -139,11 +139,15 @@ if(WIN32 AND MSVC AND PDF4QT_INSTALL_PREPARE_WIX_INSTALLER)
         set(PDF4QT_WIX_PLUGIN_SCANNER "")
     endif()
 
-    set(PDF4QT_WIX_PLUGIN_OCR [=[
+    if(PDF4QT_PLUGIN_OCR)
+        set(PDF4QT_WIX_PLUGIN_OCR [=[
       <Component Id="cmpOcrPlugin" Directory="dir_pdfplugins" Guid="{C8F5B2D3-4E6A-4F91-8B2C-3D9E8F7A6B51}">
         <File Id="filOcrPlugin" KeyPath="yes" Source="$(var.MyInstallDir)\pdfplugins\OcrPlugin.dll" />
       </Component>
 ]=])
+    else()
+        set(PDF4QT_WIX_PLUGIN_OCR "")
+    endif()
 
     if(PDF4QT_BUNDLE_OCR_SERVICE)
         set(PDF4QT_WIX_FEATURE_OCR_SERVICE [=[
