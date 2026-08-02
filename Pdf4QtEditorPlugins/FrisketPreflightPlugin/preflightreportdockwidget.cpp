@@ -24,6 +24,7 @@
 
 #include "pdfuitheme.h"
 #include "pdfwidgetutils.h"
+#include "preflightsidecarutils.h"
 
 #include <QHeaderView>
 #include <QLabel>
@@ -166,15 +167,8 @@ void PreflightReportDockWidget::refreshHeader()
                               .arg(m_model.errorCount())
                               .arg(m_model.warningCount());
 
-    // Standard page rendering does not simulate overprint (MIC-320); overprint-accurate
-    // compositing exists only in the transparency renderer behind Output Preview. Say so
-    // where the operator sees the finding, rather than only in the release notes.
-    if (m_model.hasWhiteOverprintFinding())
-    {
-        summaryText += QStringLiteral(" ");
-        summaryText += tr("This document uses overprint. Page view does not simulate "
-                          "overprint — use Output Preview to proof it accurately.");
-    }
+    summaryText += QStringLiteral(" ");
+    summaryText += pdfplugin::preflight::overprintDisclosureText(m_model.hasWhiteOverprintFinding());
 
     m_summaryLabel->setText(summaryText);
     {

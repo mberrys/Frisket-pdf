@@ -23,6 +23,10 @@ A desktop PDF toolkit for editing, inspecting, validating, and automating PDF wo
 | **Pdf4QtViewer** | Quick, read-only viewing. |
 | **Pdf4QtDiff** | Comparing two PDF documents. |
 
+## Known limitations
+
+- **Overprint is not simulated in the interactive page view.** The standard page renderer does not composite overprint (`OP`/`op`/OPM in the graphics state); overprint-accurate compositing is only available in **Output Preview**. Preflight only raises a finding for the unsafe white/near-white overprint case — a document using ordinary overprint (spot-over-process, rich black over an image) produces no finding at all. Proof any overprint-sensitive document in Output Preview before it ships to print.
+
 ## Install
 
 Use Frisket’s own release artifacts, not upstream PDF4QT packages.
