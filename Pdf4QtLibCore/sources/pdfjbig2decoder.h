@@ -469,6 +469,15 @@ public:
 private:
     static constexpr const uint32_t MAX_BITMAP_SIZE = 65536;
 
+    /// Adds \p width x \p height pixels to the running total of bitmap memory
+    /// decoded so far by this decoder instance, and throws if the cumulative
+    /// total exceeds the total-decode budget. A single bitmap can legally be
+    /// as large as the per-bitmap cap allows; this guards against a stream
+    /// that stays under that cap on every individual allocation (e.g. many
+    /// symbols in a symbol dictionary) but still amounts to a multi-gigabyte
+    /// decompression bomb in aggregate.
+    void accountBitmapPixels(int64_t width, int64_t height);
+
     /// Processes current data stream (reads all data from the stream, interprets
     /// them as segments and processes the segments).
     void processStream();
@@ -533,6 +542,7 @@ private:
     bool m_pageDefaultCompositionOperatorOverriden;
     bool m_pageSizeUndefined;
     PDFJBIG2Bitmap m_pageBitmap;
+    int64_t m_totalBitmapPixelsDecoded = 0;
 };
 
 }   // namespace pdf
