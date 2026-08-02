@@ -603,6 +603,30 @@ inline bool isNormalizedReport(const QJsonObject& report)
     return validateNormalizedReport(report);
 }
 
+/// Builds the overprint disclosure text shown in the report panel summary.
+/// Standard page rendering never simulates overprint compositing (MIC-320) —
+/// overprint-accurate compositing exists only in the transparency renderer
+/// behind Output Preview. The preflight engine only detects the unsafe
+/// white/near-white case; ordinary overprint (spot-over-process, rich black
+/// over an image) produces no finding at all. So the base notice is always
+/// shown once a report is loaded (MIC-330/R-002), regardless of findings,
+/// with an additional specific warning appended when the white-overprint
+/// finding is present.
+inline QString overprintDisclosureText(bool hasWhiteOverprintFinding)
+{
+    QString text = QObject::tr("Page view does not simulate overprint — use Output Preview to proof "
+                                "overprint-sensitive documents accurately.");
+
+    if (hasWhiteOverprintFinding)
+    {
+        text += QStringLiteral(" ");
+        text += QObject::tr("This document uses white or near-white overprint, which can "
+                            "cause unintended knockouts in print.");
+    }
+
+    return text;
+}
+
 }   // namespace pdfplugin::preflight
 
 #endif // PREFLIGHTSIDECARUTILS_H

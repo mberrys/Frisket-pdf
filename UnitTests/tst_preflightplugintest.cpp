@@ -44,6 +44,8 @@ private slots:
     void sidecarStreamBuffer_spillsToDiskAboveWatermark();
     void sidecarStreamBuffer_rejectsOverflowBeyondMax();
     void sidecarStreamBuffer_spillRoundTripsContent();
+    void overprintDisclosureText_alwaysShownEvenWithoutFinding();
+    void overprintDisclosureText_addsSpecificWarningForWhiteOverprintFinding();
 };
 
 namespace
@@ -276,6 +278,25 @@ void PreflightPluginTest::sidecarStreamBuffer_spillRoundTripsContent()
 
     QVERIFY(buffer.spilledBytes() > 0);
     QCOMPARE(buffer.takeData(), expected);
+}
+
+void PreflightPluginTest::overprintDisclosureText_alwaysShownEvenWithoutFinding()
+{
+    // R-002/MIC-330: the preflight engine only flags the unsafe white/near-white
+    // overprint case. A document using ordinary (non-white) overprint produces no
+    // finding, so the general "page view doesn't simulate overprint" notice must
+    // appear regardless of whether hasWhiteOverprintFinding is set — otherwise an
+    // operator proofing such a document sees no warning at all.
+    const QString text = pdfplugin::preflight::overprintDisclosureText(false);
+    QVERIFY(text.contains(QStringLiteral("does not simulate overprint")));
+    QVERIFY(!text.contains(QStringLiteral("white or near-white")));
+}
+
+void PreflightPluginTest::overprintDisclosureText_addsSpecificWarningForWhiteOverprintFinding()
+{
+    const QString text = pdfplugin::preflight::overprintDisclosureText(true);
+    QVERIFY(text.contains(QStringLiteral("does not simulate overprint")));
+    QVERIFY(text.contains(QStringLiteral("white or near-white")));
 }
 
 QTEST_APPLESS_MAIN(PreflightPluginTest)
