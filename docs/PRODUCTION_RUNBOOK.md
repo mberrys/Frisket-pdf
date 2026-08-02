@@ -10,9 +10,10 @@ Operational guide for shipping, monitoring, and supporting **Frisket PDF 1.6.x**
 |----------|----------|----------|------------------|
 | Windows | MSI (signed optional) | `WindowsInstall.yml` | `C:\Program Files\Frisket PDF\` (WiX) |
 | Windows | Portable zip | `ci.yml` | User-chosen |
-| Linux | `.deb` | `ci.yml` → `make-package.sh` | `/usr/bin`, `/usr/lib/pdf4qt` |
 | Linux | AppImage | `LinuxInstall.yml` | User-chosen |
 | Linux | Flatpak | `LinuxFlatpak.yml` | Flathub-style bundle |
+
+**No `.deb` package exists.** No CI workflow builds one (`make-package.sh` referenced by a prior version of this table does not exist in the repo). Linux V1 ships AppImage and Flatpak only.
 
 **V1 slim bundle** (`PDF4QT_FRISKET_DISTRIBUTION=ON`): Editor + PdfTool + core plugins only.
 
@@ -54,9 +55,9 @@ Operational guide for shipping, monitoring, and supporting **Frisket PDF 1.6.x**
 
 ### 2.3 Linux packages
 
-- **`.deb`:** Install on Ubuntu 22.04+ VM; repeat smoke test above.
 - **AppImage:** `chmod +x` and run; verify Fuse if needed.
 - **Flatpak:** Note `--filesystem=host` — document for security-conscious users.
+- **`.deb`:** does not exist. No workflow builds one; do not test or reference it until a real packaging pipeline is built.
 
 ### 2.4 Draft GitHub release
 

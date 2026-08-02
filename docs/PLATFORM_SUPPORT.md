@@ -17,7 +17,7 @@ as a **post-V1** epic; see [macOS (post-V1)](#macos-post-v1).
 | Platform | Status | CI | Official packages |
 |----------|--------|----|-------------------|
 | **Windows** (x64) | Supported | `ci.yml` + `WindowsInstall.yml` | MSI (`WixInstaller/`), portable zip |
-| **Linux** (x64) | Supported | `ci.yml` + `LinuxInstall.yml` / `LinuxFlatpak.yml` | `.deb`, AppImage, Flatpak |
+| **Linux** (x64) | Supported | `ci.yml` + `LinuxInstall.yml` / `LinuxFlatpak.yml` | AppImage, Flatpak. **`.deb` is not built by any workflow — do not claim it as shipped** |
 | **macOS** | **Not supported for V1** — source builds best-effort | None | None |
 
 Unsupported for V1: macOS, iOS, Android, other BSDs. Community builds elsewhere
@@ -33,7 +33,7 @@ are best-effort only and produce no official release artifacts.
 | Platform | Binaries | Plugins (`PDF4QT_PLUGINS_DIR`) | Preflight profiles |
 |----------|----------|--------------------------------|--------------------|
 | Windows | `<prefix>/bin` (beside MSI tree) | `<prefix>/pdfplugins` (relative `../pdfplugins`) | `share/frisket/profiles/` in bundle |
-| Linux | `<prefix>/bin` | `<prefix>/lib/pdf4qt` | `/usr/share/frisket/profiles/` (deb) |
+| Linux | `<prefix>/bin` | `<prefix>/lib/pdf4qt` | `/usr/share/frisket/profiles/` (AppImage internal `usr/` layout; no `.deb` pipeline exists yet) |
 
 Editor must resolve **PdfTool** and **FrisketPreflightPlugin** without a
 developer toolchain on PATH.
@@ -71,7 +71,7 @@ bundling** and **installer packaging** for modules that are already complete.
 | frisket-preflight profiles + schemas | Yes | ☐ | ☐ | Installed at documented path; schema version contract |
 | UnitTests (operator, corpus, PageMaster) | Yes | ☐ | ☐ | `ctest` green on both CI runners |
 | Windows MSI | In review (MIC-301) | ☐ | — | Clean VM smoke; redist; signing |
-| Linux `.deb` / AppImage / Flatpak | Exists | — | ☐ | Smoke; Flatpak `--filesystem=host` documented |
+| Linux AppImage / Flatpak | Exists | — | ☐ | Smoke; Flatpak `--filesystem=host` documented. **No `.deb` pipeline exists** — do not gate on it |
 | Sentry (optional) | Partial | ☐ | ☐ | Opt-in DSN only; DB path; no default PII |
 | OCR sidecar (optional) | Not V1-gated | ☐ | ☐ | Bundled-only guidance; do not block platform gate |
 | OcrPlugin (Editor UI) | **Not shipped in V1 — CLI-only, MIC-343** | ☐ | ☐ | `pdfplugins/OcrPlugin.dll` (or `.so`) must be **absent**. Built with `-DPDF4QT_PLUGIN_OCR=OFF`; `PdfTool ocr` is unaffected and remains available |

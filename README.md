@@ -32,7 +32,7 @@ A desktop PDF toolkit for editing, inspecting, validating, and automating PDF wo
 Use Frisket’s own release artifacts, not upstream PDF4QT packages.
 
 - **Windows (x64):** portable ZIP and MSI packaging are supported.
-- **Linux (x64):** `.deb`, AppImage, and Flatpak packaging are available through the project’s release workflows.
+- **Linux (x64):** AppImage and Flatpak packaging are available through the project’s release workflows. `.deb` is not yet built by any release workflow — do not rely on it until a real packaging pipeline exists.
 - **macOS:** not supported for V1. There is no official package, notarization, or macOS CI coverage.
 
 See [platform support](docs/PLATFORM_SUPPORT.md) for supported configurations, package layouts, and current validation notes.
