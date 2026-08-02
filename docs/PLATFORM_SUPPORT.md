@@ -74,6 +74,7 @@ bundling** and **installer packaging** for modules that are already complete.
 | Linux `.deb` / AppImage / Flatpak | Exists | — | ☐ | Smoke; Flatpak `--filesystem=host` documented |
 | Sentry (optional) | Partial | ☐ | ☐ | Opt-in DSN only; DB path; no default PII |
 | OCR sidecar (optional) | Not V1-gated | ☐ | ☐ | Bundled-only guidance; do not block platform gate |
+| OcrPlugin (Editor UI) | **Not shipped in V1 — CLI-only, MIC-343** | ☐ | ☐ | `pdfplugins/OcrPlugin.dll` (or `.so`) must be **absent**. Built with `-DPDF4QT_PLUGIN_OCR=OFF`; `PdfTool ocr` is unaffected and remains available |
 
 ### Bundling rules (all OS)
 
@@ -82,6 +83,7 @@ bundling** and **installer packaging** for modules that are already complete.
 3. Keep the default bundle C++/Qt only (see `docs/PACKAGING_LICENSING.md`); scan for forbidden Ghostscript / JRE / Python payloads.
 4. Codesign where the platform expects it (Authenticode on Windows).
 5. Document upgrade, uninstall, and binary rollback (no cloud DB).
+6. OCR ships CLI-only in V1 (`PdfTool ocr`); `OcrPlugin` (the Editor UI plugin) must not be present in any release package format. `scripts/smoke-test-install.ps1` fails the scan if it finds one (MIC-343).
 
 ### Smoke test (every installer)
 

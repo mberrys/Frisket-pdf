@@ -1,5 +1,13 @@
 # Frisket OCR sidecar (EasyOCR)
 
+> **Not a supported V1 feature.** V1 ships OCR as CLI-only, advanced / bring-your-own-sidecar
+> (MIC-343): `PdfTool ocr` is present but inert until a sidecar is supplied via
+> `FRISKET_OCR_SIDECAR` or a dev launcher. Neither the Editor `OcrPlugin` UI nor this bundled
+> `FrisketOcrService` sidecar ship in a V1 release package — `PDF4QT_PLUGIN_OCR` and
+> `PDF4QT_BUNDLE_OCR_SERVICE` are both off in release builds. OCR returns as a marketed,
+> supported feature post-V1, after the AI Module. See [MIC-333](https://linear.app/mbx2/issue/MIC-333)
+> for supply-chain guidance if you build and run this sidecar yourself.
+
 Bundled Windows sidecar for read-only OCR. Invoked by `PdfTool ocr` via stdio JSON lines.
 
 ## Dev setup (Python 3.12 venv)
