@@ -215,12 +215,18 @@ $pathParts = @($env:PATH -split ';' | Where-Object {
     return $true
 })
 $savedPath = $env:PATH
+$savedPluginPath = $env:QT_PLUGIN_PATH
+$savedQmlPath = $env:QML2_IMPORT_PATH
 $env:PATH = ($pathParts -join ';')
+Remove-Item Env:QT_PLUGIN_PATH -ErrorAction SilentlyContinue
+Remove-Item Env:QML2_IMPORT_PATH -ErrorAction SilentlyContinue
 try {
     $preflightOutput = & $pdfTool preflight $TestPdf --profile $profilePath --console-format text 2>&1
     $preflightExit = $LASTEXITCODE
 } finally {
     $env:PATH = $savedPath
+    if ($null -ne $savedPluginPath) { $env:QT_PLUGIN_PATH = $savedPluginPath }
+    if ($null -ne $savedQmlPath) { $env:QML2_IMPORT_PATH = $savedQmlPath }
 }
 if ($preflightExit -ne 0 -and $preflightExit -ne 1) {
     throw "PdfTool preflight failed with unexpected exit code $preflightExit`: $preflightOutput"

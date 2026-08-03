@@ -222,6 +222,15 @@ jobs:
           } else {
               Write-Error "WiXUIExtension.dll not found in the expected path."
           }
+
+      - name: Inject missing install DLLs into Product.wxs
+        shell: pwsh
+        run: |
+          # cmake --install stages runtime DLLs that the hand-maintained Product.wxs.in
+          # may omit. Light only packages listed files — close the gap before candle.
+          & "${env:GITHUB_WORKSPACE}\pdf4qt\scripts\Inject-WixMissingDlls.ps1" `
+            -ProductWxs "${env:GITHUB_WORKSPACE}\pdf4qt\build\WixInstaller\Product.wxs" `
+            -InstallBinDir "${env:GITHUB_WORKSPACE}\pdf4qt\build\install\usr\bin"
  
       - name: Create MSI Package
         working-directory: pdf4qt\build\WixInstaller
