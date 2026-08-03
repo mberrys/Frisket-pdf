@@ -70,7 +70,7 @@ bundling** and **installer packaging** for modules that are already complete.
 | Pdf4QtViewer / Diff / LaunchPad | Adjacent | ☐ | ☐ | Build in CI; optional in slim package |
 | frisket-preflight profiles + schemas | Yes | ☐ | ☐ | Installed at documented path; schema version contract |
 | UnitTests (operator, corpus, PageMaster) | Yes | ☐ | ☐ | `ctest` green on both CI runners |
-| Windows MSI | In review (MIC-301) | ☐ | — | Clean VM smoke; redist; signing |
+| Windows MSI | In review (MIC-301) | ☐ | — | Clean VM smoke; redist. **V1 ships unsigned** (MIC-342 / MIC-345) |
 | Linux `.deb` / AppImage / Flatpak | Exists | — | ☐ | Smoke; Flatpak `--filesystem=host` documented |
 | Sentry (optional) | Partial | ☐ | ☐ | Opt-in DSN only; DB path; no default PII |
 | OCR sidecar (optional) | Not V1-gated | ☐ | ☐ | Bundled-only guidance; do not block platform gate |
@@ -80,7 +80,7 @@ bundling** and **installer packaging** for modules that are already complete.
 1. Ship Qt runtime and required Qt plugins (`platforms`, `imageformats`, …) inside the package — do not require a system Qt install.
 2. Co-locate PdfTool, FrisketPreflightPlugin, and `frisket-default.json` per the layout table.
 3. Keep the default bundle C++/Qt only (see `docs/PACKAGING_LICENSING.md`); scan for forbidden Ghostscript / JRE / Python payloads.
-4. Codesign where the platform expects it (Authenticode on Windows).
+4. **V1 ships unsigned** on Windows (no Authenticode). Publish `SHA256SUMS.txt` and disclose SmartScreen (MIC-342). Code signing is post-V1 / paid-distribution (MIC-345) — not a V1 bundling gate.
 5. Document upgrade, uninstall, and binary rollback (no cloud DB).
 
 ### Smoke test (every installer)

@@ -8,7 +8,7 @@ Operational guide for shipping, monitoring, and supporting **Frisket PDF 1.6.x**
 
 | Platform | Artifact | Workflow | Install location |
 |----------|----------|----------|------------------|
-| Windows | MSI (signed optional) | `WindowsInstall.yml` | `C:\Program Files\Frisket PDF\` (WiX) |
+| Windows | MSI (**unsigned for V1**; signing optional post-V1) | `WindowsInstall.yml` | `C:\Program Files\Frisket PDF\` (WiX) |
 | Windows | Portable zip | `ci.yml` | User-chosen |
 | Linux | `.deb` | `ci.yml` → `make-package.sh` | `/usr/bin`, `/usr/lib/pdf4qt` |
 | Linux | AppImage | `LinuxInstall.yml` | User-chosen |

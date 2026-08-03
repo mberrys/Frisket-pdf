@@ -154,7 +154,7 @@ Sources: [QPDF license](https://qpdf.readthedocs.io/en/stable/license.html), [PD
 - [ ] Ensure default installer contains **no** Ghostscript, veraPDF, JRE/JDK, PDFBox, PikePDF, or Python payload
 - [ ] If validator pack ships: pin veraPDF + Temurin as one tested unit; MPL/OpenJDK source information
 - [ ] Run dependency vulnerability and EOL checks; record exceptions
-- [ ] Sign artifacts and publish checksums
+- [ ] Publish checksums (`SHA256SUMS.txt`) with every release artifact. **V1 ships unsigned** — Authenticode / `SIGN_MSI` is post-V1 / paid distribution (MIC-345), not a free-release gate
 - [ ] Counsel approves final manifest before first paid external distribution and after any copyleft/commercial-license change
 
 ## Acceptance criteria (MIC-140)
