@@ -1,13 +1,24 @@
 # V1 release readiness audit
 
-Audit date: **2026-07-23**, revised **2026-07-24**, corrected **2026-07-25**, signing gate struck **2026-08-02**
+Audit date: **2026-07-23**, revised **2026-07-24**, corrected **2026-07-25**, signing gate struck **2026-08-02**, gates 1–4 evidence pass **2026-08-03**
 Product: **Frisket PDF 1.6.0.0** (Qt6 desktop PDF toolkit)
 Scope: operational, security, reliability, data-integrity, compatibility, and release-readiness for first public launch.
 Platforms: **Windows and Linux** (macOS is not a V1 platform — see `docs/PLATFORM_SUPPORT.md`).
 
 ## Executive recommendation
 
-**Not ready — open engineering gates remain (installer smoke, fuzz CI, disclosures). Signing is not among them.**
+**Ready for product-owner sign-off (step 5)** — pending final green workflow URLs below for Windows MSI lifecycle smoke and Linux AppImage smoke. Core gates are implemented; CI evidence is in flight on `master` as of **2026-08-03**.
+
+| Gate | Status | Evidence (2026-08-03) |
+|------|--------|------------------------|
+| `ci.yml` build + `ctest` | **Pass** | [Run 30779926245](https://github.com/mberrys/Frisket-pdf/actions/runs/30779926245) on `70481e3d` (PR #61 merge) |
+| Fuzz on `master` (MIC-326) | **In flight** | [Run 30783904748](https://github.com/mberrys/Frisket-pdf/actions/runs/30783904748) dispatched 2026-08-03 |
+| Windows MSI smoke (MIC-301 / MIC-327) | **In flight** | [Run 30785973248](https://github.com/mberrys/Frisket-pdf/actions/runs/30785973248) dispatched after smoke-script exit-code fix (`247a3ce9`) |
+| Linux AppImage smoke (MIC-301) | **In flight** | [Run 30785795336](https://github.com/mberrys/Frisket-pdf/actions/runs/30785795336) with `scripts/smoke-test-appimage.sh` |
+| Overprint disclosure (MIC-330) | **Pass** | `overprintDisclosureText()` always shown; README + runbook R-002; `tst_preflightplugintest.cpp` |
+| Unsigned installer disclosure (MIC-342) | **Pass** | README Install section + runbook R-016 + `SHA256SUMS.txt` via `CreateReleaseDraft.yml` |
+
+If any in-flight run above fails, this recommendation reverts to **Not ready** until the listed blocker is fixed and re-run.
 
 **V1 / 1.0 ships unsigned** (reaffirmed 2026-08-02). Authenticode / DigiCert / `SIGN_MSI` are post-V1 / paid only ([MIC-345](https://linear.app/mbx2/issue/MIC-345)).
 
@@ -40,8 +51,8 @@ status must be re-derived rather than inherited from this document.
 | ID | Risk | Status | Linear | Mitigation required |
 |----|------|--------|--------|---------------------|
 | ~~R-000~~ | ~~Preflight report schema contract broken on `master`~~ | **Struck 2026-07-25** | — | Not a defect. Engine and validator are both at schema 3 on `master` |
-| **R-003** | Fuzz CI has not run since `fuzz.yml` broke | **Blocking** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Duplicate top-level `permissions:` key made the workflow invalid; every run failed at 0s. Fixed in this change — **requires one green run as evidence** |
-| **R-001** | MIC-301 — installer / clean-machine validation still In Review | **Open** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Run `scripts/Invoke-MsiSmokeTest.ps1` on a clean VM against an MSI from `WindowsInstall.yml`. **Now also covers Linux AppImage** clean-machine smoke, which had no gate at all. **`.deb` is built by `ci.yml` but confirmed broken** (missing Qt runtime, glibc mismatch — verified 2026-08-02 on a clean Ubuntu 22.04 container) and is not attached to releases, so it is out of scope for this gate until fixed |
+| **R-003** | Fuzz CI has not run since `fuzz.yml` broke | **In flight — evidence pending** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Duplicate `permissions:` fixed on `master`. [Run 30783904748](https://github.com/mberrys/Frisket-pdf/actions/runs/30783904748) dispatched 2026-08-03 — close MIC-326 when green |
+| **R-001** | MIC-301 — installer / clean-machine validation | **In flight — evidence pending** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Windows: `Invoke-MsiSmokeTest.ps1` in `WindowsInstall.yml` ([Run 30785973248](https://github.com/mberrys/Frisket-pdf/actions/runs/30785973248)). Linux: `smoke-test-appimage.sh` in `LinuxInstall.yml` ([Run 30785795336](https://github.com/mberrys/Frisket-pdf/actions/runs/30785795336)). `.deb` remains out of scope (broken; not on releases) |
 | ~~R-016~~ | ~~V1 MSI ships unsigned; no certificate held~~ | **Not a V1 gate — reaffirmed 2026-08-02** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) disclosure · [MIC-345](https://linear.app/mbx2/issue/MIC-345) procurement (post-V1) | **Ship unsigned for 1.0.** Signing never blocks launch. Disclosure (SmartScreen + `SHA256SUMS.txt`) is a marketing/docs obligation in **V1 release documentation**, not an engineering gate. Procurement stays in **Commercial / paid distribution (post-V1)** |
 | **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted — mitigation complete** | [MIC-330](https://linear.app/mbx2/issue/MIC-330) | Documented limitation + in-app disclosure. **Trigger corrected:** the report panel now shows the general "page view does not simulate overprint" notice unconditionally once a report is loaded, with an additional specific warning appended only when a `white-overprint` finding is present — see §3. Deferral of MIC-320 is now recorded in Linear (project description + MIC-306), not only here |
 | ~~R-015~~ | ~~macOS declared supported without CI, packaging or notarization~~ | **Resolved** | [MIC-336](https://linear.app/mbx2/issue/MIC-336) | macOS restated as post-V1; V1 ships Windows + Linux. MIC-336 reopened — it had been closed Done with its acceptance unmet |
@@ -159,9 +170,9 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A9 | Manifest/PDF consistency | Roll back output if manifest persist fails | **Pass** (this audit) | `pdfpagemasterexport.cpp` fix |
 | A10 | Sentry privacy | No default PII | **Pass, scope corrected** | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used. That covers SDK-attached identifiers **only** — crashpad minidumps can still contain PDF content and paths, and no SDK hook can scrub them. The former "no PDF content by design" claim was unenforced by any code; it is now stated as a disclosed property of opting in (R-008) |
 | A0 | Preflight report contract | Engine schema version accepted by plugin validator | **Pass** (corrected 2026-07-25) | Both at 3: `preflightengine.h:42`, `preflightsidecarutils.h:38` (`isSupportedSchemaVersion` accepts 1–3). Fix `c515bfa3` merged in `ba428f1b` |
-| A11 | CI build | Ubuntu + Windows compile + test | **Re-derive** | Previously "Fail — all downstream of A0." A0 is not a defect, so that attribution is void. Read current status from Actions on `master`; do not inherit this row |
-| A12 | Installer | Clean-machine install (**Windows + Linux**) | **Fail / open** | MIC-301 In Review; harness at `scripts/Invoke-MsiSmokeTest.ps1`, clean-VM run outstanding. Linux AppImage smoke added to MIC-301 on 2026-07-25 — previously ungated. `.deb` **is** built (by `ci.yml`, not by `CreateReleaseDraft.yml`, which only downloads/attaches `LinuxInstall.yml` (AppImage) and `WindowsInstall.yml` (MSI) artifacts — Flatpak isn't attached either) but is confirmed non-functional on a clean machine (missing Qt runtime, glibc mismatch) — verified 2026-08-02, not previously tested by anyone before this |
-| A13 | Overprint rendering | Correct overprint compositing in standard page view | **Deferred — mitigation incomplete** | MIC-320 deferred post-V1; detection (MIC-319) ships. In-app disclosure exists but triggers only on `white-overprint` findings (`preflightreportdockwidget.cpp:172`) while the limitation covers all overprint — MIC-330. README limitation text still missing |
+| A11 | CI build | Ubuntu + Windows compile + test | **Pass** | [Run 30779926245](https://github.com/mberrys/Frisket-pdf/actions/runs/30779926245) — Ubuntu + Windows `ctest` including `UnitTestsPreflightCorpus` (PR #61) |
+| A12 | Installer | Clean-machine install (**Windows + Linux**) | **In flight** | Windows: `Invoke-MsiSmokeTest.ps1` wired in `WindowsInstall.yml` — [Run 30785973248](https://github.com/mberrys/Frisket-pdf/actions/runs/30785973248). Linux: `scripts/smoke-test-appimage.sh` wired in `LinuxInstall.yml` — [Run 30785795336](https://github.com/mberrys/Frisket-pdf/actions/runs/30785795336). `.deb` built by `ci.yml` but non-functional — not a release artifact |
+| A13 | Overprint rendering | Correct overprint compositing in standard page view | **Deferred — mitigation complete** | MIC-320 deferred post-V1. `overprintDisclosureText()` always shown once a report loads; additional white-overprint warning when finding present (MIC-330). README + runbook R-002 published |
 | A14 | Packaging SBOM / license evidence | MIC-140 checklist complete | **Partial — gates paid distribution, not V1** | Notices generator now resolves versions + license text; artifact SBOM and counsel sign-off outstanding |
 | A15 | macOS build | Supported platform | **N/A** | Not a V1 platform; no CI, no package, no notarization |
 | A21 | Bundle policy enforcement | No Ghostscript / JRE / Python in default bundle | **Pass** (this revision) | Enforced by `scripts/smoke-test-install.ps1`, wired into `WindowsInstall.yml` |
@@ -170,7 +181,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A17 | CSP / CORS / cookies | Web security headers | **N/A** | No web app |
 | A18 | Browser compatibility | Supported browsers | **N/A** | No embedded browser |
 | A19 | OCR product gate | Required for V1 | **N/A — CLI-only** (decided 2026-07-25) | OCR is merged to `master` but V1 ships **CLI-only**: `PdfTool ocr` present; `OcrPlugin.dll` and the bundled sidecar service excluded. `PdfTool ocr` is inert without a user-supplied sidecar. **Enforced (MIC-343):** `OcrPlugin` is gated behind `-DPDF4QT_PLUGIN_OCR` (default ON for dev builds, explicitly `OFF` in `WindowsInstall.yml`/`LinuxInstall.yml`/the Flatpak manifest); the WIX component that had unconditionally bundled `OcrPlugin.dll` into the MSI is now gated the same way. `PDF4QT_BUNDLE_OCR_SERVICE` defaults `OFF`. `scripts/smoke-test-install.ps1` fails the scan if `OcrPlugin.dll` is found in an installed tree, closing the drift the plugin/service inclusion previously had no assertion against |
-| A20 | Fuzz regression | Weekly fuzz CI | **Fail — fixed here, unproven** | `fuzz.yml` had two top-level `permissions:` keys (lines 3 and 18, from CodeQL autofix `31a4444d`), making the workflow invalid. Every run failed at 0s. Previously recorded as "Pass" while nothing ran. Duplicate removed in this change; **flip to Pass only after one green run** — MIC-326 |
+| A20 | Fuzz regression | Weekly fuzz CI | **In flight** | `fuzz.yml` fixed (single `permissions:`). [Run 30783904748](https://github.com/mberrys/Frisket-pdf/actions/runs/30783904748) dispatched on `master` 2026-08-03 — flip to Pass when green (MIC-326) |
 | A23 | Manifest rollback coverage | Failure path is tested, not just implemented | **Fail** (this revision) | `pdfpagemasterexport.cpp:590-592` removes the PDF when manifest persist fails, but no test forces that failure. R-007's stated verification cites success-path tests only — MIC-335 |
 
 ---
@@ -223,7 +234,18 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 ## 4. Implemented changes (this audit)
 
-### 2026-07-25 corrections
+### 2026-08-03 gates 1–4 evidence pass
+
+| Change | File | Rationale |
+|--------|------|-----------|
+| Add AppImage smoke harness | `scripts/smoke-test-appimage.sh` | MIC-301 Linux half had no install gate |
+| Wire AppImage smoke into CI | `.github/workflows/LinuxInstall.yml` | Run smoke after pack; unsigned by default (`SIGN_APPIMAGE` optional) |
+| Pin tool checksums | `.github/workflows/LinuxInstall.yml` | `APPIMAGETOOL_SHA256` / `LINUXDEPLOYQT_SHA256` repo vars were unset |
+| Fix smoke script exit codes | `scripts/smoke-test-install.ps1`, `scripts/Invoke-MsiSmokeTest.ps1` | PdfTool preflight exit 1 (findings) was failing CI despite passing checks |
+| Unsigned + SmartScreen disclosure | `README.md` | MIC-342 |
+| Refresh pre-launch checklist | `docs/PRODUCTION_RUNBOOK.md` | Remove stale PR #54 blocker; add workflow evidence rows |
+| Owner sign-off package | this file §8 | Step-5 review surface |
+
 
 | Change | File | Rationale |
 |--------|------|-----------|
@@ -283,3 +305,17 @@ Local equivalents are covered above (PDF passwords, attachment sanitization, ato
 - `docs/attachment-path-audit.md` — MIC-303
 - `SECURITY.md` — disclosure policy
 - `docs/PRODUCTION_RUNBOOK.md` — deploy, rollback, support
+
+---
+
+## 8. Owner review checklist (step 5)
+
+Product owner: review this document and [`docs/PRODUCTION_RUNBOOK.md`](PRODUCTION_RUNBOOK.md) §10 before approving `CreateReleaseDraft.yml`.
+
+- [ ] Confirm the three in-flight workflow runs linked in the executive table are **green** (Windows MSI, Linux AppImage, fuzz)
+- [ ] Confirm README Install section matches your SmartScreen guidance (MIC-342)
+- [ ] Confirm release notes will state: unsigned installer, no page-view overprint simulation, Windows + Linux only
+- [ ] Confirm you accept known limitations in runbook §9 (overprint, unsigned MSI, Flatpak `--filesystem=host`, mirror bleed seams)
+- [ ] Sign off here and in Linear: MIC-301, MIC-326, MIC-327, MIC-330, MIC-342
+
+**After sign-off (step 6, out of scope for this pass):** dispatch `CreateReleaseDraft.yml` on the release SHA, publish `v1.6.0.0`, attach MSI + AppImage + `SHA256SUMS.txt`.
