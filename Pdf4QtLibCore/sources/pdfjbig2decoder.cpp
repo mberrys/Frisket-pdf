@@ -26,6 +26,9 @@
 #include "pdfglobal.h"
 #include "pdfdbgheap.h"
 
+#include <algorithm>
+#include <limits>
+
 namespace pdf
 {
 
@@ -47,6 +50,15 @@ constexpr int64_t JBIG2_MAX_BITMAP_PIXELS = JBIG2_MAX_BITMAP_DIMENSION * JBIG2_M
 // staying far below a DoS-sized cumulative allocation.
 constexpr int64_t JBIG2_MAX_TOTAL_BITMAP_PIXELS = 512LL * 1024 * 1024;
 
+// Compositing pixels into an already-allocated bitmap allocates nothing, so it is
+// invisible to the allocation budget above - but it is not free, and the number of
+// composition operations is driven by stream values with no inherent bound
+// (SBNUMINSTANCES for text regions, the grid dimensions for halftone regions). A
+// budget of the same order as the allocation budget keeps a legitimate page - whose
+// composited area is bounded by its own size, times a small constant for overlap -
+// comfortably inside, while capping a crafted stream at a fraction of a second of work.
+constexpr int64_t JBIG2_MAX_TOTAL_COMPOSITION_PIXELS = 1024LL * 1024 * 1024;
+
 // Custom Huffman code tables (7.4.3) store an 8-bit-derived range-length
 // field per entry with no inherent bound, and a real table has at most a
 // few dozen entries. Cap it generously to stop a crafted table with a
@@ -55,6 +67,21 @@ constexpr size_t JBIG2_MAX_HUFFMAN_TABLE_ENTRIES = 65536;
 
 namespace
 {
+
+/// Returns the value if it fits into int32_t, otherwise returns no value. Huffman-decoded
+/// integers combine a table base value with a range value read straight from the stream,
+/// and a crafted table/stream pair can push the result outside the 32-bit range. Such a
+/// value is meaningless, so it is reported as "no value" (handled by the callers exactly
+/// like an out-of-band code) instead of being computed with signed overflow.
+std::optional<int32_t> checkHuffmanRange(int64_t value)
+{
+    if (value < std::numeric_limits<int32_t>::min() || value > std::numeric_limits<int32_t>::max())
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<int32_t>(value);
+}
 
 void checkJBIG2BitmapDimensions(int width, int height)
 {
@@ -2517,6 +2544,12 @@ void PDFJBIG2Decoder::processHalftoneRegion(const PDFJBIG2SegmentHeader& header)
     }
 
     /* 6.6 step 5) - 6.6.5.2 render the grid */
+
+    // One pattern is painted per grid cell. The grid dimensions and the pattern size are
+    // independent stream values, so the product can be far larger than any bitmap that
+    // was actually allocated.
+    accountCompositionPixels(int64_t(HGW) * int64_t(HGH) * int64_t(HPW) * int64_t(HPH));
+
     for (int MG = 0; MG < static_cast<int>(HGH); ++MG)
     {
         for (int NG = 0; NG < static_cast<int>(HGW); ++NG)
@@ -2963,6 +2996,16 @@ void PDFJBIG2Decoder::accountBitmapPixels(int64_t width, int64_t height)
     if (m_totalBitmapPixelsDecoded > JBIG2_MAX_TOTAL_BITMAP_PIXELS)
     {
         throw PDFException(PDFTranslationContext::tr("JBIG2 stream exceeds the maximum total decoded bitmap size."));
+    }
+}
+
+void PDFJBIG2Decoder::accountCompositionPixels(int64_t pixels)
+{
+    m_totalCompositionPixels += std::max<int64_t>(1, pixels);
+
+    if (m_totalCompositionPixels > JBIG2_MAX_TOTAL_COMPOSITION_PIXELS)
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 stream exceeds the maximum total composition work."));
     }
 }
 
@@ -3521,6 +3564,11 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::readTextBitmap(PDFJBIG2TextRegionDecodingParamet
             const int32_t WI = IB.getWidth();
             const int32_t HI = IB.getHeight();
 
+            // SBNUMINSTANCES is a 32-bit stream value, so this loop can be asked to
+            // composite billions of symbol instances from a few bytes of input. Charge
+            // every instance against the composition budget to bound the total work.
+            accountCompositionPixels(int64_t(WI) * int64_t(HI));
+
             /* 6.4.5. step 3) vi) */
             if (parameters.TRANSPOSED == 0 && (parameters.REFCORNER == PDFJBIG2TextRegionDecodingParameters::TOPRIGHT ||
                                                parameters.REFCORNER == PDFJBIG2TextRegionDecodingParameters::BOTTOMRIGHT))
@@ -4057,7 +4105,9 @@ std::optional<int32_t> PDFJBIG2HuffmanDecoder::readSignedInteger()
             }
             else if (it->isLowValue())
             {
-                return it->value - int32_t(m_reader->read(32));
+                // The range value is attacker-controlled, so the sum/difference is computed
+                // in 64 bits and range-checked - it can easily fall outside int32_t.
+                return checkHuffmanRange(int64_t(it->value) - int64_t(m_reader->read(32)));
             }
             else if (it->rangeBitLength == 0)
             {
@@ -4065,7 +4115,7 @@ std::optional<int32_t> PDFJBIG2HuffmanDecoder::readSignedInteger()
             }
             else
             {
-                return it->value + int32_t(m_reader->read(it->rangeBitLength));
+                return checkHuffmanRange(int64_t(it->value) + int64_t(m_reader->read(it->rangeBitLength)));
             }
         }
     }

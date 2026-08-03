@@ -478,6 +478,15 @@ private:
     /// decompression bomb in aggregate.
     void accountBitmapPixels(int64_t width, int64_t height);
 
+    /// Adds \p pixels to the number of pixels composited into already-allocated
+    /// bitmaps, and throws if the cumulative total exceeds the composition budget.
+    /// Composition is not accounted for by accountBitmapPixels, because it allocates
+    /// nothing: a text region can be asked to paint SBNUMINSTANCES (a 32-bit stream
+    /// value) symbols, and a halftone region to paint one pattern per grid cell, both
+    /// from a handful of input bytes. Each call charges at least one pixel, so the
+    /// budget also bounds the per-instance decode work of zero-sized bitmaps.
+    void accountCompositionPixels(int64_t pixels);
+
     /// Processes current data stream (reads all data from the stream, interprets
     /// them as segments and processes the segments).
     void processStream();
@@ -543,6 +552,7 @@ private:
     bool m_pageSizeUndefined;
     PDFJBIG2Bitmap m_pageBitmap;
     int64_t m_totalBitmapPixelsDecoded = 0;
+    int64_t m_totalCompositionPixels = 0;
 };
 
 }   // namespace pdf
