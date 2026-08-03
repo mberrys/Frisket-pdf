@@ -33,47 +33,6 @@ jobs:
           chmod +x appimagetool-x86_64.AppImage
           sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
-      - name: Prepare GPG home
-        run: |
-          rm -rf "$GNUPGHOME"
-          install -d -m 700 "$GNUPGHOME"
-          
-      - name: Configure GPG
-        run: |
-          echo "use-agent" >> "$GNUPGHOME/gpg.conf"
-          echo "pinentry-mode loopback" >> "$GNUPGHOME/gpg.conf"
-          echo "allow-loopback-pinentry" >> "$GNUPGHOME/gpg-agent.conf"
-          echo "allow-preset-passphrase" >> "$GNUPGHOME/gpg-agent.conf"
-          gpgconf --kill gpg-agent
-          echo "GPG configuration complete."
-        env:
-          GNUPGHOME: ${{ env.GNUPGHOME }}
-
-      - name: Import PGP private key
-        run: |
-          echo "${{ secrets.PGP_PRIVATE_KEY }}" | gpg --batch --import
-          for keygrip in $(gpg --list-secret-keys --with-keygrip "${{ secrets.PGP_KEY_ID }}" | grep Keygrip | awk '{print $3}'); do
-            echo "${{ secrets.PGP_PASSPHRASE }}" | "$(gpgconf --list-dirs libexecdir)/gpg-preset-passphrase" --preset "$keygrip"
-          done
-        env:
-          GNUPGHOME: ${{ env.GNUPGHOME }}
-          
-      - name: Create Test signature
-        run: |
-          echo "TEST" >> ~/test_with_passphrase.txt
-          echo "TEST" >> ~/test_without_passphrase.txt
-          gpg --batch --yes --verbose --passphrase "${{ secrets.PGP_PASSPHRASE }}" --pinentry-mode loopback --detach-sign --local-user "${{ secrets.PGP_KEY_ID }}" --output ~/test_with_passphrase.txt.sig ~/test_with_passphrase.txt
-          gpg --batch --yes --verbose --pinentry-mode loopback --detach-sign --local-user "${{ secrets.PGP_KEY_ID }}" --output ~/test_without_passphrase.txt.sig ~/test_without_passphrase.txt
-        env:
-          GNUPGHOME: ${{ env.GNUPGHOME }}
-
-      - name: Verify Test signature
-        run: |
-          gpg --batch --yes --verbose --verify ~/test_with_passphrase.txt.sig ~/test_with_passphrase.txt
-          gpg --batch --yes --verbose --verify ~/test_without_passphrase.txt.sig ~/test_without_passphrase.txt
-        env:
-          GNUPGHOME: ${{ env.GNUPGHOME }}
-          
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
@@ -142,7 +101,31 @@ jobs:
           chmod +x deploy.AppImage
           ./deploy.AppImage install/usr/share/applications/io.github.mberrys.Frisket-pdf.desktop -executable-dir=install/usr/bin -extra-plugins=iconengines,imageformats,texttospeech
           
+      - name: Prepare GPG home
+        if: vars.SIGN_APPIMAGE == 'true'
+        run: |
+          rm -rf "$GNUPGHOME"
+          install -d -m 700 "$GNUPGHOME"
+          echo "use-agent" >> "$GNUPGHOME/gpg.conf"
+          echo "pinentry-mode loopback" >> "$GNUPGHOME/gpg.conf"
+          echo "allow-loopback-pinentry" >> "$GNUPGHOME/gpg-agent.conf"
+          echo "allow-preset-passphrase" >> "$GNUPGHOME/gpg-agent.conf"
+          gpgconf --kill gpg-agent
+          echo "${{ secrets.PGP_PRIVATE_KEY }}" | gpg --batch --import
+          for keygrip in $(gpg --list-secret-keys --with-keygrip "${{ secrets.PGP_KEY_ID }}" | grep Keygrip | awk '{print $3}'); do
+            echo "${{ secrets.PGP_PASSPHRASE }}" | "$(gpgconf --list-dirs libexecdir)/gpg-preset-passphrase" --preset "$keygrip"
+          done
+        env:
+          GNUPGHOME: ${{ env.GNUPGHOME }}
+
+      - name: Pack AppImage (unsigned — V1 default)
+        if: vars.SIGN_APPIMAGE != 'true'
+        working-directory: pdf4qt/build
+        run: |
+          appimagetool -u "${{ env.appimage_update_info }}" install/ ${{ env.appimagefilename }}
+
       - name: Sign and Repack AppImage
+        if: vars.SIGN_APPIMAGE == 'true'
         working-directory: pdf4qt/build
         run: |
           appimagetool -u "${{ env.appimage_update_info }}" -s --sign-key "${{ secrets.PGP_KEY_ID }}" install/ ${{ env.appimagefilename }}
@@ -150,12 +133,14 @@ jobs:
           GNUPGHOME: ${{ env.GNUPGHOME }}
           
       - name: Manual signature
+        if: vars.SIGN_APPIMAGE == 'true'
         run: |
           gpg --batch --yes --verbose --pinentry-mode loopback --detach-sign --passphrase "${{ secrets.PGP_PASSPHRASE }}" --local-user "${{ secrets.PGP_KEY_ID }}" --output pdf4qt/build/${{ env.appimagefilename }}.sig pdf4qt/build/${{ env.appimagefilename }}
         env:
           GNUPGHOME: ${{ env.GNUPGHOME }}
 
       - name: Verify AppImage Detached Signature
+        if: vars.SIGN_APPIMAGE == 'true'
         run: |
           echo "${{ secrets.PGP_PUBLIC_KEY }}" | gpg --batch --import
           gpg --verify pdf4qt/build/${{ env.appimagefilename }}.sig pdf4qt/build/${{ env.appimagefilename }}
@@ -179,6 +164,7 @@ jobs:
           compression-level: 0
           
       - name: Upload AppImage Signature File
+        if: vars.SIGN_APPIMAGE == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: ${{ env.appimagefilename }}.sig
@@ -197,6 +183,7 @@ jobs:
           compression-level: 0
 
       - name: Cleanup GPG home
+        if: always() && vars.SIGN_APPIMAGE == 'true'
         run: |
           rm -rf "$GNUPGHOME"
         env:
