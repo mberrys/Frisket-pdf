@@ -126,3 +126,4 @@ fi
 echo "OK: no Ghostscript / JRE / Python payload in the default bundle"
 
 echo "AppImage smoke test passed."
+exit 0
