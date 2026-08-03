@@ -1,14 +1,15 @@
 # V1 release readiness audit
 
-Audit date: **2026-07-23**, revised **2026-07-24**, corrected **2026-07-25**
+Audit date: **2026-07-23**, revised **2026-07-24**, corrected **2026-07-25**, signing gate struck **2026-08-02**
 Product: **Frisket PDF 1.6.0.0** (Qt6 desktop PDF toolkit)
 Scope: operational, security, reliability, data-integrity, compatibility, and release-readiness for first public launch.
 Platforms: **Windows and Linux** (macOS is not a V1 platform — see `docs/PLATFORM_SUPPORT.md`).
 
 ## Executive recommendation
 
-**Not ready — three open gates, one of them a broken security control. The previously
-reported launch-blocking defect (R-000) is resolved.**
+**Not ready — open engineering gates remain (installer smoke, fuzz CI, disclosures). Signing is not among them.**
+
+**V1 / 1.0 ships unsigned** (reaffirmed 2026-08-02). Authenticode / DigiCert / `SIGN_MSI` are post-V1 / paid only ([MIC-345](https://linear.app/mbx2/issue/MIC-345)).
 
 The 2026-07-23 revision concluded "ready with explicit risks." The 2026-07-24 revision
 concluded "not ready — one launch-blocking defect." **Both were wrong.** This revision
@@ -41,7 +42,7 @@ status must be re-derived rather than inherited from this document.
 | ~~R-000~~ | ~~Preflight report schema contract broken on `master`~~ | **Struck 2026-07-25** | — | Not a defect. Engine and validator are both at schema 3 on `master` |
 | **R-003** | Fuzz CI has not run since `fuzz.yml` broke | **Blocking** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Duplicate top-level `permissions:` key made the workflow invalid; every run failed at 0s. Fixed in this change — **requires one green run as evidence** |
 | **R-001** | MIC-301 — installer / clean-machine validation still In Review | **Open** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Run `scripts/Invoke-MsiSmokeTest.ps1` on a clean VM against an MSI from `WindowsInstall.yml`. **Now also covers Linux AppImage** clean-machine smoke, which had no gate at all. **`.deb` is built by `ci.yml` but confirmed broken** (missing Qt runtime, glibc mismatch — verified 2026-08-02 on a clean Ubuntu 22.04 container) and is not attached to releases, so it is out of scope for this gate until fixed |
-| **R-016** | V1 MSI ships unsigned; no certificate held | **Decided 2026-07-25 — ship unsigned** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) disclosure · [MIC-345](https://linear.app/mbx2/issue/MIC-345) procurement | Was the only risk in this register with no Linear issue. Blocking on a 1–3 week procurement would have slipped Aug 8. **Remaining obligation:** disclose the SmartScreen prompt in README, release notes, and runbook, and point users at `SHA256SUMS.txt` for integrity |
+| ~~R-016~~ | ~~V1 MSI ships unsigned; no certificate held~~ | **Not a V1 gate — reaffirmed 2026-08-02** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) disclosure · [MIC-345](https://linear.app/mbx2/issue/MIC-345) procurement (post-V1) | **Ship unsigned for 1.0.** Signing never blocks launch. Disclosure (SmartScreen + `SHA256SUMS.txt`) is a marketing/docs obligation in **V1 release documentation**, not an engineering gate. Procurement stays in **Commercial / paid distribution (post-V1)** |
 | **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted — mitigation complete** | [MIC-330](https://linear.app/mbx2/issue/MIC-330) | Documented limitation + in-app disclosure. **Trigger corrected:** the report panel now shows the general "page view does not simulate overprint" notice unconditionally once a report is loaded, with an additional specific warning appended only when a `white-overprint` finding is present — see §3. Deferral of MIC-320 is now recorded in Linear (project description + MIC-306), not only here |
 | ~~R-015~~ | ~~macOS declared supported without CI, packaging or notarization~~ | **Resolved** | [MIC-336](https://linear.app/mbx2/issue/MIC-336) | macOS restated as post-V1; V1 ships Windows + Linux. MIC-336 reopened — it had been closed Done with its acceptance unmet |
 
@@ -57,7 +58,7 @@ document cannot drift from it again.
 | Question | Decision |
 |----------|----------|
 | Overprint-correct rendering a V1 gate? | **No** — deferred post-V1 (MIC-320). V1 ships detection + disclosure, no overprint-safe claim |
-| Sign the Windows installer? | **No** — V1 ships unsigned; procurement in parallel (MIC-345) |
+| Sign the Windows installer? | **No** — V1 / 1.0 ships unsigned (reaffirmed 2026-08-02). Procurement is post-V1 (MIC-345). Signing is **not** a launch blocker |
 | Linux a V1 platform? | **Yes** — Windows and Linux both ship V1. macOS post-V1 |
 | OCR in V1? | **CLI-only** — `PdfTool ocr` only; no `OcrPlugin`, no bundled sidecar service (MIC-343) |
 | V1 free or paid? | **Free public release** — licensing checklist gates first paid distribution |
@@ -182,7 +183,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
-| **R-001** | Cannot ship Windows installer confidently | All Windows users | Fresh VM without MSVC/Qt; install MSI | Installer pipeline not fully signed off (MIC-301) | Complete MSI smoke test; code-sign if `SIGN_MSI` enabled | Install → launch Editor → run preflight on sample PDF | Release |
+| **R-001** | Cannot ship Windows installer confidently | All Windows users | Fresh VM without MSVC/Qt; install MSI | Installer pipeline not fully signed off (MIC-301) | Complete MSI smoke test on clean VM. **Do not block on signing** — V1 ships unsigned (MIC-342 / MIC-345) | Install → launch Editor → run preflight on sample PDF | Release |
 | **R-002** | Page view does not simulate overprint | Print/prepress shops proofing overprint work | Open an overprint fixture; compare page view against Output Preview | Overprint is implemented in `pdftransparencyrenderer.cpp` (Output Preview) but absent from the standard QPainter path in `pdfpainter.cpp`; that renderer is RGB and overprint is a subtractive CMYK model, so correct handling there is an XL change (MIC-320) | **Accepted for V1:** documented limitation + in-app disclosure — the preflight report panel now always tells the operator to use Output Preview once a report is loaded (not only when a `white-overprint` finding is present), with an additional specific warning for the unsafe white/near-white case. README documents the general limitation. No "overprint-safe output" claim in marketing | Run preflight on any PDF; confirm the general panel note always appears. Run on `white-overprint-form.pdf`; confirm the additional specific warning also appears; proof via Output Preview | Product |
 
 ### High
@@ -211,7 +212,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 | **R-012** | Mirror bleed seams on high-contrast art | MIC-339 (Done) | Known V1 limitation (`docs/bleed-stress-test-results.md`, `PRODUCTION_RUNBOOK.md:233`). Operators can switch to pixel-repeat/stretch (MIC-122) |
 | **R-013** | Only `add-bleed` fixup in plugin UI | MIC-338 | Other fixups filtered by design. Not yet stated in user-facing docs |
 | **R-014** | No macOS CI | MIC-336 | macOS is not a V1 platform; source builds are best-effort (`docs/PLATFORM_SUPPORT.md`). **ID note:** MIC-336 previously reused R-014 to mean "add macOS support, High" — the inverse of this row. R-IDs are now immutable; that override has been removed |
-| **R-016** | V1 MSI ships unsigned | **MIC-342** | **Escalated to a launch gate 2026-07-25 — see §Executive recommendation.** No code-signing certificate held; Windows users see SmartScreen on first install. DigiCert procurement is a parallel track with 1–3 week lead time, which likely makes this the schedule-determining item for an Aug 8 target. Had no Linear issue until 2026-07-25 — the 2026-07-23 risk wave filed R-001…R-014 and skipped it |
+| **R-016** | V1 MSI ships unsigned | **MIC-342** (docs) · **MIC-345** (post-V1) | **Not a launch gate — reaffirmed 2026-08-02.** V1 / 1.0 ships unsigned by design (normal for solo/OSS GitHub Releases). SmartScreen disclosure + `SHA256SUMS.txt` remain (MIC-342). Certificate procurement is commercial/post-V1 only (MIC-345). Earlier “escalated to launch gate” wording in this register was incorrect and is struck |
 
 > **Register hygiene (added 2026-07-25).** Risk IDs are immutable once assigned: a given
 > R-number means one thing permanently. Every row above must carry its Linear issue ID, and

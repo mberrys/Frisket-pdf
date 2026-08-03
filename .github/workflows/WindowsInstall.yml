@@ -13,6 +13,7 @@ jobs:
     runs-on: windows-2022
     env:
       VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
+      QT_QPA_PLATFORM: offscreen
 
     steps:
       - name: Checkout repository
@@ -133,6 +134,9 @@ jobs:
           modules: 'qtspeech qtmultimedia qtimageformats'
           cache: 'true'
           cache-key-prefix: ${{ runner.os }}-qt-6111
+          # aqtinstall 3.3.0 cannot resolve Qt 6.11+ Windows repo layout (miurahr/aqtinstall#1007).
+          # Pin PR #1000 merge until aqtinstall >3.3.0 ships with that fix.
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b
           
 
       - name: Find VC Redistributable Directories
@@ -166,6 +170,7 @@ jobs:
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_VCPKG_BUILD_TYPE=Release -DPDF4QT_INSTALL_QT_DEPENDENCIES=ON -DPDF4QT_INSTALL_DEPENDENCIES=ON -DCMAKE_TOOLCHAIN_FILE="${env:GITHUB_WORKSPACE}\vcpkg\scripts\buildsystems\vcpkg.cmake" -DPDF4QT_QT_ROOT="${env:Qt6_DIR}" -DPDF4QT_INSTALL_MSVC_REDISTRIBUTABLE=ON -DPDF4QT_INSTALL_PREPARE_WIX_INSTALLER=ON -DPDF4QT_INSTALL_TO_USR=ON -DPDF4QT_PLUGIN_OCR=OFF -DPDF4QT_BUNDLE_OCR_SERVICE=OFF
           cmake --build build --target release_translations --config Release -j6
           cmake --build build --config Release -j6
+          ctest --test-dir build -C Release --output-on-failure
           cmake --install build --config Release
         env:
           VCToolsRedistDir: ${{ env.VCToolsRedistDir }}
@@ -230,6 +235,18 @@ jobs:
         run: |
           signtool.exe sign /sha1 ${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }} /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 "${{ github.workspace }}\pdf4qt\build\install\${{ env.msipackagefilename }}"        
           signtool.exe verify /v /pa "${{ github.workspace }}\pdf4qt\build\install\${{ env.msipackagefilename }}"
+
+      - name: Run MSI lifecycle smoke test
+        shell: pwsh
+        run: |
+          # WiX is invoked with -arch x86, so INSTALLFOLDER resolves under ProgramFilesX86.
+          # Editor launch is skipped: no interactive desktop on the runner.
+          $msiPath = Join-Path $env:GITHUB_WORKSPACE "pdf4qt\build\install\${{ env.msipackagefilename }}"
+          $installDir = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'PDF4QT'
+          & "${env:GITHUB_WORKSPACE}\pdf4qt\scripts\Invoke-MsiSmokeTest.ps1" `
+            -MsiPath $msiPath `
+            -InstallDir $installDir `
+            -SkipEditorLaunch
 
       - name: Create MSIX Package
         run: |
