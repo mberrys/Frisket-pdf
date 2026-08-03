@@ -238,15 +238,18 @@ State these up front; each is a documented V1 behaviour, not a regression.
 
 ## 10. Pre-launch checklist (maintainer)
 
-- [ ] **PR #54 merged** — the preflight schema contract (engine v3 / validator v2) is broken on `master` without it; the operator loop does not work
-- [ ] `ci.yml` green on release SHA (`ci_ok` job passing)
+- [x] Preflight schema contract aligned on `master` (engine + plugin validator both at schema 3; PR #54 merged)
+- [ ] `ci.yml` green on release SHA (`ci_ok` job passing) — evidence: Actions run on `master`
 - [ ] Branch protection requires the `ci_ok` status check on `master`
-- [ ] MIC-301 clean-VM MSI smoke test completed via `scripts/Invoke-MsiSmokeTest.ps1`; transcript attached to the issue
+- [ ] MIC-301 Windows MSI smoke green via `WindowsInstall.yml` → `scripts/Invoke-MsiSmokeTest.ps1`; run URL attached to MIC-327
+- [ ] MIC-301 Linux AppImage smoke green via `LinuxInstall.yml` → `scripts/smoke-test-appimage.sh`; run URL attached to MIC-301
+- [ ] MIC-326 fuzz workflow green on `master`; run URL attached to the issue
 - [ ] MSI install architecture confirmed 64-bit (see the `candle -arch x86` note in `docs/PLATFORM_SUPPORT.md`)
-- [ ] MIC-320 documented as known limitation and disclosed in the report panel
+- [x] MIC-320 documented as known limitation; report panel shows general overprint disclosure (MIC-330)
+- [x] README documents unsigned Windows installer, SmartScreen steps, and `SHA256SUMS.txt` integrity check (MIC-342)
 - [ ] `PACKAGING_LICENSING.md` critical items reviewed (full checklist gates *paid* distribution)
 - [ ] `THIRD_PARTY_NOTICES.txt` generated for the release artifact
-- [ ] README points to Frisket release artifacts (not upstream PDF4QT)
+- [x] README points to Frisket release artifacts (not upstream PDF4QT)
 - [ ] Draft release artifacts attached with `SHA256SUMS.txt`
 - [ ] Release notes state: unsigned installer, no overprint simulation in page view, Windows + Linux only
 - [ ] `docs/V1_RELEASE_READINESS.md` recommendation reviewed by product owner

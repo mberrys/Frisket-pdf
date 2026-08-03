@@ -159,6 +159,14 @@ jobs:
         env:
           GNUPGHOME: ${{ env.GNUPGHOME }}
 
+      - name: Run AppImage smoke test
+        working-directory: pdf4qt
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          chmod +x "build/${{ env.appimagefilename }}"
+          ./scripts/smoke-test-appimage.sh "build/${{ env.appimagefilename }}"
+
       - name: Upload AppImage Package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:

@@ -31,8 +31,8 @@ A desktop PDF toolkit for editing, inspecting, validating, and automating PDF wo
 
 Use Frisket’s own release artifacts, not upstream PDF4QT packages.
 
-- **Windows (x64):** portable ZIP and MSI packaging are supported.
-- **Linux (x64):** AppImage packaging is available through the project’s release workflows and attached to GitHub releases; Flatpak packaging exists (`LinuxFlatpak.yml`) but isn't yet attached to releases either. `ci.yml` also builds a `.deb` on every push to `master`, but **it does not work** — verified by installing it on a clean Ubuntu 22.04 container: `dpkg -i` succeeds, but the binary fails to launch (`libQt6Gui.so.6: cannot open shared object file`) because, unlike the AppImage, it doesn't bundle the Qt runtime, and it also has a glibc version mismatch against 22.04. Do not install the `.deb` until it's fixed.
+- **Windows (x64):** download the MSI or portable ZIP from [GitHub releases](https://github.com/mberrys/Frisket-pdf/releases). **V1 installers are unsigned** — Windows SmartScreen will show an “unrecognized app” warning on first install. Choose **More info** → **Run anyway** to proceed. Verify the download against `SHA256SUMS.txt` on the release page before installing.
+- **Linux (x64):** download the AppImage from [GitHub releases](https://github.com/mberrys/Frisket-pdf/releases), `chmod +x` it, and run. Verify the download against `SHA256SUMS.txt` on the release page. Flatpak packaging exists (`LinuxFlatpak.yml`) but isn't yet attached to releases. `ci.yml` also builds a `.deb` on every push to `master`, but **it does not work** — verified by installing it on a clean Ubuntu 22.04 container: `dpkg -i` succeeds, but the binary fails to launch (`libQt6Gui.so.6: cannot open shared object file`) because, unlike the AppImage, it doesn't bundle the Qt runtime, and it also has a glibc version mismatch against 22.04. Do not install the `.deb` until it's fixed.
 - **macOS:** not supported for V1. There is no official package, notarization, or macOS CI coverage.
 
 See [platform support](docs/PLATFORM_SUPPORT.md) for supported configurations, package layouts, and current validation notes.
