@@ -248,3 +248,4 @@ if (-not $SkipEditorLaunch) {
 }
 
 Write-Host "Smoke test passed."
+exit 0

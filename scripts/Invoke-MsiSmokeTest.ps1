@@ -129,3 +129,4 @@ if (Test-Path -LiteralPath $InstallDir) {
 
 Write-Host ""
 Write-Host "MSI lifecycle smoke test passed. Attach this transcript to MIC-301."
+exit 0
