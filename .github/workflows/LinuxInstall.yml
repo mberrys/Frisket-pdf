@@ -16,6 +16,9 @@ jobs:
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg_installed
       GNUPGHOME: ${{ github.workspace }}/gnupg
       VCPKG_COMMIT: 0878b5224d4a4968940ee296a2e7fae2d3b62983
+      # Pinned 2026-08-03 from upstream continuous releases.
+      APPIMAGETOOL_SHA256: a6d71e2b6cd66f8e8d16c37ad164658985e0cf5fcaa950c90a482890cb9d13e0
+      LINUXDEPLOYQT_SHA256: 974a87457ed26241b793bed7841978fcdf84158d13220e53833a06515f173b0b
 
     steps:
       - name: Install dependencies
@@ -26,7 +29,7 @@ jobs:
       - name: Install appimagetool
         run: |
           wget -c "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-          echo "${{ vars.APPIMAGETOOL_SHA256 }}  appimagetool-x86_64.AppImage" | sha256sum -c -
+          echo "${APPIMAGETOOL_SHA256}  appimagetool-x86_64.AppImage" | sha256sum -c -
           chmod +x appimagetool-x86_64.AppImage
           sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
@@ -135,7 +138,7 @@ jobs:
         run: |
           cp install/usr/share/icons/hicolor/scalable/apps/io.github.mberrys.Frisket-pdf.svg install/io.github.mberrys.Frisket-pdf.svg
           wget -O deploy.AppImage https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
-          echo "${{ vars.LINUXDEPLOYQT_SHA256 }}  deploy.AppImage" | sha256sum -c -
+          echo "${LINUXDEPLOYQT_SHA256}  deploy.AppImage" | sha256sum -c -
           chmod +x deploy.AppImage
           ./deploy.AppImage install/usr/share/applications/io.github.mberrys.Frisket-pdf.desktop -executable-dir=install/usr/bin -extra-plugins=iconengines,imageformats,texttospeech
           
