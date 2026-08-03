@@ -126,7 +126,8 @@
                 "-DPDF4QT_INSTALL_QT_DEPENDENCIES=OFF",
                 "-DPDF4QT_INSTALL_DEPENDENCIES=OFF",
                 "-DPDF4QT_INSTALL_TO_USR=OFF",
-                "-DCMAKE_VERBOSE_MAKEFILE=OFF"
+                "-DCMAKE_VERBOSE_MAKEFILE=OFF",
+                "-DPDF4QT_PLUGIN_OCR=OFF"
             ],
             "build-commands": [
               "ninja all",

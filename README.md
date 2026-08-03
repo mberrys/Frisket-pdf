@@ -23,12 +23,16 @@ A desktop PDF toolkit for editing, inspecting, validating, and automating PDF wo
 | **Pdf4QtViewer** | Quick, read-only viewing. |
 | **Pdf4QtDiff** | Comparing two PDF documents. |
 
+## Known limitations
+
+- **Overprint is not simulated in the interactive page view.** The standard page renderer does not composite overprint (`OP`/`op`/OPM in the graphics state); overprint-accurate compositing is only available in **Output Preview**. Preflight only raises a finding for the unsafe white/near-white overprint case — a document using ordinary overprint (spot-over-process, rich black over an image) produces no finding at all. Proof any overprint-sensitive document in Output Preview before it ships to print.
+
 ## Install
 
 Use Frisket’s own release artifacts, not upstream PDF4QT packages.
 
 - **Windows (x64):** portable ZIP and MSI packaging are supported.
-- **Linux (x64):** `.deb`, AppImage, and Flatpak packaging are available through the project’s release workflows.
+- **Linux (x64):** AppImage packaging is available through the project’s release workflows and attached to GitHub releases; Flatpak packaging exists (`LinuxFlatpak.yml`) but isn't yet attached to releases either. `ci.yml` also builds a `.deb` on every push to `master`, but **it does not work** — verified by installing it on a clean Ubuntu 22.04 container: `dpkg -i` succeeds, but the binary fails to launch (`libQt6Gui.so.6: cannot open shared object file`) because, unlike the AppImage, it doesn't bundle the Qt runtime, and it also has a glibc version mismatch against 22.04. Do not install the `.deb` until it's fixed.
 - **macOS:** not supported for V1. There is no official package, notarization, or macOS CI coverage.
 
 See [platform support](docs/PLATFORM_SUPPORT.md) for supported configurations, package layouts, and current validation notes.

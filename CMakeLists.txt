@@ -99,6 +99,13 @@ option(PDF4QT_BUILD_LAUNCHPAD "Build Pdf4QtLaunchPad application" ${_PDF4QT_BUIL
 option(PDF4QT_PLUGIN_AUDIOBOOK "Build AudioBook editor plugin" ${_PDF4QT_PLUGIN_AUDIOBOOK_DEFAULT})
 option(PDF4QT_PLUGIN_SCANNER "Build Scanner editor plugin" ${_PDF4QT_PLUGIN_SCANNER_DEFAULT})
 
+# V1 ships OCR as CLI-only (PdfTool ocr) per the 2026-07-25 product decision (MIC-343).
+# The Editor OCR UI plugin is not part of the V1 release surface, but stays buildable
+# for local/developer use. Release packaging workflows pass -DPDF4QT_PLUGIN_OCR=OFF
+# explicitly; PdfTool's OCR subcommand is unaffected. (PDF4QT_BUNDLE_OCR_SERVICE, the
+# other half of the V1 CLI-only OCR surface, is declared in frisket-ocr/tools/CMakeLists.txt.)
+option(PDF4QT_PLUGIN_OCR "Build the OCR editor plugin (UI)" ON)
+
 if(PDF4QT_ENABLE_SANITIZERS OR PDF4QT_BUILD_FUZZERS)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)

@@ -10,9 +10,10 @@ Operational guide for shipping, monitoring, and supporting **Frisket PDF 1.6.x**
 |----------|----------|----------|------------------|
 | Windows | MSI (**unsigned for V1**; signing optional post-V1) | `WindowsInstall.yml` | `C:\Program Files\Frisket PDF\` (WiX) |
 | Windows | Portable zip | `ci.yml` | User-chosen |
-| Linux | `.deb` | `ci.yml` → `make-package.sh` | `/usr/bin`, `/usr/lib/pdf4qt` |
 | Linux | AppImage | `LinuxInstall.yml` | User-chosen |
 | Linux | Flatpak | `LinuxFlatpak.yml` | Flathub-style bundle |
+
+**`.deb` is built but does not work — do not distribute it.** `ci.yml`'s `build_ubuntu` job runs `make-package.sh` (generated from `make-package.sh.in` via CMake `configure_file`) on every push to `master` and uploads a `ubuntu-deb-package` artifact. Verified 2026-08-02 by installing the artifact from a real CI run on a clean Ubuntu 22.04 Docker container: `dpkg -i` succeeds, but the installed binary fails to launch — `libQt6Gui.so.6: cannot open shared object file` — because, unlike the AppImage (which uses `linuxdeployqt`), the `.deb` doesn't bundle the Qt runtime or declare any `Depends:` in its control file. It also has a glibc version mismatch against 22.04 (`GLIBC_2.38' not found`). It is not attached to GitHub releases by `CreateReleaseDraft.yml`. Linux V1 ships AppImage (and, once wired into the release process, Flatpak) only, until this is fixed.
 
 **V1 slim bundle** (`PDF4QT_FRISKET_DISTRIBUTION=ON`): Editor + PdfTool + core plugins only.
 
@@ -54,9 +55,9 @@ Operational guide for shipping, monitoring, and supporting **Frisket PDF 1.6.x**
 
 ### 2.3 Linux packages
 
-- **`.deb`:** Install on Ubuntu 22.04+ VM; repeat smoke test above.
 - **AppImage:** `chmod +x` and run; verify Fuse if needed.
 - **Flatpak:** Note `--filesystem=host` — document for security-conscious users.
+- **`.deb`:** builds in CI but does not run — confirmed missing Qt runtime + glibc mismatch (§1). Do not install or distribute it until fixed.
 
 ### 2.4 Draft GitHub release
 

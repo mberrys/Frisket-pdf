@@ -24,13 +24,19 @@
     Permit the FrisketOcrService bundle (which carries a Python runtime) to be
     present. docs/PACKAGING_LICENSING.md requires the *default* bundle to be
     C++/Qt only, so this is off by default and the scan fails when it is found.
+
+.PARAMETER AllowOcrPlugin
+    Permit OcrPlugin.dll to be present. V1 ships OCR as CLI-only (PdfTool ocr) --
+    the Editor OCR UI plugin is not part of the V1 release surface (MIC-343), so
+    this is off by default and the scan fails when it is found.
 #>
 param(
     [string]$InstallDir = "${env:ProgramFiles}\PDF4QT",
     [string]$ProfilesDir = "",
     [string]$TestPdf = "",
     [switch]$SkipEditorLaunch,
-    [switch]$AllowOcrSidecar
+    [switch]$AllowOcrSidecar,
+    [switch]$AllowOcrPlugin
 )
 
 Set-StrictMode -Version Latest
@@ -164,13 +170,21 @@ foreach ($item in $requiredFiles) {
     Write-Host "OK: $($item.Label)"
 }
 
-# The OCR plugin is optional and explicitly out of the V1 gate, so report it rather
-# than failing when a slim distribution omits it.
+# V1 ships OCR as CLI-only (PdfTool ocr); the Editor OCR UI plugin is not part of
+# the V1 release surface (MIC-343). Its presence in a release bundle is packaging
+# drift, not an optional extra -- fail loudly rather than silently reporting it.
 $ocrPlugin = Join-Path $pluginsDir "OcrPlugin.dll"
 if (Test-Path -LiteralPath $ocrPlugin) {
-    Write-Host "OK: Frisket OCR plugin present"
+    if ($AllowOcrPlugin) {
+        Write-Host "OK: OcrPlugin.dll present (explicitly allowed via -AllowOcrPlugin)"
+    } else {
+        $ocrPluginMessage = "OcrPlugin.dll found at $ocrPlugin. V1 ships OCR as CLI-only (MIC-343) -- " +
+            "this plugin must not be in a release bundle. Build with -DPDF4QT_PLUGIN_OCR=OFF, " +
+            "or re-run with -AllowOcrPlugin if this is an intentional non-V1 build."
+        throw $ocrPluginMessage
+    }
 } else {
-    Write-Host "INFO: OcrPlugin.dll absent (optional, not a V1 gate)"
+    Write-Host "OK: OcrPlugin.dll absent (V1 CLI-only OCR surface, MIC-343)"
 }
 
 if ([string]::IsNullOrWhiteSpace($TestPdf)) {

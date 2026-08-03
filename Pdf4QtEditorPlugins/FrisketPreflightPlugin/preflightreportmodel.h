@@ -90,9 +90,10 @@ public:
     bool hasAddBleedFixup() const;
     const PreflightFixupEntry* addBleedFixup() const;
 
-    /// Returns true if any finding reports white or near-white overprint. Standard
-    /// page rendering does not simulate overprint (MIC-320), so the report panel
-    /// steers the operator to Output Preview when this is set.
+    /// Returns true if any finding reports white or near-white overprint. The report
+    /// panel always steers the operator to Output Preview (MIC-320/MIC-330), since
+    /// overprint in general is undetected by the engine; this flag only controls the
+    /// additional, more specific warning about the unsafe white/near-white case.
     bool hasWhiteOverprintFinding() const;
 
 private:
