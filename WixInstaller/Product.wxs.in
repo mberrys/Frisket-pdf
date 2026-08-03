@@ -100,6 +100,10 @@ ${PDF4QT_WIX_SENTRY_CRASHPAD}
       <Component Id="cmpQt6Xml" Directory="INSTALLFOLDER" Guid="{686836FB-9324-4849-AEFC-3AC5575BE2EC}">
                 <File Id="filQt6Xml" KeyPath="yes" Source="$(var.MyInstallDir)\Qt6Xml.dll" />
       </Component>
+${PDF4QT_WIX_ICU_COMPONENTS}
+      <Component Id="cmpqoffscreen" Directory="dir_platforms" Guid="{A1B2C3D4-E5F6-4789-A012-3456789ABCDE}">
+        <File Id="filqoffscreen" KeyPath="yes" Source="$(var.MyInstallDir)\platforms\qoffscreen.dll" />
+      </Component>
       <Component Id="cmpqsvgicon" Directory="dir_iconengines" Guid="{2A149233-0A00-466A-A962-D28D3D5DE53C}">
         <File Id="filqsvgicon" KeyPath="yes" Source="$(var.MyInstallDir)\iconengines\qsvgicon.dll" />
       </Component>

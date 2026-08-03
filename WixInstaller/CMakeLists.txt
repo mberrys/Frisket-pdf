@@ -183,6 +183,33 @@ if(WIN32 AND MSVC AND PDF4QT_INSTALL_PREPARE_WIX_INSTALLER)
         set(PDF4QT_WIX_SENTRY_CRASHPAD "")
     endif()
 
+    # Qt ICU DLLs (versioned filenames vary by Qt build). Discover at configure time
+    # and emit WiX components so the MSI matches cmake --install.
+    set(PDF4QT_WIX_ICU_COMPONENTS "")
+    if(PDF4QT_INSTALL_QT_DEPENDENCIES AND NOT "${PDF4QT_QT_ROOT}" STREQUAL "")
+        file(GLOB _pdf4qt_icu_dlls LIST_DIRECTORIES false "${PDF4QT_QT_ROOT}/bin/icu*.dll")
+        set(_pdf4qt_icu_index 0)
+        foreach(_pdf4qt_icu_dll IN LISTS _pdf4qt_icu_dlls)
+            get_filename_component(_pdf4qt_icu_name "${_pdf4qt_icu_dll}" NAME)
+            get_filename_component(_pdf4qt_icu_id "${_pdf4qt_icu_dll}" NAME_WE)
+            string(REGEX REPLACE "[^A-Za-z0-9]" "" _pdf4qt_icu_id "${_pdf4qt_icu_id}")
+            math(EXPR _pdf4qt_icu_index "${_pdf4qt_icu_index}+1")
+            # Deterministic GUID namespace from the DLL basename so reconfigure is stable.
+            string(UUID _pdf4qt_icu_guid NAMESPACE "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+                   NAME "frisket-wix-icu-${_pdf4qt_icu_name}" TYPE SHA1 UPPER)
+            string(APPEND PDF4QT_WIX_ICU_COMPONENTS
+"      <Component Id=\"cmp${_pdf4qt_icu_id}\" Directory=\"INSTALLFOLDER\" Guid=\"{${_pdf4qt_icu_guid}}\">
+        <File Id=\"fil${_pdf4qt_icu_id}\" KeyPath=\"yes\" Source=\"$(var.MyInstallDir)\\${_pdf4qt_icu_name}\" />
+      </Component>
+")
+        endforeach()
+        if(_pdf4qt_icu_index EQUAL 0)
+            message(WARNING "PDF4QT_INSTALL_QT_DEPENDENCIES is ON but no icu*.dll found under ${PDF4QT_QT_ROOT}/bin — MSI may fail at runtime with STATUS_DLL_NOT_FOUND")
+        else()
+            message(STATUS "WiX will package ${_pdf4qt_icu_index} Qt ICU DLL(s) from ${PDF4QT_QT_ROOT}/bin")
+        endif()
+    endif()
+
     configure_file(PDF4QT.sln.in PDF4QT.sln)
     configure_file(PDF4QT.wixproj.in PDF4QT.wixproj)
     configure_file(Product.wxs.in Product.wxs)

@@ -389,6 +389,17 @@ if(PDF4QT_INSTALL_DEPENDENCIES AND NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
             PATTERN "*.pdb" EXCLUDE
         )
 
+        # ICU is a load-time dependency of Qt6Core on Windows aqt builds; without
+        # these DLLs beside PdfTool.exe the MSI-installed binary fails with
+        # STATUS_DLL_NOT_FOUND (0xC0000135) even when Qt6*.dll themselves are present.
+        install(DIRECTORY ${PDF4QT_QT_ROOT}/bin/
+            RUNTIME DESTINATION ${PDF4QT_INSTALL_LIB_DIR}/
+            FILES_MATCHING
+            PATTERN "icu*.dll"
+            PATTERN "Debug" EXCLUDE
+            PATTERN "*.pdb" EXCLUDE
+        )
+
         install(DIRECTORY ${PDF4QT_QT_ROOT}/plugins/platforms/
             RUNTIME DESTINATION ${PDF4QT_INSTALL_LIB_DIR}/platforms/
             FILES_MATCHING

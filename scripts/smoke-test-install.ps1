@@ -201,8 +201,27 @@ if ([string]::IsNullOrWhiteSpace($TestPdf) -or -not (Test-Path -LiteralPath $Tes
 
 $profilePath = Join-Path $ProfilesDir "frisket-default.json"
 $pdfTool = Join-Path $InstallDir "PdfTool.exe"
-$preflightOutput = & $pdfTool preflight $TestPdf --profile $profilePath --console-format text 2>&1
-$preflightExit = $LASTEXITCODE
+# Strip Qt from PATH so preflight cannot silently resolve ICU/Qt deps from a
+# developer or CI toolchain install — the bundle must be self-contained (MIC-301).
+$qtRoots = @($env:QT_ROOT_DIR, $env:Qt6_DIR, $env:PDF4QT_QT_ROOT) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+$pathParts = @($env:PATH -split ';' | Where-Object {
+    $part = $_
+    if ([string]::IsNullOrWhiteSpace($part)) { return $false }
+    foreach ($root in $qtRoots) {
+        if ($part.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    }
+    if ($part -match '[\\/]Qt[\\/].*[\\/]bin' ) { return $false }
+    return $true
+})
+$savedPath = $env:PATH
+$env:PATH = ($pathParts -join ';')
+try {
+    $preflightOutput = & $pdfTool preflight $TestPdf --profile $profilePath --console-format text 2>&1
+    $preflightExit = $LASTEXITCODE
+} finally {
+    $env:PATH = $savedPath
+}
 if ($preflightExit -ne 0 -and $preflightExit -ne 1) {
     throw "PdfTool preflight failed with unexpected exit code $preflightExit`: $preflightOutput"
 }
