@@ -50,14 +50,38 @@ constexpr int64_t JBIG2_MAX_BITMAP_PIXELS = JBIG2_MAX_BITMAP_DIMENSION * JBIG2_M
 // staying far below a DoS-sized cumulative allocation.
 constexpr int64_t JBIG2_MAX_TOTAL_BITMAP_PIXELS = 512LL * 1024 * 1024;
 
-// Compositing pixels into an already-allocated bitmap allocates nothing, so it is
-// invisible to the allocation budget above - but it is not free, and the number of
-// composition operations is driven by stream values with no inherent bound
-// (SBNUMINSTANCES for text regions, the grid dimensions for halftone regions). A
-// budget of the same order as the allocation budget keeps a legitimate page - whose
-// composited area is bounded by its own size, times a small constant for overlap -
-// comfortably inside, while capping a crafted stream at a fraction of a second of work.
-constexpr int64_t JBIG2_MAX_TOTAL_COMPOSITION_PIXELS = 1024LL * 1024 * 1024;
+// The budget above bounds how much memory a stream can make the decoder allocate, but
+// not how long it can make the decoder run - and the two are only loosely related.
+// Arithmetic-decoding a pixel costs far more than storing it, compositing allocates
+// nothing at all, and a loop that decodes zero-sized bitmaps allocates nothing while
+// still spinning. All three are driven by stream values with no inherent bound
+// (SBNUMINSTANCES for text regions, the grid dimensions for halftone regions, the
+// height classes of a symbol dictionary), so decoding *work* is tracked separately, as
+// two independent quantities that fail for different reasons and so need different
+// caps:
+//
+//  - Pixels (decoded or composited). A single legal-size bitmap at the allocation cap
+//    above, arithmetic-decoded under ASan/UBSan, was measured at ~11.2M px/s - i.e. the
+//    512 Mi allocation cap alone can already cost ~48s of decode time for one bitmap
+//    that never trips any composition-count check. A cap here has to sit below that:
+//    160 Mi keeps the worst case around 15s, comfortably inside the 30s local verify
+//    budget (scripts/docker-fuzz-build-inner.sh) and the 1200s CI fuzz timeout, while
+//    still covering pages up to roughly 600 dpi A3 (~70M px) with margin for
+//    compositing overlap. There genuinely is no larger value that is simultaneously
+//    "supports arbitrarily large scans" and "bounded decode time under sanitizers" -
+//    a bigger legitimate bitmap costs proportionally more time to arithmetic-decode,
+//    full stop. Release builds without sanitizer overhead will decode this cap's worth
+//    of pixels considerably faster.
+//  - Items (one decoded bitmap, symbol instance, halftone grid cell, or symbol
+//    dictionary height class). A degenerate stream can request an item that costs zero
+//    pixels - a zero-sized symbol, a height class that decodes nothing - so pixels
+//    alone cannot bound it; only a per-item cap can. This cap is deliberately tight:
+//    a real page needs at most tens of thousands of items, so ~2M leaves it
+//    unrestricted, while it bounds a degenerate stream (whose items cost only a
+//    handful of arithmetic-decoder rounds each) to a couple of seconds regardless of
+//    how large the pixel budget above is.
+constexpr int64_t JBIG2_MAX_TOTAL_DECODE_WORK_PIXELS = 160LL * 1024 * 1024;
+constexpr int64_t JBIG2_MAX_TOTAL_DECODE_WORK_ITEMS = 2LL * 1024 * 1024;
 
 // Custom Huffman code tables (7.4.3) store an 8-bit-derived range-length
 // field per entry with no inherent bound, and a real table has at most a
@@ -1617,6 +1641,13 @@ void PDFJBIG2Decoder::processSymbolDictionary(const PDFJBIG2SegmentHeader& heade
     /* 6.5.5 step 4) - read all bitmaps */
     while (NSYMSDECODED < parameters.SDNUMNEWSYMS)
     {
+        // A height class that decodes no symbol at all - its first delta width is an
+        // out-of-band code - leaves NSYMSDECODED untouched, so this loop makes no
+        // progress and never reaches a bitmap decode that would be accounted for. The
+        // arithmetic decoder keeps producing integers past the end of the data, so the
+        // loop is otherwise unbounded; charge every height class as an item.
+        accountDecodeWork(1, 0);
+
         /* 6.5.5 step 4) b) - decode height class delta height according to 6.5.6 */
         int32_t HCDH = checkInteger(parameters.SDHUFF ? parameters.SDHUFFDH_Decoder.readSignedInteger() : arithmeticDecoder.getSignedInteger(&arithmeticDecoderStates.states[PDFJBIG2ArithmeticDecoderStates::IADH]));
         HCHEIGHT += HCDH;
@@ -2547,8 +2578,9 @@ void PDFJBIG2Decoder::processHalftoneRegion(const PDFJBIG2SegmentHeader& header)
 
     // One pattern is painted per grid cell. The grid dimensions and the pattern size are
     // independent stream values, so the product can be far larger than any bitmap that
-    // was actually allocated.
-    accountCompositionPixels(int64_t(HGW) * int64_t(HGH) * int64_t(HPW) * int64_t(HPH));
+    // was actually allocated - and a zero-sized pattern makes it zero while still costing
+    // one paint call per cell, hence the grid cells are also charged as items.
+    accountDecodeWork(int64_t(HGW) * int64_t(HGH), int64_t(HGW) * int64_t(HGH) * int64_t(HPW) * int64_t(HPH));
 
     for (int MG = 0; MG < static_cast<int>(HGH); ++MG)
     {
@@ -2999,13 +3031,22 @@ void PDFJBIG2Decoder::accountBitmapPixels(int64_t width, int64_t height)
     }
 }
 
-void PDFJBIG2Decoder::accountCompositionPixels(int64_t pixels)
+void PDFJBIG2Decoder::accountDecodeWork(int64_t items, int64_t pixels)
 {
-    m_totalCompositionPixels += std::max<int64_t>(1, pixels);
+    // The counts are derived from stream values, so they are clamped to their own
+    // budget before accumulating - a saturating charge trips the corresponding check
+    // just the same, and the addition cannot overflow.
+    m_totalDecodeWorkItems += std::clamp<int64_t>(items, 0, JBIG2_MAX_TOTAL_DECODE_WORK_ITEMS);
+    m_totalDecodeWorkPixels += std::clamp<int64_t>(pixels, 0, JBIG2_MAX_TOTAL_DECODE_WORK_PIXELS);
 
-    if (m_totalCompositionPixels > JBIG2_MAX_TOTAL_COMPOSITION_PIXELS)
+    if (m_totalDecodeWorkItems > JBIG2_MAX_TOTAL_DECODE_WORK_ITEMS)
     {
-        throw PDFException(PDFTranslationContext::tr("JBIG2 stream exceeds the maximum total composition work."));
+        throw PDFException(PDFTranslationContext::tr("JBIG2 stream exceeds the maximum total number of decoded items."));
+    }
+
+    if (m_totalDecodeWorkPixels > JBIG2_MAX_TOTAL_DECODE_WORK_PIXELS)
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 stream exceeds the maximum total decoding work."));
     }
 }
 
@@ -3013,6 +3054,7 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::readBitmap(PDFJBIG2BitmapDecodingParameters& par
 {
     checkJBIG2BitmapDimensions(parameters.GBW, parameters.GBH);
     accountBitmapPixels(parameters.GBW, parameters.GBH);
+    accountDecodeWork(1, int64_t(parameters.GBW) * int64_t(parameters.GBH));
 
     if (parameters.MMR)
     {
@@ -3322,6 +3364,7 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::readRefinementBitmap(PDFJBIG2BitmapRefinementDec
     // Use algorithm described in 6.3.5.6
     checkJBIG2BitmapDimensions(parameters.GRW, parameters.GRH);
     accountBitmapPixels(parameters.GRW, parameters.GRH);
+    accountDecodeWork(1, int64_t(parameters.GRW) * int64_t(parameters.GRH));
     PDFJBIG2Bitmap GRREG(parameters.GRW, parameters.GRH, 0x00);
 
     // Use arithmetic encoding. For templates, we fill bytes from right to left, from bottom to top bits,
@@ -3565,9 +3608,11 @@ PDFJBIG2Bitmap PDFJBIG2Decoder::readTextBitmap(PDFJBIG2TextRegionDecodingParamet
             const int32_t HI = IB.getHeight();
 
             // SBNUMINSTANCES is a 32-bit stream value, so this loop can be asked to
-            // composite billions of symbol instances from a few bytes of input. Charge
-            // every instance against the composition budget to bound the total work.
-            accountCompositionPixels(int64_t(WI) * int64_t(HI));
+            // composite billions of symbol instances from a few bytes of input. Each
+            // instance costs several arithmetic-decoder rounds and a symbol bitmap copy
+            // even when it paints nothing, so it is charged as an item as well as for
+            // its pixels; the item charge is what actually bounds the loop.
+            accountDecodeWork(1, int64_t(WI) * int64_t(HI));
 
             /* 6.4.5. step 3) vi) */
             if (parameters.TRANSPOSED == 0 && (parameters.REFCORNER == PDFJBIG2TextRegionDecodingParameters::TOPRIGHT ||
