@@ -26,6 +26,8 @@
 #include "pdfdocumentwriter.h"
 #include "pdfoutputformatter.h"
 
+#include <QFile>
+
 namespace pdftool
 {
 
@@ -193,6 +195,12 @@ int PDFToolAddBleed::execute(const PDFToolOptions& options)
     if (options.addBleedDryRun)
     {
         return ExitSuccess;
+    }
+
+    if (QFile::exists(options.addBleedOutputDocument) && !options.addBleedOverwrite)
+    {
+        PDFConsole::writeError(PDFToolTranslationContext::tr("Output '%1' already exists. Use --overwrite to replace it.").arg(options.addBleedOutputDocument), options.outputCodec);
+        return ErrorInvalidArguments;
     }
 
     pdf::PDFDocumentWriter writer(nullptr);

@@ -577,11 +577,20 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
         const PDFObjectReference pageReference = page->getPageReference();
         const PDFReal translateX = -newMedia.left();
         const PDFReal translateY = -newMedia.top();
-        const bool needsOriginShift = !qFuzzyIsNull(translateX) || !qFuzzyIsNull(translateY);
-        const QRectF normalizedMedia(0.0, 0.0, newMedia.width(), newMedia.height());
+        // Default policy keeps TrimBox fixed; only re-anchor the page origin when trim
+        // itself is being expanded and the enlarged media box would use negative coords.
+        const bool reanchorOrigin = settings.expandTrimBox
+                && (!qFuzzyIsNull(translateX) || !qFuzzyIsNull(translateY));
+        const QRectF outputMedia = reanchorOrigin
+                ? QRectF(0.0, 0.0, newMedia.width(), newMedia.height())
+                : newMedia;
 
-        auto shiftRect = [translateX, translateY](const QRectF& rect) -> QRectF
+        auto mapOutputRect = [reanchorOrigin, translateX, translateY](const QRectF& rect) -> QRectF
         {
+            if (!reanchorOrigin)
+            {
+                return rect;
+            }
             return QRectF(rect.left() + translateX, rect.top() + translateY, rect.width(), rect.height());
         };
 
@@ -629,31 +638,38 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
             }
         }
 
-        if (needsOriginShift)
+        if (reanchorOrigin)
         {
             prependContentTranslate(builder, pageReference, translateX, translateY);
             isPageContentChanged = true;
         }
 
-        if (settings.expandMediaBox || needsOriginShift)
+        if (settings.expandMediaBox || reanchorOrigin)
         {
-            builder->setPageMediaBox(pageReference, normalizedMedia);
+            builder->setPageMediaBox(pageReference, outputMedia);
         }
-        if (settings.expandCropBox || needsOriginShift)
+        if (settings.expandCropBox || reanchorOrigin)
         {
-            builder->setPageCropBox(pageReference, shiftRect(newCrop));
+            builder->setPageCropBox(pageReference, mapOutputRect(newCrop));
         }
-        if (settings.expandBleedBox || needsOriginShift)
+        if (settings.expandBleedBox || reanchorOrigin)
         {
-            builder->setPageBleedBox(pageReference, shiftRect(newBleed));
+            builder->setPageBleedBox(pageReference, mapOutputRect(newBleed));
         }
-        // Always rewrite Trim when origin shifts so it stays aligned with content.
-        builder->setPageTrimBox(pageReference, shiftRect(settings.expandTrimBox ? newTrim : page->getTrimBox()));
+        if (settings.expandTrimBox)
+        {
+            builder->setPageTrimBox(pageReference, mapOutputRect(newTrim));
+        }
+        else
+        {
+            // Rewrite unchanged trim so outer-box expansion does not collapse it.
+            builder->setPageTrimBox(pageReference, page->getTrimBox());
+        }
 
-        pageReport.newMediaBox = normalizedMedia;
-        pageReport.newCropBox = shiftRect(newCrop);
-        pageReport.newBleedBox = shiftRect(newBleed);
-        pageReport.newTrimBox = shiftRect(settings.expandTrimBox ? newTrim : page->getTrimBox());
+        pageReport.newMediaBox = outputMedia;
+        pageReport.newCropBox = mapOutputRect(newCrop);
+        pageReport.newBleedBox = mapOutputRect(newBleed);
+        pageReport.newTrimBox = settings.expandTrimBox ? mapOutputRect(newTrim) : page->getTrimBox();
 
         if (settings.analyzeOnly)
         {
@@ -696,7 +712,7 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
                     continue;
                 }
 
-                painter->drawImage(shiftRect(destPageRect), fill);
+                painter->drawImage(mapOutputRect(destPageRect), fill);
                 pageReport.sidesApplied.append(work.side);
                 isPageContentChanged = true;
             }

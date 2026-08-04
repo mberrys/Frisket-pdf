@@ -40,6 +40,7 @@ struct PDF4QTLIBCORESHARED_EXPORT PDFBleedMarginProbeSettings
     PDFBleedFixupSettings::ReferenceBox referenceBox = PDFBleedFixupSettings::ReferenceBox::TrimBox;
     QMarginsF bleedMM = QMarginsF(3.0, 3.0, 3.0, 3.0);
     bool fastOnly = false;
+    qint64 maxRasterPixels = 250LL * 1000 * 1000;
 };
 
 struct PDF4QTLIBCORESHARED_EXPORT PDFBleedMarginProbeEdgeResult

@@ -23,6 +23,7 @@
 #include "pdftooldecrypt.h"
 #include "pdfdocumentbuilder.h"
 #include "pdfdocumentwriter.h"
+#include "pdftoolcancel.h"
 
 namespace pdftool
 {
@@ -69,10 +70,36 @@ int PDFToolDecryptApplication::execute(const PDFToolOptions& options)
         return ExitSuccess;
     }
 
+    if (const int blocked = validateDestructiveOutput(options, options.document))
+    {
+        return blocked;
+    }
+
+    if (options.destructiveReport)
+    {
+        PDFConsole::writeText(PDFToolTranslationContext::tr("Would decrypt '%1'.").arg(options.document), options.outputCodec);
+    }
+
+    if (options.destructiveDryRun)
+    {
+        return ExitSuccess;
+    }
+
+    if (isCancelRequested())
+    {
+        return ExitFailure;
+    }
+
     pdf::PDFDocumentBuilder builder(&document);
     builder.removeEncryption();
     builder.setSecurityHandler(pdf::PDFSecurityHandlerPointer(new pdf::PDFNoneSecurityHandler()));
     document = builder.build();
+
+    if (isCancelRequested())
+    {
+        removePartialOutput(options.document);
+        return ExitFailure;
+    }
 
     pdf::PDFDocumentWriter writer(nullptr);
     pdf::PDFOperationResult result = writer.write(options.document, &document, true);
@@ -88,7 +115,7 @@ int PDFToolDecryptApplication::execute(const PDFToolOptions& options)
 
 PDFToolAbstractApplication::Options PDFToolDecryptApplication::getOptionsFlags() const
 {
-    return ConsoleFormat | OpenDocument;
+    return ConsoleFormat | OpenDocument | DestructiveWrite;
 }
 
 }   // namespace pdftool

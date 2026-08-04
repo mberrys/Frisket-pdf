@@ -780,6 +780,16 @@ void FrisketPreflightPlugin::onApplyBleedFixupRequested()
         return;
     }
 
+    if (QFile::exists(outputPath))
+    {
+        if (QMessageBox::warning(m_widget, tr("Apply Bleed Fix"),
+                                 tr("'%1' already exists. Overwrite it?").arg(QDir::toNativeSeparators(outputPath)),
+                                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
+
     pdf::PDFDocument fixedDocument = *m_document;
     pdf::PDFBleedFixupSettings settings;
     settings.mode = pdf::PDFBleedFixupMode(modeCombo->currentData().toInt());
