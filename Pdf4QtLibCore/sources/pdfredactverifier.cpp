@@ -208,8 +208,12 @@ bool fileContainsIncrementalMarker(const QString& filePath)
         return false;
     }
 
-    const QByteArray tail = file.readAll().right(8192);
-    return tail.contains("/Prev");
+    // The whole file must already be loaded into memory to search it, so scan
+    // all of it rather than only the last 8 KiB: a large trailer/xref-stream
+    // dictionary or bulk /ID content can push /Prev past a fixed tail window,
+    // producing a false negative on the exact incremental-save check this
+    // function exists to catch.
+    return file.readAll().contains("/Prev");
 }
 
 }   // namespace

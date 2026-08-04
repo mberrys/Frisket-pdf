@@ -442,6 +442,12 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
         report->pages.clear();
     }
 
+    // Accumulated locally and only published into *report once the whole batch
+    // has committed successfully: document mutations are all-or-nothing (rolled
+    // back on any error return below), so a partially-filled *report must not
+    // describe pages whose changes were never actually applied.
+    QVector<PDFBleedFixupPageReport> pageReports;
+
     if (!document)
     {
         return PDFTranslationContext::tr("Invalid document.");
@@ -574,6 +580,15 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
             newTrim = PDFBleedFixupMath::expandBoxTo(newTrim, targetBleed);
         }
 
+        // Regardless of which individual expand flags were requested, keep the
+        // box nesting PDF-conformant (MediaBox superset CropBox superset
+        // BleedBox): an enclosing box left smaller than one that just grew
+        // produces an invalid PDF and clips bleed artwork outside the
+        // paintable/visible area. expandBoxTo only grows (union), so this is a
+        // no-op when the boxes already nest correctly.
+        newCrop = PDFBleedFixupMath::expandBoxTo(newCrop, newBleed);
+        newMedia = PDFBleedFixupMath::expandBoxTo(newMedia, newCrop);
+
         const PDFObjectReference pageReference = page->getPageReference();
         const PDFReal translateX = -newMedia.left();
         const PDFReal translateY = -newMedia.top();
@@ -638,32 +653,40 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
             }
         }
 
-        if (reanchorOrigin)
+        // analyzeOnly is a dry run: report what the box/content changes would be
+        // without touching the document (the builder must stay untouched so the
+        // final modifier.finalize()/getDocument() commit below is skipped).
+        if (!settings.analyzeOnly)
         {
-            prependContentTranslate(builder, pageReference, translateX, translateY);
-            isPageContentChanged = true;
-        }
+            if (reanchorOrigin)
+            {
+                prependContentTranslate(builder, pageReference, translateX, translateY);
+                isPageContentChanged = true;
+            }
 
-        if (settings.expandMediaBox || reanchorOrigin)
-        {
-            builder->setPageMediaBox(pageReference, outputMedia);
-        }
-        if (settings.expandCropBox || reanchorOrigin)
-        {
-            builder->setPageCropBox(pageReference, mapOutputRect(newCrop));
-        }
-        if (settings.expandBleedBox || reanchorOrigin)
-        {
-            builder->setPageBleedBox(pageReference, mapOutputRect(newBleed));
-        }
-        if (settings.expandTrimBox)
-        {
-            builder->setPageTrimBox(pageReference, mapOutputRect(newTrim));
-        }
-        else
-        {
-            // Rewrite unchanged trim so outer-box expansion does not collapse it.
-            builder->setPageTrimBox(pageReference, page->getTrimBox());
+            // Also write MediaBox/CropBox when the nesting cascade above grew them
+            // to stay conformant, even if their own expand flag was not set.
+            if (settings.expandMediaBox || reanchorOrigin || newMedia != page->getMediaBox())
+            {
+                builder->setPageMediaBox(pageReference, outputMedia);
+            }
+            if (settings.expandCropBox || reanchorOrigin || newCrop != page->getCropBox())
+            {
+                builder->setPageCropBox(pageReference, mapOutputRect(newCrop));
+            }
+            if (settings.expandBleedBox || reanchorOrigin)
+            {
+                builder->setPageBleedBox(pageReference, mapOutputRect(newBleed));
+            }
+            if (settings.expandTrimBox)
+            {
+                builder->setPageTrimBox(pageReference, mapOutputRect(newTrim));
+            }
+            else
+            {
+                // Rewrite unchanged trim so outer-box expansion does not collapse it.
+                builder->setPageTrimBox(pageReference, page->getTrimBox());
+            }
         }
 
         pageReport.newMediaBox = outputMedia;
@@ -720,25 +743,30 @@ PDFOperationResult PDFBleedFixup::apply(PDFDocument* document,
             pageContentStreamBuilder.end(painter);
         }
 
-        if (report)
+        pageReports.append(pageReport);
+    }
+
+    if (!settings.analyzeOnly)
+    {
+        modifier.markReset();
+        if (isPageContentChanged)
         {
-            report->pages.append(pageReport);
+            modifier.markPageContentsChanged();
+            flags |= PDFModifiedDocument::PageContents;
         }
+
+        if (!modifier.finalize())
+        {
+            return PDFTranslationContext::tr("Failed to finalize document modifications.");
+        }
+
+        *document = *modifier.getDocument();
     }
 
-    modifier.markReset();
-    if (isPageContentChanged)
+    if (report)
     {
-        modifier.markPageContentsChanged();
-        flags |= PDFModifiedDocument::PageContents;
+        report->pages = std::move(pageReports);
     }
-
-    if (!modifier.finalize())
-    {
-        return PDFTranslationContext::tr("Failed to finalize document modifications.");
-    }
-
-    *document = *modifier.getDocument();
 
     if (modificationFlags)
     {

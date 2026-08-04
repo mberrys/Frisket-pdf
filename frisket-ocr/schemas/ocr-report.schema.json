@@ -48,7 +48,7 @@
       "required": ["page", "status"],
       "properties": {
         "page": { "type": "integer", "minimum": 1 },
-        "status": { "type": "string", "enum": ["ocr", "skipped_has_text", "failed"] },
+        "status": { "type": "string", "enum": ["ocr", "skipped_has_text", "skipped_empty", "failed"] },
         "text": { "type": "string" },
         "lines": {
           "type": "array",

@@ -30,14 +30,17 @@ def main() -> int:
         except json.JSONDecodeError as exc:
             response = {"ok": False, "error": f"invalid json: {exc}"}
         else:
-            try:
-                response = run_ocr(request)
-            except Exception as exc:  # noqa: BLE001 — surface to PdfTool
-                response = {
-                    "page": request.get("page", 0),
-                    "ok": False,
-                    "error": str(exc),
-                }
+            if not isinstance(request, dict):
+                response = {"ok": False, "error": "request must be a JSON object"}
+            else:
+                try:
+                    response = run_ocr(request)
+                except Exception as exc:  # noqa: BLE001 — surface to PdfTool
+                    response = {
+                        "page": request.get("page", 0),
+                        "ok": False,
+                        "error": str(exc),
+                    }
         _write_response(response)
     return 0
 

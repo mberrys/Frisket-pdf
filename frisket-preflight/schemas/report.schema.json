@@ -5,16 +5,20 @@
   "description": "Normalized JSON report written to stdout by frisket-preflight. The Qt plugin consumes this shape only — never backend-specific payloads.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "pass", "profile", "errors", "warnings", "fixups_available"],
+  "required": ["schema_version", "pass", "profile", "errors", "warnings", "fixups_available", "inspection_complete", "checks"],
   "properties": {
     "schema_version": {
       "type": "integer",
-      "enum": [1, 2],
-      "description": "Report contract version. Version 1 required page and bbox on every finding. Version 2 adds explicit scope and optional location fields. Bump only with a coordinated engine + plugin release."
+      "enum": [1, 2, 3],
+      "description": "Report contract version. Version 1 required page and bbox on every finding. Version 2 adds explicit scope and optional location fields. Version 3 adds inspection_complete and per-check status reporting (checks[]). Bump only with a coordinated engine + plugin release."
+    },
+    "inspection_complete": {
+      "type": "boolean",
+      "description": "False when at least one check could not run to completion (unknown check id, or a check threw and was contained) — pass is forced false in that case even if no error findings were recorded."
     },
     "pass": {
       "type": "boolean",
-      "description": "True when errors[] is empty. Warnings alone do not fail the run."
+      "description": "True when errors[] is empty and inspection_complete is true. Warnings alone do not fail the run."
     },
     "profile": {
       "type": "string",
@@ -43,6 +47,11 @@
       "type": "array",
       "description": "Fixups the engine believes apply to this document given the profile. May be filtered dynamically by the engine; not necessarily identical to profile.fixups.",
       "items": { "$ref": "#/$defs/fixup_available" }
+    },
+    "checks": {
+      "type": "array",
+      "description": "Per-check outcome for every check listed in the profile, in profile order.",
+      "items": { "$ref": "#/$defs/check_status" }
     }
   },
   "$defs": {
@@ -135,6 +144,27 @@
         { "$ref": "#/$defs/finding_v1" },
         { "$ref": "#/$defs/finding_v2" }
       ]
+    },
+    "check_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Profile check id this status refers to."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "warning", "failed", "skipped", "unsupported"],
+          "description": "ok: no findings. warning: only warning/info findings. failed: at least one error finding, or the check threw and was contained. skipped: disabled in the profile. unsupported: unknown check id."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Present for skipped/unsupported/failed statuses; omitted for ok/warning."
+        }
+      }
     },
     "fixup_available": {
       "type": "object",

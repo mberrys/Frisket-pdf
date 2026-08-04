@@ -257,7 +257,14 @@ public:
             return true;
         }
 
-        errorMessage = PDFToolTranslationContext::tr("Timed out waiting for OCR sidecar response.");
+        if (m_process.state() == QProcess::NotRunning)
+        {
+            errorMessage = PDFToolTranslationContext::tr("OCR sidecar process exited unexpectedly (exit code %1).").arg(m_process.exitCode());
+        }
+        else
+        {
+            errorMessage = PDFToolTranslationContext::tr("Timed out waiting for OCR sidecar response.");
+        }
         return false;
     }
 
@@ -490,7 +497,7 @@ int PDFToolOcrApplication::execute(const PDFToolOptions& options)
         {
             pdf::PDFOcrSkippedPage skipped;
             skipped.page = oneBasedPage;
-            skipped.reason = QStringLiteral("empty");
+            skipped.reason = QStringLiteral("no_image_content");
             report.skippedPages.push_back(skipped);
 
             pdf::PDFOcrPageResult pageResult;
@@ -574,6 +581,14 @@ int PDFToolOcrApplication::execute(const PDFToolOptions& options)
     }
 
     sidecar.stop();
+
+    if (cancelled)
+    {
+        // A cancelled run is not a completed pass, even if no page had failed
+        // yet: the pages[] array is truncated and callers must not treat this
+        // report the same as a full, successful run.
+        report.pass = false;
+    }
 
     const QByteArray reportJson = QJsonDocument(report.toJson()).toJson(QJsonDocument::Compact);
     PDFConsole::writeData(reportJson);

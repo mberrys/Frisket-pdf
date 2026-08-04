@@ -112,7 +112,12 @@ PDFOcrPageGate::PageOcrNeed PDFOcrPageGate::classifyPage(PDFDocumentSession* ses
     const PDFDocumentTextFlow textFlow =
         factory.create(document, pageIndices, PDFDocumentTextFlowFactory::Algorithm::Layout);
 
-    if (countNonWhitespaceCharacters(textFlow) >= settings.minTextCharacters)
+    // count > 0 is required in addition to the threshold comparison: with
+    // minTextCharacters == 0 (a valid, user-settable value), "count >= 0" would
+    // otherwise be true for a page with literally zero extracted text, silently
+    // classifying every image-only scan as "has text" and disabling OCR entirely.
+    const int nonWhitespaceCharacterCount = countNonWhitespaceCharacters(textFlow);
+    if (nonWhitespaceCharacterCount > 0 && nonWhitespaceCharacterCount >= settings.minTextCharacters)
     {
         return PageOcrNeed::SkipHasText;
     }
