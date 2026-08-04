@@ -1,24 +1,27 @@
 # V1 release readiness audit
 
-Audit date: **2026-07-23**, revised **2026-07-24**, corrected **2026-07-25**, signing gate struck **2026-08-02**, gates 1–4 evidence pass **2026-08-03**
+Audit date: **2026-07-23**, revised **2026-07-24**, corrected **2026-07-25**, signing gate struck **2026-08-02**, gates 1–4 evidence pass **2026-08-03**, fuzz evidence returned **2026-08-03**
 Product: **Frisket PDF 1.6.0.0** (Qt6 desktop PDF toolkit)
 Scope: operational, security, reliability, data-integrity, compatibility, and release-readiness for first public launch.
 Platforms: **Windows and Linux** (macOS is not a V1 platform — see `docs/PLATFORM_SUPPORT.md`).
 
 ## Executive recommendation
 
-**Ready for product-owner sign-off (step 5)** — pending final green workflow URLs below for Windows MSI lifecycle smoke and Linux AppImage smoke. Core gates are implemented; CI evidence is in flight on `master` as of **2026-08-03**.
+**Not ready — one launch-blocking gate is red.** The installer gates have landed green;
+the fuzz gate came back with two real findings in the JBIG2 decoder. R-003 / A20 stays
+blocking until `fuzz.yml` is green on `master`.
 
 | Gate | Status | Evidence (2026-08-03) |
 |------|--------|------------------------|
-| `ci.yml` build + `ctest` | **Pass** | [Run 30779926245](https://github.com/mberrys/Frisket-pdf/actions/runs/30779926245) on `70481e3d` (PR #61 merge) |
-| Fuzz on `master` (MIC-326) | **In flight** | [Run 30783904748](https://github.com/mberrys/Frisket-pdf/actions/runs/30783904748) dispatched 2026-08-03 |
-| Windows MSI smoke (MIC-301 / MIC-327) | **In flight** | [Run 30785973248](https://github.com/mberrys/Frisket-pdf/actions/runs/30785973248) dispatched after smoke-script exit-code fix (`247a3ce9`) |
-| Linux AppImage smoke (MIC-301) | **In flight** | [Run 30785795336](https://github.com/mberrys/Frisket-pdf/actions/runs/30785795336) with `scripts/smoke-test-appimage.sh` |
+| `ci.yml` build + `ctest` | **Pass** | [Run 30792705447](https://github.com/mberrys/Frisket-pdf/actions/runs/30792705447) on `master` |
+| Fuzz on `master` (MIC-326) | **Fail** | [Run 30803378370](https://github.com/mberrys/Frisket-pdf/actions/runs/30803378370) — exit 70: UBSan signed-integer overflow in `pdfjbig2decoder.cpp` + a >1200 s libFuzzer timeout in `fuzz_images`. See §3 R-003 |
+| Windows MSI smoke (MIC-301 / MIC-327) | **Pass** | [Run 30792705392](https://github.com/mberrys/Frisket-pdf/actions/runs/30792705392) — green after the WiX ICU/harvest fixes (`7127f65`, `29b553f`) |
+| Linux AppImage smoke (MIC-301) | **Pass** | [Run 30787629154](https://github.com/mberrys/Frisket-pdf/actions/runs/30787629154) with `scripts/smoke-test-appimage.sh` |
 | Overprint disclosure (MIC-330) | **Pass** | `overprintDisclosureText()` always shown; README + runbook R-002; `tst_preflightplugintest.cpp` |
 | Unsigned installer disclosure (MIC-342) | **Pass** | README Install section + runbook R-016 + `SHA256SUMS.txt` via `CreateReleaseDraft.yml` |
 
-If any in-flight run above fails, this recommendation reverts to **Not ready** until the listed blocker is fixed and re-run.
+This recommendation returns to **Ready for product-owner sign-off (step 5)** once the fuzz
+gate is green on `master`.
 
 **V1 / 1.0 ships unsigned** (reaffirmed 2026-08-02). Authenticode / DigiCert / `SIGN_MSI` are post-V1 / paid only ([MIC-345](https://linear.app/mbx2/issue/MIC-345)).
 
@@ -51,8 +54,8 @@ status must be re-derived rather than inherited from this document.
 | ID | Risk | Status | Linear | Mitigation required |
 |----|------|--------|--------|---------------------|
 | ~~R-000~~ | ~~Preflight report schema contract broken on `master`~~ | **Struck 2026-07-25** | — | Not a defect. Engine and validator are both at schema 3 on `master` |
-| **R-003** | Fuzz CI has not run since `fuzz.yml` broke | **In flight — evidence pending** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Duplicate `permissions:` fixed on `master`. [Run 30783904748](https://github.com/mberrys/Frisket-pdf/actions/runs/30783904748) dispatched 2026-08-03 — close MIC-326 when green |
-| **R-001** | MIC-301 — installer / clean-machine validation | **In flight — evidence pending** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Windows: `Invoke-MsiSmokeTest.ps1` in `WindowsInstall.yml` ([Run 30785973248](https://github.com/mberrys/Frisket-pdf/actions/runs/30785973248)). Linux: `smoke-test-appimage.sh` in `LinuxInstall.yml` ([Run 30785795336](https://github.com/mberrys/Frisket-pdf/actions/runs/30785795336)). `.deb` remains out of scope (broken; not on releases) |
+| **R-003** | JBIG2 decoder: signed-integer overflow + unbounded decode (DoS) | **Blocking — fix landed, re-run pending** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Fuzz CI now runs and found two real defects on the first green-workflow run. Both fixed in `pdfjbig2decoder.cpp` (see §3 R-003 and §4). Close MIC-326 when `fuzz.yml` is green on `master` |
+| ~~R-001~~ | ~~MIC-301 — installer / clean-machine validation~~ | **Pass 2026-08-03** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Windows: `Invoke-MsiSmokeTest.ps1` in `WindowsInstall.yml` — [Run 30792705392](https://github.com/mberrys/Frisket-pdf/actions/runs/30792705392) green. Linux: `smoke-test-appimage.sh` in `LinuxInstall.yml` — [Run 30787629154](https://github.com/mberrys/Frisket-pdf/actions/runs/30787629154) green. `.deb` remains out of scope (broken; not on releases) |
 | ~~R-016~~ | ~~V1 MSI ships unsigned; no certificate held~~ | **Not a V1 gate — reaffirmed 2026-08-02** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) disclosure · [MIC-345](https://linear.app/mbx2/issue/MIC-345) procurement (post-V1) | **Ship unsigned for 1.0.** Signing never blocks launch. Disclosure (SmartScreen + `SHA256SUMS.txt`) is a marketing/docs obligation in **V1 release documentation**, not an engineering gate. Procurement stays in **Commercial / paid distribution (post-V1)** |
 | **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted — mitigation complete** | [MIC-330](https://linear.app/mbx2/issue/MIC-330) | Documented limitation + in-app disclosure. **Trigger corrected:** the report panel now shows the general "page view does not simulate overprint" notice unconditionally once a report is loaded, with an additional specific warning appended only when a `white-overprint` finding is present — see §3. Deferral of MIC-320 is now recorded in Linear (project description + MIC-306), not only here |
 | ~~R-015~~ | ~~macOS declared supported without CI, packaging or notarization~~ | **Resolved** | [MIC-336](https://linear.app/mbx2/issue/MIC-336) | macOS restated as post-V1; V1 ships Windows + Linux. MIC-336 reopened — it had been closed Done with its acceptance unmet |
@@ -171,7 +174,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A10 | Sentry privacy | No default PII | **Pass, scope corrected** | Desktop sentry-native 0.15.x defaults to no PII; NX-only setter not used. That covers SDK-attached identifiers **only** — crashpad minidumps can still contain PDF content and paths, and no SDK hook can scrub them. The former "no PDF content by design" claim was unenforced by any code; it is now stated as a disclosed property of opting in (R-008) |
 | A0 | Preflight report contract | Engine schema version accepted by plugin validator | **Pass** (corrected 2026-07-25) | Both at 3: `preflightengine.h:42`, `preflightsidecarutils.h:38` (`isSupportedSchemaVersion` accepts 1–3). Fix `c515bfa3` merged in `ba428f1b` |
 | A11 | CI build | Ubuntu + Windows compile + test | **Pass** | [Run 30779926245](https://github.com/mberrys/Frisket-pdf/actions/runs/30779926245) — Ubuntu + Windows `ctest` including `UnitTestsPreflightCorpus` (PR #61) |
-| A12 | Installer | Clean-machine install (**Windows + Linux**) | **In flight** | Windows: `Invoke-MsiSmokeTest.ps1` wired in `WindowsInstall.yml` — [Run 30785973248](https://github.com/mberrys/Frisket-pdf/actions/runs/30785973248). Linux: `scripts/smoke-test-appimage.sh` wired in `LinuxInstall.yml` — [Run 30785795336](https://github.com/mberrys/Frisket-pdf/actions/runs/30785795336). `.deb` built by `ci.yml` but non-functional — not a release artifact |
+| A12 | Installer | Clean-machine install (**Windows + Linux**) | **Pass** (2026-08-03) | Windows: `Invoke-MsiSmokeTest.ps1` wired in `WindowsInstall.yml` — [Run 30792705392](https://github.com/mberrys/Frisket-pdf/actions/runs/30792705392) green. Linux: `scripts/smoke-test-appimage.sh` wired in `LinuxInstall.yml` — [Run 30787629154](https://github.com/mberrys/Frisket-pdf/actions/runs/30787629154) green. `.deb` built by `ci.yml` but non-functional — not a release artifact |
 | A13 | Overprint rendering | Correct overprint compositing in standard page view | **Deferred — mitigation complete** | MIC-320 deferred post-V1. `overprintDisclosureText()` always shown once a report loads; additional white-overprint warning when finding present (MIC-330). README + runbook R-002 published |
 | A14 | Packaging SBOM / license evidence | MIC-140 checklist complete | **Partial — gates paid distribution, not V1** | Notices generator now resolves versions + license text; artifact SBOM and counsel sign-off outstanding |
 | A15 | macOS build | Supported platform | **N/A** | Not a V1 platform; no CI, no package, no notarization |
@@ -181,7 +184,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A17 | CSP / CORS / cookies | Web security headers | **N/A** | No web app |
 | A18 | Browser compatibility | Supported browsers | **N/A** | No embedded browser |
 | A19 | OCR product gate | Required for V1 | **N/A — CLI-only** (decided 2026-07-25) | OCR is merged to `master` but V1 ships **CLI-only**: `PdfTool ocr` present; `OcrPlugin.dll` and the bundled sidecar service excluded. `PdfTool ocr` is inert without a user-supplied sidecar. **Enforced (MIC-343):** `OcrPlugin` is gated behind `-DPDF4QT_PLUGIN_OCR` (default ON for dev builds, explicitly `OFF` in `WindowsInstall.yml`/`LinuxInstall.yml`/the Flatpak manifest); the WIX component that had unconditionally bundled `OcrPlugin.dll` into the MSI is now gated the same way. `PDF4QT_BUNDLE_OCR_SERVICE` defaults `OFF`. `scripts/smoke-test-install.ps1` fails the scan if `OcrPlugin.dll` is found in an installed tree, closing the drift the plugin/service inclusion previously had no assertion against |
-| A20 | Fuzz regression | Weekly fuzz CI | **In flight** | `fuzz.yml` fixed (single `permissions:`). [Run 30783904748](https://github.com/mberrys/Frisket-pdf/actions/runs/30783904748) dispatched on `master` 2026-08-03 — flip to Pass when green (MIC-326) |
+| A20 | Fuzz regression | Weekly fuzz CI | **Fail — fix landed, re-run pending** | `fuzz.yml` fixed (single `permissions:`) and now executing. [Run 30803378370](https://github.com/mberrys/Frisket-pdf/actions/runs/30803378370) failed with two real JBIG2 findings — see R-003. Both fixed in `pdfjbig2decoder.cpp`; flip to Pass when a re-run is green (MIC-326) |
 | A23 | Manifest rollback coverage | Failure path is tested, not just implemented | **Fail** (this revision) | `pdfpagemasterexport.cpp:590-592` removes the PDF when manifest persist fails, but no test forces that failure. R-007's stated verification cites success-path tests only — MIC-335 |
 
 ---
@@ -201,7 +204,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
-| **R-003** | Malicious PDF crash / DoS | Anyone opening untrusted PDFs | Crafted PDF via fuzz corpus | Parser/codec attack surface | **Escalated to Blocking 2026-07-25:** fuzz CI was not running at all — `fuzz.yml` invalid since CodeQL autofix `31a4444d` added a second top-level `permissions:` key. Harnesses (MIC-304) were fine; the workflow that runs them was dead, and A20 reported "Pass" throughout. Duplicate key removed in this change | Fuzz workflow **green** (not merely present); no open critical CVEs — MIC-326 | Security |
+| **R-003** | Malicious PDF crash / DoS | Anyone opening untrusted PDFs | `fuzz_images` on the JBIG2 branch of the harness | **Two real defects, found by the first fuzz run that actually executed** (the workflow had been dead since CodeQL autofix `31a4444d` added a second top-level `permissions:` key; A20 reported "Pass" throughout). (1) Signed-integer overflow at `Pdf4QtLibCore/sources/pdfjbig2decoder.cpp:4068` — `PDFJBIG2HuffmanDecoder::readSignedInteger` added a stream-supplied 32-bit range value to a table base value in `int32_t`. (2) Unbounded decode — `SBNUMINSTANCES` (a 32-bit stream value) drives the text-region composition loop, and the halftone grid loop paints one pattern per cell; neither was charged against the existing decode budget, which only accounts for *allocation*. A few input bytes could request billions of composition operations | (1) Arithmetic moved to `int64_t` and range-checked via `checkHuffmanRange`; an out-of-range result is reported as "no value", which callers already handle as out-of-band. (2) The first attempt (`accountCompositionPixels`) charged only composited *pixels*, with a floor of one pixel per item and a 1 GiB budget; the pinned seed `c8a61daa` never reached that code at all, spinning instead in the symbol-dictionary height-class loop (`processSymbolDictionary`), which decodes two arithmetic integers per pass and makes no progress when a height class yields no symbol — invisible to any pixel-based budget because it never touches a bitmap. A second, independent timeout was then found locally while verifying the first fix: `readBitmap` decoding a single legal-size generic-region bitmap took >30 s under ASan/UBSan — bounded in allocation (the existing 512 Mi cap) but not in *time*. Replaced by `accountDecodeWork(items, pixels)`, charging two **independent** budgets: `JBIG2_MAX_TOTAL_DECODE_WORK_ITEMS` (2 Mi items — one per decoded bitmap, symbol instance, halftone grid cell, or symbol-dictionary height class; this is what bounds zero-pixel degenerate loops, regardless of pixel count) and `JBIG2_MAX_TOTAL_DECODE_WORK_PIXELS` (160 Mi decoded/composited pixels — sized from a measured ASan throughput of ~11.2M px/s to keep worst-case decode time to ~15 s, comfortably under the 30 s local verify budget and the 1200 s CI timeout, while still covering pages up to ~600 dpi A3). Splitting pixels from items (rather than one combined "work unit" budget, which was tried and reverted) lets each cap be sized for what it actually bounds — an unavoidable time/size trade-off given a legitimate large scan and a malicious same-size bitmap are indistinguishable until fully decoded. Verified: seed `c8a61daa` now executes in **169 ms** (was >1200 s), the second seed in **46 ms** (was >30 s), the real verify invocation (`-max_total_time=30`) against the regression corpus exits 0 with slowest single input 19 s, and a 15-minute standalone libFuzzer session at `-timeout=20` is clean (13.7M runs, 0 crashes/timeouts) | Fuzz workflow **green** (not merely present); no open critical CVEs — MIC-326 | Security |
 | **R-004** | Orphan `PdfTool` if Editor killed hard | Operators canceling preflight | Kill Editor from Task Manager during preflight | OS-level process termination | Document: use in-app cancel; plugin kills child on normal close | Manual checklist item 12 in v1-operator-acceptance | Support |
 | **R-005** | Packaging license gaps (Qt LGPL evidence) | Legal/compliance | Audit installer contents | MIC-140 checklist incomplete | Complete `PACKAGING_LICENSING.md` gate before enterprise sales | Checklist sign-off | Legal/Release |
 | **R-006** | Flatpak broad filesystem access | Linux Flatpak users | Install Flatpak; inspect permissions | `--filesystem=host` in manifest | Document risk; consider tightening to `home` post-V1 | Flatpak manifest review | Release |
@@ -233,6 +236,16 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 ---
 
 ## 4. Implemented changes (this audit)
+
+### 2026-08-03 fuzz findings
+
+| Change | File | Rationale |
+|--------|------|-----------|
+| Range-check Huffman-decoded integers in 64-bit arithmetic | `Pdf4QtLibCore/sources/pdfjbig2decoder.cpp` | UBSan signed-integer overflow at `:4068` — R-003 (1) |
+| Charge symbol-instance and halftone-grid composition against a new budget | `Pdf4QtLibCore/sources/pdfjbig2decoder.cpp` / `.h` | `SBNUMINSTANCES`-driven unbounded decode; libFuzzer timeout >1200 s — R-003 (2) |
+| Charge decoded/composited pixels and per-item counts against two independent decode-work budgets | `Pdf4QtLibCore/sources/pdfjbig2decoder.cpp` / `.h` | Pixel-only composition budget missed the symbol-dictionary height-class loop entirely (zero-pixel spin); a single combined budget then let a legal-size generic-region decode take >47 s once the pixel cap was loosened for large-scan support — R-003 (2) |
+| Add `Fuzz/corpus/regression/` seeds + README for both R-003 (2) timeouts | `Fuzz/corpus/regression/` | Corpus was not committed to any branch; pinning both seeds (including the newly-found symbol-dictionary one) prevents silent regression |
+| Mark installer gates Pass; return fuzz gate to blocking | this file §2, §3 | Executive table was stale on all four in-flight rows |
 
 ### 2026-08-03 gates 1–4 evidence pass
 
