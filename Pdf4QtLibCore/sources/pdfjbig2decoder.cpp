@@ -3825,12 +3825,25 @@ void PDFJBIG2Decoder::checkBitmapSize(const uint32_t size)
     }
 }
 
+void PDFJBIG2Decoder::checkRegionOffset(const int32_t offset)
+{
+    // offsetX/offsetY are signed (a region may legitimately be placed partly
+    // off the page bitmap; PDFJBIG2Bitmap::paint clips out-of-range pixels
+    // safely). Do not reinterpret a negative offset as a huge uint32_t via
+    // checkBitmapSize(), which would always exceed MAX_BITMAP_SIZE and reject
+    // well-formed regions using negative placement.
+    if (offset < -int32_t(MAX_BITMAP_SIZE) || offset > int32_t(MAX_BITMAP_SIZE))
+    {
+        throw PDFException(PDFTranslationContext::tr("JBIG2 region offset out of range (%1).").arg(offset));
+    }
+}
+
 void PDFJBIG2Decoder::checkRegionSegmentInformationField(const PDFJBIG2RegionSegmentInformationField& field)
 {
     checkBitmapSize(field.width);
     checkBitmapSize(field.height);
-    checkBitmapSize(field.offsetX);
-    checkBitmapSize(field.offsetY);
+    checkRegionOffset(field.offsetX);
+    checkRegionOffset(field.offsetY);
 
     if (field.width == 0 || field.height == 0)
     {

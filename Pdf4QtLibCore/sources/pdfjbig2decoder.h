@@ -543,6 +543,7 @@ private:
     PDFJBIG2ReferencedSegments getReferencedSegments(const PDFJBIG2SegmentHeader& header) const;
 
     static void checkBitmapSize(const uint32_t size);
+    static void checkRegionOffset(const int32_t offset);
     static void checkRegionSegmentInformationField(const PDFJBIG2RegionSegmentInformationField& field);
     static int32_t checkInteger(std::optional<int32_t> value);
 

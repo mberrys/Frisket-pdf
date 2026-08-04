@@ -1735,7 +1735,18 @@ PreflightResult PreflightEngine::run(const PreflightProfileData& profile)
 
         const bool checkFailed = result.errors.size() > errorsBefore;
         const bool checkWarned = result.warnings.size() > warningsBefore;
-        status.status = (checkFailed || checkWarned) ? QStringLiteral("failed") : QStringLiteral("ok");
+        if (checkFailed)
+        {
+            status.status = QStringLiteral("failed");
+        }
+        else if (checkWarned)
+        {
+            status.status = QStringLiteral("warning");
+        }
+        else
+        {
+            status.status = QStringLiteral("ok");
+        }
         result.checkStatuses.push_back(status);
     }
 
@@ -1815,6 +1826,13 @@ bool PreflightEngine::parseProfile(const QJsonObject& profileObject, PreflightPr
         }
 
         check.severity = checkObject.value(QStringLiteral("severity")).toString(check.severity);
+        if (check.severity != QStringLiteral("error") &&
+            check.severity != QStringLiteral("warning") &&
+            check.severity != QStringLiteral("info"))
+        {
+            errorMessage = PDFTranslationContext::tr("Check '%1' has invalid severity '%2' (must be 'error', 'warning', or 'info').").arg(check.id, check.severity);
+            return false;
+        }
         check.enabled = checkObject.value(QStringLiteral("enabled")).toBool(true);
         check.amountPt = checkObject.value(QStringLiteral("amount_pt")).toDouble(check.amountPt);
         check.required = checkObject.value(QStringLiteral("required")).toBool(check.required);

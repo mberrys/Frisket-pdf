@@ -106,7 +106,10 @@ int PDFToolEncryptApplication::execute(const PDFToolOptions& options)
 
     if (isCancelRequested())
     {
-        removePartialOutput(options.document);
+        // Nothing has been written yet (writer.write() below uses QSaveFile and
+        // only touches the target on a successful commit), so there is no
+        // partial output to clean up. Removing the file here would delete the
+        // still-intact original.
         return ExitFailure;
     }
 
