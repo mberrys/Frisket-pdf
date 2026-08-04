@@ -1022,6 +1022,27 @@ void PDFSidebarWidget::openAttachment(const pdf::PDFFileSpecification* fileSpeci
         fileName = tr("attachment");
     }
 
+    static const QStringList dangerousExtensions = {
+        QStringLiteral("exe"), QStringLiteral("bat"), QStringLiteral("cmd"),
+        QStringLiteral("com"), QStringLiteral("vbs"), QStringLiteral("js"),
+        QStringLiteral("wsh"), QStringLiteral("ps1"), QStringLiteral("msi"),
+        QStringLiteral("scr"), QStringLiteral("pif"), QStringLiteral("reg"),
+        QStringLiteral("sh"), QStringLiteral("bash"), QStringLiteral("zsh"),
+        QStringLiteral("desktop"), QStringLiteral("py"), QStringLiteral("appimage")
+    };
+
+    const QString extension = QFileInfo(fileName).suffix().toLower();
+    if (dangerousExtensions.contains(extension))
+    {
+        if (QMessageBox::warning(this, tr("Security Warning"),
+                                 tr("Attachment '%1' appears to be an executable or script. "
+                                    "This is potentially dangerous. Are you sure you want to open it?").arg(fileName),
+                                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
+
     const QString message = tr("Would you like to open attachment '%1' using the associated application?").arg(fileName);
     if (QMessageBox::question(this, tr("Open Attachment"), message) != QMessageBox::Yes)
     {

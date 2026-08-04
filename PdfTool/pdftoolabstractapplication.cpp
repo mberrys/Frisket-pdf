@@ -207,6 +207,7 @@ void PDFToolAbstractApplication::initializeCommandLineParser(QCommandLineParser*
         parser->addOption(QCommandLineOption("dpi", "Rasterization DPI for edge sampling.", "dpi", "300"));
         parser->addOption(QCommandLineOption("sample-pixels", "Edge sample depth in pixels for pixel-repeat/stretch.", "n", "1"));
         parser->addOption(QCommandLineOption("force", "Ignore skip-if-already-bleeding heuristic."));
+        parser->addOption(QCommandLineOption("overwrite", "Overwrite an existing output file."));
         parser->addOption(QCommandLineOption("dry-run", "Compute report only; do not write an output file."));
         parser->addOption(QCommandLineOption("report", "Print before/after box report."));
     }
@@ -615,6 +616,7 @@ PDFToolOptions PDFToolAbstractApplication::getOptions(QCommandLineParser* parser
         {
             options.addBleedSettings.skipIfAlreadyBleeding = false;
         }
+        options.addBleedOverwrite = parser->isSet("overwrite");
     }
 
     if (optionFlags.testFlag(PreflightProfile))

@@ -1825,6 +1825,11 @@ bool PreflightEngine::parseProfile(const QJsonObject& profileObject, PreflightPr
 
         check.rasterConfirm = checkObject.value(QStringLiteral("raster_confirm")).toBool(false);
         check.probeDpi = checkObject.value(QStringLiteral("probe_dpi")).toInt(150);
+        if (check.rasterConfirm && check.probeDpi <= 0)
+        {
+            errorMessage = PDFTranslationContext::tr("Check '%1' requires positive probe_dpi when raster_confirm is enabled.").arg(check.id);
+            return false;
+        }
         check.probeThreshold = checkObject.value(QStringLiteral("probe_threshold")).toInt(16);
         check.rasterWhiteThreshold = checkObject.value(QStringLiteral("raster_white_threshold")).toDouble(0.9975);
 

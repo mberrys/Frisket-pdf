@@ -177,6 +177,7 @@ struct PDFToolOptions
     QString addBleedOutputDocument;
     bool addBleedDryRun = false;
     bool addBleedReport = false;
+    bool addBleedOverwrite = false;
 
     // Shared destructive-write guard (optimize, redact, encrypt, unite, separate).
     bool destructiveDryRun = false;

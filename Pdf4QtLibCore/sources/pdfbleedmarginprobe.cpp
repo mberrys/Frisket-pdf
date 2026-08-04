@@ -34,6 +34,8 @@
 #include <QPainter>
 #include <QtMath>
 
+#include <cmath>
+
 namespace pdf
 {
 
@@ -296,22 +298,19 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeRaster(const PDFPage* page,
     PDFMeshQualitySettings meshQualitySettings;
     PDFRenderer renderer(document, &fontCache, cms.get(), &optionalContentActivity, features, meshQualitySettings);
 
-    PDFRasterizer rasterizer(nullptr);
-    rasterizer.reset(RendererEngine::QPainter);
-
     const QSizeF mediaSize = page->getRotatedMediaBox().size();
     const PDFReal pointToPixel = settings.dpi / 72.0;
+    const double fullWidthPxReal = std::ceil(mediaSize.width() * pointToPixel);
+    const double fullHeightPxReal = std::ceil(mediaSize.height() * pointToPixel);
 
-    // Render full page at probe DPI, then crop each strip.
-    const int fullW = qMax(1, qCeil(mediaSize.width() * pointToPixel));
-    const int fullH = qMax(1, qCeil(mediaSize.height() * pointToPixel));
-    QImage fullImage(QSize(fullW, fullH), QImage::Format_ARGB32_Premultiplied);
-    fullImage.fill(Qt::white);
-    QPainter fullPainter(&fullImage);
+    if (!std::isfinite(fullWidthPxReal) || !std::isfinite(fullHeightPxReal))
+    {
+        return result;
+    }
 
+    const int fullW = qMax(1, int(fullWidthPxReal));
+    const int fullH = qMax(1, int(fullHeightPxReal));
     const QTransform pageToDevice = PDFRenderer::createPagePointToDevicePointMatrix(page, QRect(QPoint(0, 0), QSize(fullW, fullH)));
-    renderer.render(&fullPainter, pageToDevice, pageIndex);
-    fullPainter.end();
 
     const PDFBleedFixupSide sides[4] = {
         PDFBleedFixupSide::Left, PDFBleedFixupSide::Right,
@@ -341,21 +340,33 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeRaster(const PDFPage* page,
             continue;
         }
 
-        const QRect stripPxRect = mapPageRectToImage(stripRect, pageToDevice, fullImage.size());
+        const QRect stripPxRect = mapPageRectToImage(stripRect, pageToDevice, QSize(fullW, fullH));
         if (stripPxRect.isEmpty() || stripPxRect.width() <= 0 || stripPxRect.height() <= 0)
         {
             continue;
         }
 
-        const QImage stripCropped = fullImage.copy(stripPxRect);
-        int inkCount = 0;
-        const int pixelCount = stripCropped.width() * stripCropped.height();
-
-        for (int y = 0; y < stripCropped.height(); ++y)
+        const double pixelCount = double(stripPxRect.width()) * double(stripPxRect.height());
+        if (settings.maxRasterPixels > 0 && pixelCount > double(settings.maxRasterPixels))
         {
-            for (int x = 0; x < stripCropped.width(); ++x)
+            continue;
+        }
+
+        QImage stripImage(stripPxRect.size(), QImage::Format_ARGB32_Premultiplied);
+        stripImage.fill(Qt::white);
+        QPainter stripPainter(&stripImage);
+        stripPainter.translate(-stripPxRect.left(), -stripPxRect.top());
+        renderer.render(&stripPainter, pageToDevice, pageIndex);
+        stripPainter.end();
+
+        int inkCount = 0;
+        const int pixelCountInt = stripImage.width() * stripImage.height();
+
+        for (int y = 0; y < stripImage.height(); ++y)
+        {
+            for (int x = 0; x < stripImage.width(); ++x)
             {
-                if (pixelIsInk(stripCropped, x, y, settings.threshold))
+                if (pixelIsInk(stripImage, x, y, settings.threshold))
                 {
                     ++inkCount;
                 }
@@ -363,10 +374,10 @@ PDFBleedMarginProbeResult PDFBleedMarginProbe::probeRaster(const PDFPage* page,
         }
 
         PDFBleedMarginProbeEdgeResult edgeResult;
-        const qreal inkCoverage = pixelCount > 0 ? static_cast<qreal>(inkCount) / static_cast<qreal>(pixelCount) : 0.0;
+        const qreal inkCoverage = pixelCountInt > 0 ? static_cast<qreal>(inkCount) / static_cast<qreal>(pixelCountInt) : 0.0;
         edgeResult.hasContent = inkCoverage > (1.0 - settings.whiteCoverageThreshold);
         edgeResult.inkPixels = inkCount;
-        edgeResult.totalPixels = pixelCount;
+        edgeResult.totalPixels = pixelCountInt;
         edgeResult.stripRect = stripRect;
 
         switch (side)
