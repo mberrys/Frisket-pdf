@@ -478,14 +478,19 @@ private:
     /// decompression bomb in aggregate.
     void accountBitmapPixels(int64_t width, int64_t height);
 
-    /// Adds \p pixels to the number of pixels composited into already-allocated
-    /// bitmaps, and throws if the cumulative total exceeds the composition budget.
-    /// Composition is not accounted for by accountBitmapPixels, because it allocates
-    /// nothing: a text region can be asked to paint SBNUMINSTANCES (a 32-bit stream
-    /// value) symbols, and a halftone region to paint one pattern per grid cell, both
-    /// from a handful of input bytes. Each call charges at least one pixel, so the
-    /// budget also bounds the per-instance decode work of zero-sized bitmaps.
-    void accountCompositionPixels(int64_t pixels);
+    /// Charges \p items decoded items (decoded bitmaps, symbol instances, halftone grid
+    /// cells, symbol-dictionary height classes) and \p pixels decoded or composited
+    /// pixels against two independent decoding-work budgets, and throws when either
+    /// cumulative total exceeds its own cap. This bounds decoding *time*, which
+    /// accountBitmapPixels does not: a text region can be asked to paint SBNUMINSTANCES
+    /// (a 32-bit stream value) symbols and a halftone region one pattern per grid cell,
+    /// neither of which allocates, and arithmetic-decoding a pixel costs far more than
+    /// storing it - so a legitimate large scan and a same-size malicious bitmap cost the
+    /// same decode time until fully decoded, and the pixel cap has to bound that time
+    /// rather than the page sizes it can support. The item cap is separate because pixel
+    /// count cannot bound it: a stream of zero-sized bitmaps costs no pixels at all, but
+    /// still costs an arithmetic-decoder round per item.
+    void accountDecodeWork(int64_t items, int64_t pixels);
 
     /// Processes current data stream (reads all data from the stream, interprets
     /// them as segments and processes the segments).
@@ -552,7 +557,8 @@ private:
     bool m_pageSizeUndefined;
     PDFJBIG2Bitmap m_pageBitmap;
     int64_t m_totalBitmapPixelsDecoded = 0;
-    int64_t m_totalCompositionPixels = 0;
+    int64_t m_totalDecodeWorkItems = 0;
+    int64_t m_totalDecodeWorkPixels = 0;
 };
 
 }   // namespace pdf
