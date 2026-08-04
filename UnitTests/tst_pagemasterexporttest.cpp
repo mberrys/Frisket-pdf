@@ -69,6 +69,8 @@ private slots:
     void cancel_closeDetach_invalidatesProgressAndBoundedWait();
     void atomicWrite_leavesNoPartialFiles();
     void manifest_persistedWithWrittenStatuses();
+    void manifest_persistFailure_removesNewOutput();
+    void manifest_persistFailure_keepsOverwrittenOutput();
     void resume_skipsAlreadyWrittenOutputs();
     void resume_mismatchedManifestStartsFreshBatch();
     void preflight_gate_blocksFailedOutput();
@@ -112,6 +114,82 @@ pdf::PDFDocument readDocument(const QString& fileName)
     pdf::PDFDocument document = reader.readFromFile(fileName);
     Q_ASSERT(reader.getReadingResult() == pdf::PDFDocumentReader::Result::OK);
     return document;
+}
+
+/// Makes \p directoryPath reject new files, and verifies it actually does. Returns false
+/// when the platform ignores the permission change - directory permissions are advisory on
+/// Windows, and root bypasses them everywhere - so the caller can skip rather than assert
+/// on a condition that was never established.
+bool denyWritesToDirectory(const QString& directoryPath)
+{
+    QFile directory(directoryPath);
+    if (!directory.setPermissions(QFile::ReadOwner | QFile::ExeOwner))
+    {
+        return false;
+    }
+
+    QFile probe(QDir(directoryPath).filePath(QStringLiteral("write-probe")));
+    if (probe.open(QIODevice::WriteOnly))
+    {
+        probe.close();
+        probe.remove();
+        return false;
+    }
+
+    return true;
+}
+
+void allowWritesToDirectory(const QString& directoryPath)
+{
+    QFile(directoryPath).setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+}
+
+/// Restores write access to a directory on scope exit, so a failing QVERIFY cannot leave a
+/// locked directory behind for QTemporaryDir to trip over during cleanup.
+class DirectoryWriteLock
+{
+public:
+    explicit DirectoryWriteLock(QString directoryPath) : m_directoryPath(std::move(directoryPath)) { }
+    ~DirectoryWriteLock() { allowWritesToDirectory(m_directoryPath); }
+
+    DirectoryWriteLock(const DirectoryWriteLock&) = delete;
+    DirectoryWriteLock& operator=(const DirectoryWriteLock&) = delete;
+
+private:
+    QString m_directoryPath;
+};
+
+/// Rewrites the manifest at \p manifestPath so every output is pending again, which makes a
+/// resuming run re-write them instead of skipping them.
+bool resetManifestOutputsToPending(const QString& manifestPath)
+{
+    QFile file(manifestPath);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        return false;
+    }
+
+    QJsonObject manifest = QJsonDocument::fromJson(file.readAll()).object();
+    file.close();
+
+    QJsonArray outputs = manifest.value(QStringLiteral("outputs")).toArray();
+    for (int index = 0; index < outputs.size(); ++index)
+    {
+        QJsonObject entry = outputs.at(index).toObject();
+        entry.insert(QStringLiteral("status"), QStringLiteral("pending"));
+        entry.remove(QStringLiteral("error"));
+        outputs.replace(index, entry);
+    }
+    manifest.insert(QStringLiteral("outputs"), outputs);
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+        return false;
+    }
+
+    file.write(QJsonDocument(manifest).toJson(QJsonDocument::Compact));
+    file.close();
+    return true;
 }
 
 bool anyOutputExists(const QStringList& paths)
@@ -730,6 +808,114 @@ void PageMasterExportTest::manifest_persistedWithWrittenStatuses()
     const QJsonArray outputs = result.manifest.value(QStringLiteral("outputs")).toArray();
     QCOMPARE(outputs.size(), 1);
     QCOMPARE(outputs.first().toObject().value(QStringLiteral("status")).toString(), QStringLiteral("written"));
+}
+
+void PageMasterExportTest::manifest_persistFailure_removesNewOutput()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString manifestDirPath = tempDir.filePath(QStringLiteral("manifest-dir"));
+    QVERIFY(QDir().mkpath(manifestDirPath));
+    const QString manifestPath = QDir(manifestDirPath).filePath(QStringLiteral("batch.json"));
+    const QString outputPath = tempDir.filePath(QStringLiteral("rollback.pdf"));
+
+    // Produce a manifest this job can resume from. The manifest lives in its own directory
+    // so it can be made unwritable without also blocking the output write.
+    pdf::PDFDocument initialSource = buildFilledPage();
+    pdf::PDFPageMasterExportJob initialJob;
+    initialJob.assembledDocuments.push_back({ documentPage(0, initialSource) });
+    initialJob.documents.emplace(0, std::move(initialSource));
+    initialJob.outputFileNames.push_back(outputPath);
+    initialJob.overwriteFiles = true;
+    initialJob.manifestPath = manifestPath;
+
+    const pdf::PDFPageMasterExportResult initialResult = pdf::PDFPageMasterExport::run(std::move(initialJob));
+    QVERIFY(initialResult.success);
+    QVERIFY(QFile::exists(outputPath));
+
+    // The output must not exist when the resuming run writes it, so that the run is the
+    // creator of the file and rollback is allowed to remove it.
+    QVERIFY(QFile::remove(outputPath));
+    QVERIFY(resetManifestOutputsToPending(manifestPath));
+
+    if (!denyWritesToDirectory(manifestDirPath))
+    {
+        allowWritesToDirectory(manifestDirPath);
+        QSKIP("Directory write permissions are not enforced for this user/platform.");
+    }
+    const DirectoryWriteLock lock(manifestDirPath);
+
+    pdf::PDFDocument resumeSource = buildFilledPage();
+    pdf::PDFPageMasterExportJob resumeJob;
+    resumeJob.assembledDocuments.push_back({ documentPage(0, resumeSource) });
+    resumeJob.documents.emplace(0, std::move(resumeSource));
+    resumeJob.outputFileNames.push_back(outputPath);
+    resumeJob.overwriteFiles = true;
+    resumeJob.resume = true;
+    resumeJob.manifestPath = manifestPath;
+
+    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(resumeJob));
+
+    QVERIFY(!result.success);
+    QVERIFY(result.errorMessage.contains(QStringLiteral("Manifest update failed")));
+    QVERIFY(result.writtenFiles.isEmpty());
+
+    // The point of the rollback: no PDF is left behind that the manifest does not know about.
+    QVERIFY(!QFile::exists(outputPath));
+}
+
+void PageMasterExportTest::manifest_persistFailure_keepsOverwrittenOutput()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString manifestDirPath = tempDir.filePath(QStringLiteral("manifest-dir"));
+    QVERIFY(QDir().mkpath(manifestDirPath));
+    const QString manifestPath = QDir(manifestDirPath).filePath(QStringLiteral("batch.json"));
+    const QString outputPath = tempDir.filePath(QStringLiteral("overwritten.pdf"));
+
+    pdf::PDFDocument initialSource = buildFilledPage();
+    pdf::PDFPageMasterExportJob initialJob;
+    initialJob.assembledDocuments.push_back({ documentPage(0, initialSource) });
+    initialJob.documents.emplace(0, std::move(initialSource));
+    initialJob.outputFileNames.push_back(outputPath);
+    initialJob.overwriteFiles = true;
+    initialJob.manifestPath = manifestPath;
+
+    const pdf::PDFPageMasterExportResult initialResult = pdf::PDFPageMasterExport::run(std::move(initialJob));
+    QVERIFY(initialResult.success);
+    QVERIFY(QFile::exists(outputPath));
+
+    // Unlike the previous test, the output is left in place, so the resuming run overwrites
+    // a pre-existing file instead of creating one.
+    QVERIFY(resetManifestOutputsToPending(manifestPath));
+
+    if (!denyWritesToDirectory(manifestDirPath))
+    {
+        allowWritesToDirectory(manifestDirPath);
+        QSKIP("Directory write permissions are not enforced for this user/platform.");
+    }
+    const DirectoryWriteLock lock(manifestDirPath);
+
+    pdf::PDFDocument resumeSource = buildFilledPage(QRectF(0, 0, 320, 320));
+    pdf::PDFPageMasterExportJob resumeJob;
+    resumeJob.assembledDocuments.push_back({ documentPage(0, resumeSource) });
+    resumeJob.documents.emplace(0, std::move(resumeSource));
+    resumeJob.outputFileNames.push_back(outputPath);
+    resumeJob.overwriteFiles = true;
+    resumeJob.resume = true;
+    resumeJob.manifestPath = manifestPath;
+
+    const pdf::PDFPageMasterExportResult result = pdf::PDFPageMasterExport::run(std::move(resumeJob));
+
+    QVERIFY(!result.success);
+    QVERIFY(result.errorMessage.contains(QStringLiteral("Manifest update failed")));
+
+    // Removing this output would destroy the file it replaced, so it is kept and the
+    // inconsistency is reported instead.
+    QVERIFY(QFile::exists(outputPath));
+    QCOMPARE(readDocument(outputPath).getCatalog()->getPage(0)->getMediaBox().width(), 320.0);
 }
 
 void PageMasterExportTest::resume_skipsAlreadyWrittenOutputs()

@@ -185,7 +185,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A18 | Browser compatibility | Supported browsers | **N/A** | No embedded browser |
 | A19 | OCR product gate | Required for V1 | **N/A — CLI-only** (decided 2026-07-25) | OCR is merged to `master` but V1 ships **CLI-only**: `PdfTool ocr` present; `OcrPlugin.dll` and the bundled sidecar service excluded. `PdfTool ocr` is inert without a user-supplied sidecar. **Enforced (MIC-343):** `OcrPlugin` is gated behind `-DPDF4QT_PLUGIN_OCR` (default ON for dev builds, explicitly `OFF` in `WindowsInstall.yml`/`LinuxInstall.yml`/the Flatpak manifest); the WIX component that had unconditionally bundled `OcrPlugin.dll` into the MSI is now gated the same way. `PDF4QT_BUNDLE_OCR_SERVICE` defaults `OFF`. `scripts/smoke-test-install.ps1` fails the scan if `OcrPlugin.dll` is found in an installed tree, closing the drift the plugin/service inclusion previously had no assertion against |
 | A20 | Fuzz regression | Weekly fuzz CI | **Fail — fix landed, re-run pending** | `fuzz.yml` fixed (single `permissions:`) and now executing. [Run 30803378370](https://github.com/mberrys/Frisket-pdf/actions/runs/30803378370) failed with two real JBIG2 findings — see R-003. Both fixed in `pdfjbig2decoder.cpp`; flip to Pass when a re-run is green (MIC-326) |
-| A23 | Manifest rollback coverage | Failure path is tested, not just implemented | **Fail** (this revision) | `pdfpagemasterexport.cpp:590-592` removes the PDF when manifest persist fails, but no test forces that failure. R-007's stated verification cites success-path tests only — MIC-335 |
+| A23 | Manifest rollback coverage | Failure path is tested, not just implemented | **Pass** (2026-08-04) | `UnitTests/tst_pagemasterexporttest.cpp` — `manifest_persistFailure_removesNewOutput` and `manifest_persistFailure_keepsOverwrittenOutput` force a real manifest-persist failure (resume run against a manifest in a write-denied directory) and assert both rollback branches. Skipped, not silently passed, where directory permissions are unenforceable (Windows, root) — MIC-335 |
 
 ---
 
@@ -213,11 +213,11 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 | ID | Impact | Affected users | Reproduction | Root cause | Fix / mitigation | Verification | Owner |
 |----|--------|----------------|--------------|------------|------------------|--------------|-------|
-| **R-007** | Resume batch after manifest failure | PageMaster power users | Disk full during manifest write | Was: PDF written, manifest stale | **Fixed:** remove PDF on manifest failure (`Pdf4QtLibCore/sources/pdfpagemasterexport.cpp:590-592`) | **Untested.** The cited "existing manifest tests" (`manifest_persistedWithWrittenStatuses`, `resume_skipsAlreadyWrittenOutputs`, `resume_mismatchedManifestStartsFreshBatch`) are all success-path; nothing forces a manifest-persist failure. Test tracked in MIC-335 | Core |
+| **R-007** | Resume batch after manifest failure | PageMaster power users | Disk full during manifest write | Was: PDF written, manifest stale | **Fixed:** remove a PDF this run created when manifest persist fails; keep it (and report the inconsistency) when the write had replaced a pre-existing file, since removing it would destroy user data | **Tested (2026-08-04).** Both branches covered by `manifest_persistFailure_removesNewOutput` and `manifest_persistFailure_keepsOverwrittenOutput` in `UnitTests/tst_pagemasterexporttest.cpp` — MIC-335 | Core |
 | **R-008** | Sentry crash minidumps can contain PDF content and file paths | Opt-in telemetry users | Crash with `SENTRY_DSN` set | Crashpad captures thread stacks and referenced heap memory out-of-process. A crash in the parser or content processor therefore has document bytes live in the dump. `before_send` cannot filter this — it applies to events, not the minidump upload | **Disclosure, not enforcement.** `SENTRY_DSN` is unset by default and must stay unset when handling confidential documents. Do not restate "no PDF content by design" — nothing implements it | `PdfTool sentry-verify`; confirm `SENTRY_DSN` unset in shipped configs | Release |
 | **R-009** | Theme/scheme requires restart | All GUI users | Change color scheme in settings | Settings read only at startup | Document in release notes | Manual | UX |
 | **R-010** | OCR sidecar supply chain | OCR users | Point `FRISKET_OCR_SIDECAR` at unknown binary | External Python/PyInstaller bundle | Ship only signed/bundled sidecar; document env var | OCR README | Release |
-| **R-011** | README links upstream releases | New users | Read install section | Fork branding drift | Update README install URLs to Frisket releases | README review | Docs |
+| ~~R-011~~ | ~~README links upstream releases~~ | — | — | Fork branding drift | **Resolved.** Every install link in `README.md` points at `mberrys/Frisket-pdf/releases`; the only upstream link left is the PDF4QT attribution in the License section, which is correct and stays | README review 2026-08-04 | Docs |
 
 ### Low
 
@@ -236,6 +236,13 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 ---
 
 ## 4. Implemented changes (this audit)
+
+### 2026-08-04
+
+| Change | File | Rationale |
+|--------|------|-----------|
+| Cover both manifest-rollback branches with tests | `UnitTests/tst_pagemasterexporttest.cpp` | A23 / R-007 / MIC-335 — the rollback was implemented but no test forced a manifest-persist failure |
+| Mark A23 Pass, R-007 tested, R-011 resolved | this file | R-011 was already fixed in `README.md` and had gone stale in the register |
 
 ### 2026-08-03 fuzz findings
 
@@ -271,7 +278,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 
 | Change | File | Rationale |
 |--------|------|-----------|
-| Roll back written PDF when batch manifest persist fails | `Pdf4QtLibCore/sources/pdfpagemasterexport.cpp` | Prevents resume/state inconsistency (R-007) — **untested, see A23** |
+| Roll back written PDF when batch manifest persist fails | `Pdf4QtLibCore/sources/pdfpagemasterexport.cpp` | Prevents resume/state inconsistency (R-007) — tested as of 2026-08-04, see A23 |
 | Disable Sentry default PII | `pdfsentry.cpp` / docs | Confirmed desktop 0.15.x has no PII setter (NX-only); default remains off (R-008) |
 | Set preflight `QProcess` working directory to app bundle dir | `frisketpreflightplugin.cpp` | Predictable sidecar resolution |
 
