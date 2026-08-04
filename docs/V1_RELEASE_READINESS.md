@@ -7,21 +7,22 @@ Platforms: **Windows and Linux** (macOS is not a V1 platform — see `docs/PLATF
 
 ## Executive recommendation
 
-**Not ready — one launch-blocking gate is red.** The installer gates have landed green;
-the fuzz gate came back with two real findings in the JBIG2 decoder. R-003 / A20 stays
-blocking until `fuzz.yml` is green on `master`.
+**Ready for product-owner sign-off (step 5).** Every launch gate is green on `master`.
+The fuzz gate — the last one outstanding — returned two real JBIG2 findings. The first fix
+(PR #63) closed the overflow but bounded only composited pixels, which the pinned timeout
+seed never reached; PR #65 replaced it with the two-budget `accountDecodeWork` and added a
+regression corpus. The gate is green on the commit containing both.
 
 | Gate | Status | Evidence (2026-08-03) |
 |------|--------|------------------------|
 | `ci.yml` build + `ctest` | **Pass** | [Run 30792705447](https://github.com/mberrys/Frisket-pdf/actions/runs/30792705447) on `master` |
-| Fuzz on `master` (MIC-326) | **Fail** | [Run 30803378370](https://github.com/mberrys/Frisket-pdf/actions/runs/30803378370) — exit 70: UBSan signed-integer overflow in `pdfjbig2decoder.cpp` + a >1200 s libFuzzer timeout in `fuzz_images`. See §3 R-003 |
+| Fuzz on `master` (MIC-326) | **Pass** | [Run 30937285025](https://github.com/mberrys/Frisket-pdf/actions/runs/30937285025) — green on `9ed6a8e2` at the full 600 s/target budget. That commit contains both PR #63 (overflow + first budget) and PR #65 (`accountDecodeWork` + regression corpus), which together close the two findings from [run 30803378370](https://github.com/mberrys/Frisket-pdf/actions/runs/30803378370) |
 | Windows MSI smoke (MIC-301 / MIC-327) | **Pass** | [Run 30792705392](https://github.com/mberrys/Frisket-pdf/actions/runs/30792705392) — green after the WiX ICU/harvest fixes (`7127f65`, `29b553f`) |
 | Linux AppImage smoke (MIC-301) | **Pass** | [Run 30787629154](https://github.com/mberrys/Frisket-pdf/actions/runs/30787629154) with `scripts/smoke-test-appimage.sh` |
 | Overprint disclosure (MIC-330) | **Pass** | `overprintDisclosureText()` always shown; README + runbook R-002; `tst_preflightplugintest.cpp` |
 | Unsigned installer disclosure (MIC-342) | **Pass** | README Install section + runbook R-016 + `SHA256SUMS.txt` via `CreateReleaseDraft.yml` |
 
-This recommendation returns to **Ready for product-owner sign-off (step 5)** once the fuzz
-gate is green on `master`.
+No launch-blocking gate remains open. The next step is the owner review in §8.
 
 **V1 / 1.0 ships unsigned** (reaffirmed 2026-08-02). Authenticode / DigiCert / `SIGN_MSI` are post-V1 / paid only ([MIC-345](https://linear.app/mbx2/issue/MIC-345)).
 
@@ -54,7 +55,7 @@ status must be re-derived rather than inherited from this document.
 | ID | Risk | Status | Linear | Mitigation required |
 |----|------|--------|--------|---------------------|
 | ~~R-000~~ | ~~Preflight report schema contract broken on `master`~~ | **Struck 2026-07-25** | — | Not a defect. Engine and validator are both at schema 3 on `master` |
-| **R-003** | JBIG2 decoder: signed-integer overflow + unbounded decode (DoS) | **Blocking — fix landed, re-run pending** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Fuzz CI now runs and found two real defects on the first green-workflow run. Both fixed in `pdfjbig2decoder.cpp` (see §3 R-003 and §4). Close MIC-326 when `fuzz.yml` is green on `master` |
+| ~~R-003~~ | ~~JBIG2 decoder: signed-integer overflow + unbounded decode (DoS)~~ | **Pass 2026-08-04** | [MIC-326](https://linear.app/mbx2/issue/MIC-326) | Fuzz CI now runs and found two real defects on the first workflow run that executed. Both fixed in `pdfjbig2decoder.cpp` (PR #63, completed by PR #65; see §3 R-003 and §4). [Run 30937285025](https://github.com/mberrys/Frisket-pdf/actions/runs/30937285025) is green on `master` at the full budget — MIC-326 can be closed |
 | ~~R-001~~ | ~~MIC-301 — installer / clean-machine validation~~ | **Pass 2026-08-03** | [MIC-301](https://linear.app/mbx2/issue/MIC-301), [MIC-327](https://linear.app/mbx2/issue/MIC-327) | Windows: `Invoke-MsiSmokeTest.ps1` in `WindowsInstall.yml` — [Run 30792705392](https://github.com/mberrys/Frisket-pdf/actions/runs/30792705392) green. Linux: `smoke-test-appimage.sh` in `LinuxInstall.yml` — [Run 30787629154](https://github.com/mberrys/Frisket-pdf/actions/runs/30787629154) green. `.deb` remains out of scope (broken; not on releases) |
 | ~~R-016~~ | ~~V1 MSI ships unsigned; no certificate held~~ | **Not a V1 gate — reaffirmed 2026-08-02** | [MIC-342](https://linear.app/mbx2/issue/MIC-342) disclosure · [MIC-345](https://linear.app/mbx2/issue/MIC-345) procurement (post-V1) | **Ship unsigned for 1.0.** Signing never blocks launch. Disclosure (SmartScreen + `SHA256SUMS.txt`) is a marketing/docs obligation in **V1 release documentation**, not an engineering gate. Procurement stays in **Commercial / paid distribution (post-V1)** |
 | **R-002** | MIC-320 — overprint not simulated in standard page rendering | **Accepted — mitigation complete** | [MIC-330](https://linear.app/mbx2/issue/MIC-330) | Documented limitation + in-app disclosure. **Trigger corrected:** the report panel now shows the general "page view does not simulate overprint" notice unconditionally once a report is loaded, with an additional specific warning appended only when a `white-overprint` finding is present — see §3. Deferral of MIC-320 is now recorded in Linear (project description + MIC-306), not only here |
@@ -184,7 +185,7 @@ Logging: stderr/stdout for PdfTool; no centralized log shipping in product
 | A17 | CSP / CORS / cookies | Web security headers | **N/A** | No web app |
 | A18 | Browser compatibility | Supported browsers | **N/A** | No embedded browser |
 | A19 | OCR product gate | Required for V1 | **N/A — CLI-only** (decided 2026-07-25) | OCR is merged to `master` but V1 ships **CLI-only**: `PdfTool ocr` present; `OcrPlugin.dll` and the bundled sidecar service excluded. `PdfTool ocr` is inert without a user-supplied sidecar. **Enforced (MIC-343):** `OcrPlugin` is gated behind `-DPDF4QT_PLUGIN_OCR` (default ON for dev builds, explicitly `OFF` in `WindowsInstall.yml`/`LinuxInstall.yml`/the Flatpak manifest); the WIX component that had unconditionally bundled `OcrPlugin.dll` into the MSI is now gated the same way. `PDF4QT_BUNDLE_OCR_SERVICE` defaults `OFF`. `scripts/smoke-test-install.ps1` fails the scan if `OcrPlugin.dll` is found in an installed tree, closing the drift the plugin/service inclusion previously had no assertion against |
-| A20 | Fuzz regression | Weekly fuzz CI | **Fail — fix landed, re-run pending** | `fuzz.yml` fixed (single `permissions:`) and now executing. [Run 30803378370](https://github.com/mberrys/Frisket-pdf/actions/runs/30803378370) failed with two real JBIG2 findings — see R-003. Both fixed in `pdfjbig2decoder.cpp`; flip to Pass when a re-run is green (MIC-326) |
+| A20 | Fuzz regression | Weekly fuzz CI | **Pass** (2026-08-04) | `fuzz.yml` fixed (single `permissions:`) and executing. [Run 30803378370](https://github.com/mberrys/Frisket-pdf/actions/runs/30803378370) failed with two real JBIG2 findings (see R-003); both fixed in `pdfjbig2decoder.cpp`, and [run 30937285025](https://github.com/mberrys/Frisket-pdf/actions/runs/30937285025) is green on `master` at the full 600 s/target budget (MIC-326) |
 | A23 | Manifest rollback coverage | Failure path is tested, not just implemented | **Pass** (2026-08-04) | `UnitTests/tst_pagemasterexporttest.cpp` — `manifest_persistFailure_removesNewOutput` and `manifest_persistFailure_keepsOverwrittenOutput` force a real manifest-persist failure (resume run against a manifest in a write-denied directory) and assert both rollback branches. Skipped, not silently passed, where directory permissions are unenforceable (Windows, root) — MIC-335 |
 
 ---
@@ -243,6 +244,7 @@ Sorted by severity. **Owner** defaults to release engineering unless noted.
 |--------|------|-----------|
 | Cover both manifest-rollback branches with tests | `UnitTests/tst_pagemasterexporttest.cpp` | A23 / R-007 / MIC-335 — the rollback was implemented but no test forced a manifest-persist failure |
 | Mark A23 Pass, R-007 tested, R-011 resolved | this file | R-011 was already fixed in `README.md` and had gone stale in the register |
+| Flip A20 / R-003 to Pass; restate the executive recommendation | this file | Full-budget fuzz run is green on `master`; no launch gate remains open |
 
 ### 2026-08-03 fuzz findings
 
