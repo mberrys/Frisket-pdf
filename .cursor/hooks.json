@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-guard-bash.sh"
+      }
+    ],
+    "preToolUse": [
+      {
+        "matcher": "Write|StrReplace",
+        "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-guard-write.sh",
+        "failClosed": false
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-format-cpp.sh"
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "python scripts/hooks/run-bash.py scripts/hooks/session-policy.sh"
+      }
+    ],
+    "stop": [
+      {
+        "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-stop-self-review.sh"
+      }
+    ]
+  }
+}
