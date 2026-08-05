@@ -67,13 +67,15 @@ sudo apt-get install -y --no-install-recommends \
     libspeechd-dev \
     flex \
     bison \
-    perl
+    perl \
+    clang-tidy-18 \
+    clang-tools-18
 
 log "Bootstrapping vcpkg at ${VCPKG_ROOT}..."
 if [[ ! -x "${VCPKG_ROOT}/vcpkg" ]]; then
     sudo mkdir -p "$(dirname "${VCPKG_ROOT}")"
     if [[ ! -d "${VCPKG_ROOT}/.git" ]]; then
-        sudo git clone --depth=1 https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}"
+        sudo git clone https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}"
     fi
     sudo chown -R "$(id -un):$(id -gn)" "${VCPKG_ROOT}"
     (cd "${VCPKG_ROOT}" && ./bootstrap-vcpkg.sh -disableMetrics)
@@ -120,7 +122,8 @@ cmake -B "${BUILD_DIR}" -S "${REPO_ROOT}" -G Ninja \
     -DVCPKG_INSTALLED_DIR="${VCPKG_INSTALLED_DIR}" \
     -DVCPKG_MANIFEST_INSTALL=OFF \
     -DCMAKE_BUILD_TYPE=Release \
-    -DPDF4QT_QT_ROOT="${PDF4QT_QT_ROOT}"
+    -DPDF4QT_QT_ROOT="${PDF4QT_QT_ROOT}" \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 log "Writing ~/.bashrc Frisket dev block..."
 BASHRC="${HOME}/.bashrc"
