@@ -1,0 +1,50 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c, c++]
+
+  - repo: local
+    hooks:
+      - id: forbid-secret-files
+        name: forbid secret-bearing files (BSP-001)
+        entry: python scripts/hooks/run-bash.py scripts/hooks/forbid-secret-files.sh
+        language: system
+        pass_filenames: false
+
+      - id: prod-data-guard
+        name: production-data guard advisory (BSP-003)
+        entry: python scripts/hooks/run-bash.py scripts/hooks/prod-data-guard.sh
+        language: system
+        pass_filenames: false
+
+      - id: cmake-discipline
+        name: CMake discipline (BSP-005)
+        entry: python scripts/hooks/run-bash.py scripts/hooks/cmake-discipline.sh
+        language: system
+        pass_filenames: false
+
+      - id: clang-tidy
+        name: clang-tidy staged TUs (BSP-005)
+        entry: python scripts/hooks/run-bash.py scripts/hooks/clang-tidy-staged.sh
+        language: system
+        types_or: [c, c++]
+
+      - id: commit-msg-conventional
+        name: Conventional Commits (BSP-002)
+        entry: python scripts/hooks/run-bash.py scripts/hooks/commit-msg-conventional.sh
+        language: system
+        stages: [commit-msg]
+
+      - id: pre-push-policy
+        name: pre-push policy (BSP-002, BSP-006)
+        entry: python scripts/hooks/run-bash.py scripts/hooks/pre-push.sh
+        language: system
+        stages: [pre-push]
+        pass_filenames: false

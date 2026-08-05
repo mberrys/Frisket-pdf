@@ -1,0 +1,55 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-guard-bash.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-guard-write.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-format-cpp.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/hooks/run-bash.py scripts/hooks/session-policy.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/hooks/run-bash.py scripts/hooks/cc-stop-self-review.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
