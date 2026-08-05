@@ -41,16 +41,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
   # 1.7 — direct push and force-push guard
   if [[ "$remote_ref" =~ $protected ]]; then
-    current=$(git rev-parse --abbrev-ref HEAD)
-    if [[ "$current" == "main" || "$current" == "master" || "$current" == "stable" ]]; then
-      echo "BSP-002 §3.3 — direct push to $remote_ref refused. Open a PR from a feature branch." >&2
-      exit 1
-    fi
-    if [[ "$remote_sha" != "0000000000000000000000000000000000000000" ]] \
-       && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
-      echo "BSP-002 §3.3 — non-fast-forward (force) push to $remote_ref refused." >&2
-      exit 1
-    fi
+    echo "BSP-002 §3.3 — direct push to $remote_ref refused. Open a PR from a feature branch." >&2
+    exit 1
   fi
 
   [[ "$local_ref" == "0000000000000000000000000000000000000000" ]] && continue
