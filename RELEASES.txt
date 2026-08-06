@@ -6,10 +6,15 @@ CURRENT:
  - Known limitation: changing the color scheme requires an application restart (R-009).
  - Frisket V1 supports Windows and Linux. macOS is not a supported platform for this
    release; no macOS release assets are published.
+ - Issue #412: Change default Note author name (and please do not use the system name)
+ - Issue #409: [idea] choose color of Redact Rectangle
+ - Issue #408: [idea] Make XYZ shortcut refer to outline item when selected
  - Issue #398: Enhancing Speech Support: Locale Addons and System Voice Detection
+ - Issue #397: No Audio Output When Using Text-to-Speech
  - Issue #395: [idea] white crosshair easier to see in dark mode
  - Issue #299: PDF element display error
  - Issue #258: feat: Insert page number
+ - Issue #238: Pdf Editor: "Edit page content" makes image disappear
  - Issue #231: PDF4Qt Diff does not open files on Linux
  - Issue #169: Option to render text as text when using Qpainter backend
 
