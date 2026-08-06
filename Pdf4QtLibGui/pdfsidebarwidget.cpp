@@ -409,7 +409,7 @@ void PDFSidebarWidget::selectPage(Page page)
         {
             QMessageBox::critical(this, tr("Error"), tr("Speech engine failed to initialize. Reported error: %1").arg(engineErrorMessage));
         }
-        else
+        else if (!m_textToSpeech || m_textToSpeech->areEngineListsInitialized())
         {
             QMessageBox::critical(this, tr("Error"), tr("The speech feature is available, but its options are not properly set. Please check the speech settings in the options dialog."));
         }

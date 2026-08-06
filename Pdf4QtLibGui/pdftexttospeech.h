@@ -75,6 +75,9 @@ public:
     /// occured, then empty string is returned.
     const QString& getEngineErrorMessage() const { return m_engineErrorMessage; }
 
+    /// Returns true if locale/voice lists have been populated from the engine.
+    bool areEngineListsInitialized() const { return m_engineListsInitialized; }
+
     /// Sets active document to text to speech engine
     void setDocument(const pdf::PDFModifiedDocument& document);
 
