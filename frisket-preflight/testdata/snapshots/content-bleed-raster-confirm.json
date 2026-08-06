@@ -6,7 +6,7 @@
         },
         {
             "id": "content-bleed",
-            "status": "failed"
+            "status": "warning"
         }
     ],
     "errors": [
