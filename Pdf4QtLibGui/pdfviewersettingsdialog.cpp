@@ -31,6 +31,7 @@
 
 #include <QAction>
 #include <QLineEdit>
+#include <QLocale>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QListWidgetItem>
@@ -42,6 +43,26 @@
 
 namespace pdfviewer
 {
+
+namespace
+{
+// Must match the same literal used in PDFSidebarWidget::createOutlineActions,
+// which tags its outline-item actions with this property so their entries in
+// this dialog's shortcuts table can be prefixed by category (e.g. "Outline: XYZ")
+// without changing the action's own text, which is what shows up in its context menu.
+constexpr const char* ACTION_CATEGORY_PROPERTY = "pdf4qtActionCategory";
+}
+
+QString PDFViewerSettingsDialog::getActionShortcutDisplayText(const QAction* action)
+{
+    const QVariant category = action->property(ACTION_CATEGORY_PROPERTY);
+    if (category.isValid())
+    {
+        return tr("%1: %2").arg(category.toString(), action->text());
+    }
+
+    return action->text();
+}
 
 class SettingsDelegate : public QStyledItemDelegate
 {
@@ -139,6 +160,11 @@ PDFViewerSettingsDialog::PDFViewerSettingsDialog(const PDFViewerSettings::Settin
     ui->cmsColorAdaptationXYZComboBox->addItem(tr("CAT97 matrix"), int (pdf::PDFCMSSettings::ColorAdaptationXYZ::CAT97));
     ui->cmsColorAdaptationXYZComboBox->addItem(tr("CAT02 matrix"), int (pdf::PDFCMSSettings::ColorAdaptationXYZ::CAT02));
     ui->cmsColorAdaptationXYZComboBox->addItem(tr("Bradford method"), int (pdf::PDFCMSSettings::ColorAdaptationXYZ::Bradford));
+
+    // Author identity
+    ui->authorNameModeComboBox->addItem(tr("Anonymous (do not disclose the user name)"), static_cast<int>(pdf::PDFAuthorSettings::AuthorNameMode::Anonymous));
+    ui->authorNameModeComboBox->addItem(tr("System user name"), static_cast<int>(pdf::PDFAuthorSettings::AuthorNameMode::SystemUserName));
+    ui->authorNameModeComboBox->addItem(tr("Custom name"), static_cast<int>(pdf::PDFAuthorSettings::AuthorNameMode::CustomName));
 
     // UI Color Schemes
     ui->colorSchemeCombo->addItem(tr("Automatic (or via command line)"), static_cast<int>(PDFViewerSettings::AutoScheme));
@@ -331,6 +357,9 @@ void PDFViewerSettingsDialog::loadData()
     // Security
     ui->allowLaunchCheckBox->setChecked(m_settings.m_allowLaunchApplications);
     ui->allowRunURICheckBox->setChecked(m_settings.m_allowLaunchURI);
+    ui->authorNameModeComboBox->setCurrentIndex(ui->authorNameModeComboBox->findData(static_cast<int>(m_settings.m_authorNameMode)));
+    ui->customAuthorNameEdit->setText(m_settings.m_customAuthorName);
+    updateAuthorSettingsUI();
 
     // UI
     ui->maximumRecentFileCountEdit->setValue(m_otherSettings.maximumRecentFileCount);
@@ -409,11 +438,49 @@ void PDFViewerSettingsDialog::loadData()
     ui->sigmoidFunctionSlopeEdit->setValue(m_cmsSettings.sigmoidSlopeFactor);
     ui->bitonalThresholdEdit->setValue(m_cmsSettings.bitonalThreshold);
 
-    // Text-to-speech
-    ui->speechEnginesComboBox->setCurrentIndex(ui->speechEnginesComboBox->findData(m_settings.m_speechEngine));
+    // Text-to-speech. Jakub Melka: engine/locale/voice can be unset (for example, when the
+    // application is started for the first time) - in that case we select the default values,
+    // so the speech works without manual configuration by the user.
+    int speechEngineIndex = ui->speechEnginesComboBox->findData(m_settings.m_speechEngine);
+    if (speechEngineIndex == -1 && ui->speechEnginesComboBox->count() > 0)
+    {
+        speechEngineIndex = 0;
+    }
+    if (speechEngineIndex != -1)
+    {
+        m_settings.m_speechEngine = ui->speechEnginesComboBox->itemData(speechEngineIndex).toString();
+    }
+    ui->speechEnginesComboBox->setCurrentIndex(speechEngineIndex);
     setSpeechEngine(m_settings.m_speechEngine, m_settings.m_speechLocale);
-    ui->speechLocaleComboBox->setCurrentIndex(ui->speechLocaleComboBox->findData(m_settings.m_speechLocale));
-    ui->speechVoiceComboBox->setCurrentIndex(ui->speechVoiceComboBox->findData(m_settings.m_speechVoice));
+
+    int speechLocaleIndex = ui->speechLocaleComboBox->findData(m_settings.m_speechLocale);
+    if (speechLocaleIndex == -1)
+    {
+        speechLocaleIndex = ui->speechLocaleComboBox->findData(QLocale::system().name());
+    }
+    if (speechLocaleIndex == -1 && ui->speechLocaleComboBox->count() > 0)
+    {
+        speechLocaleIndex = 0;
+    }
+    if (speechLocaleIndex != -1)
+    {
+        m_settings.m_speechLocale = ui->speechLocaleComboBox->itemData(speechLocaleIndex).toString();
+
+        // Jakub Melka: voices are filled for the old locale, we must update them
+        setSpeechEngine(m_settings.m_speechEngine, m_settings.m_speechLocale);
+    }
+    ui->speechLocaleComboBox->setCurrentIndex(speechLocaleIndex);
+
+    int speechVoiceIndex = ui->speechVoiceComboBox->findData(m_settings.m_speechVoice);
+    if (speechVoiceIndex == -1 && ui->speechVoiceComboBox->count() > 0)
+    {
+        speechVoiceIndex = 0;
+    }
+    if (speechVoiceIndex != -1)
+    {
+        m_settings.m_speechVoice = ui->speechVoiceComboBox->itemData(speechVoiceIndex).toString();
+    }
+    ui->speechVoiceComboBox->setCurrentIndex(speechVoiceIndex);
     ui->speechRateEdit->setValue(m_settings.m_speechRate);
     ui->speechPitchEdit->setValue(m_settings.m_speechPitch);
     ui->speechVolumeEdit->setValue(m_settings.m_speechVolume);
@@ -513,6 +580,15 @@ void PDFViewerSettingsDialog::saveData()
     else if (sender == ui->allowRunURICheckBox)
     {
         m_settings.m_allowLaunchURI = ui->allowRunURICheckBox->isChecked();
+    }
+    else if (sender == ui->authorNameModeComboBox)
+    {
+        m_settings.m_authorNameMode = static_cast<pdf::PDFAuthorSettings::AuthorNameMode>(ui->authorNameModeComboBox->currentData().toInt());
+        updateAuthorSettingsUI();
+    }
+    else if (sender == ui->customAuthorNameEdit)
+    {
+        m_settings.m_customAuthorName = ui->customAuthorNameEdit->text();
     }
     else if (sender == ui->developerModeCheckBox)
     {
@@ -775,7 +851,7 @@ void PDFViewerSettingsDialog::loadActionShortcutsTable()
         QAction* action = m_actions[i];
 
         // Action name and icon
-        QTableWidgetItem* actionItem = new QTableWidgetItem(action->icon(), action->text());
+        QTableWidgetItem* actionItem = new QTableWidgetItem(action->icon(), getActionShortcutDisplayText(action));
         actionItem->setFlags(Qt::ItemIsEnabled);
         ui->shortcutsTableWidget->setItem(i, 0, actionItem);
 
@@ -796,7 +872,7 @@ bool PDFViewerSettingsDialog::saveActionShortcutsTable()
             QKeySequence sequence = QKeySequence::fromString(shortcut, QKeySequence::NativeText);
             if (sequence.toString(QKeySequence::PortableText).isEmpty())
             {
-                QMessageBox::critical(this, tr("Error"), tr("Shortcut '%1' is invalid for action %2.").arg(shortcut, m_actions[i]->text()));
+                QMessageBox::critical(this, tr("Error"), tr("Shortcut '%1' is invalid for action %2.").arg(shortcut, getActionShortcutDisplayText(m_actions[i])));
                 return false;
             }
         }
@@ -902,6 +978,27 @@ void PDFViewerSettingsDialog::setSpeechEngine(const QString& engine, const QStri
         ui->speechVoiceComboBox->addItem(QString("%1 (%2, %3)").arg(voice.name(), QVoice::genderName(voice.gender()), QVoice::ageName(voice.age())), voice.name());
     }
     ui->speechVoiceComboBox->setUpdatesEnabled(true);
+}
+
+void PDFViewerSettingsDialog::updateAuthorSettingsUI()
+{
+    const bool isCustomName = m_settings.m_authorNameMode == pdf::PDFAuthorSettings::AuthorNameMode::CustomName;
+
+    ui->customAuthorNameLabel->setEnabled(isCustomName);
+    ui->customAuthorNameEdit->setEnabled(isCustomName);
+
+    // Show the author name, which will be really used, so the user can see,
+    // what will be written into the document
+    switch (m_settings.m_authorNameMode)
+    {
+        case pdf::PDFAuthorSettings::AuthorNameMode::SystemUserName:
+            ui->customAuthorNameEdit->setPlaceholderText(pdf::PDFSysUtils::getUserName());
+            break;
+
+        default:
+            ui->customAuthorNameEdit->setPlaceholderText(pdf::PDFAuthorSettings::getAnonymousAuthorName());
+            break;
+    }
 }
 
 bool PDFViewerSettingsDialog::canCloseDialog()
