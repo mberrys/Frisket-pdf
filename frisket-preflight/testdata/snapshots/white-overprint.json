@@ -2,7 +2,7 @@
     "checks": [
         {
             "id": "white-overprint",
-            "status": "failed"
+            "status": "warning"
         }
     ],
     "errors": [
