@@ -6,7 +6,7 @@
         },
         {
             "id": "image-resolution",
-            "status": "failed"
+            "status": "warning"
         },
         {
             "id": "bleed",
